@@ -1,3 +1,10 @@
+"""
+TODO:
+    Create CustomGrid Class for handling all grid stuff.
+    Add Saving/Loading an offer to/from a file.
+    Add Dialog for uploading selected objects to a database.
+    Add Windows to handle loading objects from a database.
+"""
 import wx
 import wx.adv
 import wx.dataview as dv
@@ -98,15 +105,17 @@ class Panel(wx.Panel):
         #------------------------------------------------------------------------------------------
         # Simplebook - gridpage
         #------------------------------------------------------------------------------------------
-        self.selected_product = Link(Link.PRODUCT, [0, 0, 0])
+        self.selected_product = None
         self.gp_namelabel = wx.StaticText(gridpage, label=GP_NAMELABEL)
         self.gp_predefs_label = wx.StaticText(gridpage, label=GP_PREDEFS_LABEL)
         self.gp_materials_label = wx.StaticText(gridpage, label=GP_MATERIALS_LABEL)
         self.gp_products_label = wx.StaticText(gridpage, label=GP_PRODUCTS_LABEL)
-        self.gp_parts_label = wx.StaticText(
-            gridpage,
-            label=GP_PARTS_LABEL.format(self.data.get(self.selected_product).code)
-        )
+        try:
+            part_label = self.data.get(self.selected_product).code
+        except (IndexError, AttributeError):
+            part_label = ""
+
+        self.gp_parts_label = wx.StaticText(gridpage,label=GP_PARTS_LABEL.format(part_label))
         self.gp_namectrl = wx.TextCtrl(gridpage, size=GP_NAMECTRL_SIZE)
 
         self.Bind(wx.EVT_TEXT, self.on_gp_namectrl_text, self.gp_namectrl)
@@ -118,9 +127,21 @@ class Panel(wx.Panel):
         self.grid_predefs = self.init_grid(gridpage, Link(Link.PREDEFS, [0, 0]))
         self.grid_materials = self.init_grid(gridpage, Link(Link.MATERIALS, [0, 0]))
         self.grid_products = self.init_grid(gridpage, Link(Link.PRODUCTS, [0, 0]))
-        self.grid_parts = self.init_grid(gridpage, Link(Link.PARTS, [i for i in self.selected_product.n]))
+        self.grid_parts = self.init_grid(gridpage, None)
 
         self.Bind(wx.grid.EVT_GRID_CELL_LEFT_DCLICK, self.on_grid_cell_left_dclick)
+        self.Bind(wx.grid.EVT_GRID_SELECT_CELL, self.on_grid_product_selected_cell, self.grid_products)
+
+        self.Bind(wx.grid.EVT_GRID_TABBING, self.on_grid_predefs_tab, self.grid_predefs)
+        self.Bind(wx.grid.EVT_GRID_TABBING, self.on_grid_materials_tab, self.grid_materials)
+        self.Bind(wx.grid.EVT_GRID_TABBING, self.on_grid_products_tab, self.grid_products)
+        self.Bind(wx.grid.EVT_GRID_TABBING, self.on_grid_parts_tab, self.grid_parts)
+
+        self.Bind(wx.grid.EVT_GRID_CELL_CHANGED, self.on_grid_predefs_cell_changed, self.grid_predefs)
+        self.Bind(wx.grid.EVT_GRID_CELL_CHANGED, self.on_grid_materials_cell_changed, self.grid_materials)
+        self.Bind(wx.grid.EVT_GRID_CELL_CHANGED, self.on_grid_products_cell_changed, self.grid_products)
+        self.Bind(wx.grid.EVT_GRID_CELL_CHANGED, self.on_grid_parts_cell_changed, self.grid_parts)
+
 
         gp_sizer = wx.BoxSizer(wx.VERTICAL)
         gp_sizer.Add(gp_label_sizer)
@@ -225,12 +246,13 @@ class Panel(wx.Panel):
                 print(f"Panel.on_treeitem_activate: Change page to {obj}")
 
                 if link.target == Link.GROUP:
-                    self.update_gridpage_content(obj)
+                    self.update_gridpage_content(link)
 
             elif self.pagesel_link.n != link.n:
                 # Change content of the page to obj.
                 self.pagesel_link = link
-                self.update_gridpage_content(obj)
+                if link.target == Link.GROUP:
+                    self.update_gridpage_content(link)
 
             else:
                 print(f"Panel.on_treeitem_activate: Page already activated {obj}")
@@ -272,15 +294,21 @@ class Panel(wx.Panel):
         else:
             print(f"Panel.on_gp_namectrl_text: Selected page '{self.pagesel_link}' is not a grouppage")
 
-    def update_gridpage_content(self, obj):
+    def update_gridpage_content(self, link):
         """Update the content of the gridpage.
 
         Args:
-            obj (Group): Group with the new data.
+            link (Link): Link to the new Group.
         """
+        obj = self.data.get(link)
+        # self.selected_product = Link(Link.PRODUCT, link.n + [0])
         if isinstance(obj, Group):
             self.gp_namectrl.ChangeValue(obj.name)
             print(f"Panel.on_treeitem_activate: Change page content to {obj}")
+            self.update_grid(Link(Link.PREDEFS, link.n))
+            self.update_grid(Link(Link.MATERIALS, link.n))
+            self.update_grid(Link(Link.PRODUCTS, link.n))
+            self.update_grid(None)
         else:
             print(f"Panel.update_gridpage_content given object '{obj}' is not a Group class.")
 
@@ -295,33 +323,109 @@ class Panel(wx.Panel):
             wx.Grid: The initialized grid object.
         """
         grid = wx.grid.Grid(parent)
-        table = CustomDataTable(self.data.get(link))
+        table = CustomDataTable(self.data.get(link), link)
         grid.SetTable(table, True)
         grid.SetRowLabelSize(0)
         grid.SetMargins(0, 0)
         grid.AutoSizeColumns(False)
         return grid
 
+    def update_grid(self, link):
+        """Update the content of a grid matching the type of obj in the given list.
+
+        Args:
+            objlist (list): A list of Predef|Material|Product|Part objects.
+        """
+        grid = None
+        if link is None:
+            table = CustomDataTable(None, link)
+            self.grid_parts.SetTable(table, True)
+            self.grid_parts.Refresh()
+            return
+        elif link.target == Link.PARTS:
+            grid = self.grid_parts
+        elif link.target == Link.PREDEFS:
+            grid = self.grid_predefs
+        elif link.target == Link.MATERIALS:
+            grid = self.grid_materials
+        elif link.target == Link.PRODUCTS:
+            grid = self.grid_products
+
+        else:
+            raise TypeError(f"Panel.update_grid: No grid exists for link target: {link.tar}")
+
+        array = self.data.get(link)
+        print(f"Panel.update_grid: Update an array with {array}")
+        table = CustomDataTable(array, link)
+        grid.SetTable(table, True)
+        grid.Refresh()
+
     def on_grid_cell_left_dclick(self, evt):
         """Change default behaviour so that left doubleclick enables cell editing."""
-        if self.grid.CanEnableCellControl():
-            self.grid.EnableCellEditControl()
+        if evt.GetEventObject().CanEnableCellControl():
+            evt.GetEventObject().EnableCellEditControl()
+
+    def on_grid_predefs_tab(self, evt):
+        print("Event grid predefs tab")
+    def on_grid_materials_tab(self, evt):
+        print("Event grid materials tab")
+    def on_grid_products_tab(self, evt):
+        print("Event grid products tab")
+    def on_grid_parts_tab(self, evt):
+        print("Event grid parts tab")
+
+    def on_grid_predefs_cell_changed(self, evt):
+        link = Link(Link.PREDEF, self.pagesel_link.n + [evt.GetRow()])
+        grid = self.grid_predefs
+        self.grid_cell_changed(evt, grid, link)
+
+    def on_grid_materials_cell_changed(self, evt):
+        link = Link(Link.MATERIAL, self.pagesel_link.n + [evt.GetRow()])
+        self.grid_cell_changed(evt, self.grid_materials, link)
+
+    def on_grid_products_cell_changed(self, evt):
+        link = Link(Link.PRODUCT, self.pagesel_link.n + [evt.GetRow()])
+        self.grid_cell_changed(evt, self.grid_products, link)
+
+    def on_grid_parts_cell_changed(self, evt):
+        link = Link(Link.PART, self.pagesel_link.n + [evt.GetRow()])
+        self.grid_cell_changed(evt, self.grid_parts, link)
+
+    def grid_cell_changed(self, evt, grid, link):
+        row = evt.GetRow()
+        col = evt.GetCol()
+        value = grid.GetCellValue(row, col)
+        print(f"Panel.grid_cell_changed: col: {col}, link.tar: {link.target}, row: {link.n[-1]}, value: {value}")
+        self.data.set(link, col, value)
+
+    def on_grid_product_selected_cell(self, evt):
+        row = evt.GetRow()
+        n = self.pagesel_link.n + [row]
+        self.selected_product = Link(Link.PRODUCT, [i for i in n])
+        self.update_grid(Link(Link.PARTS, [i for i in n]))
+
+        try:
+            part_label = self.data.get(self.selected_product).code
+        except (IndexError, AttributeError):
+            part_label = ""
+
+        self.gp_parts_label.SetLabel(GP_PARTS_LABEL.format(part_label))
 
 class Link:
     DATA = 0
     OFFERS = 1
     OFFER = 2
     INFO = 3
-    GROUPS = 4
-    GROUP = 5
-    PREDEFS = 6
-    MATERIALS = 7
-    PRODUCTS = 8
-    PARTS = 9
-    PREDEF = 10
-    MATERIAL = 11
-    PRODUCT = 12
-    PART = 13
+    GROUPS = 1000
+    GROUP = 1001
+    PREDEFS = 2000
+    PREDEF = 2001
+    MATERIALS = 2012
+    MATERIAL = 2013
+    PRODUCTS = 2014
+    PRODUCT = 2015
+    PARTS = 2016
+    PART = 2017
 
     def __init__(self, tar, n: list):
         """Link referring to an object in Data class.
@@ -363,13 +467,25 @@ class Link:
         elif self.target == Link.PART:
             return len(self.n) == 4
 
+    def get_new_object(self):
+        if self.target == Link.PREDEF:
+            return Predef()
+        elif self.target == Link.MATERIAL:
+            return Material()
+        elif self.target == Link.PRODUCT:
+            return Product()
+        elif self.target == Link.PART:
+            return Part()
+
 
 class Data:
     def __init__(self) -> None:
         self.offers = []
     
     def get(self, link: Link):
-        if link.target == Link.OFFER:
+        if link is None:
+            return []
+        elif link.target == Link.OFFER:
             return self.offers[link.n[0]]
         elif link.target == Link.GROUP:
             return self.offers[link.n[0]].groups[link.n[1]]
@@ -383,6 +499,14 @@ class Data:
             return self.offers[link.n[0]].groups[link.n[1]].products[link.n[2]]
         elif link.target == Link.PARTS:
             return self.offers[link.n[0]].groups[link.n[1]].products[link.n[2]].parts
+        elif link.target == Link.PREDEF:
+            return self.offers[link.n[0]].groups[link.n[1]].predefs[link.n[2]]
+        elif link.target == Link.MATERIAL:
+            return self.offers[link.n[0]].groups[link.n[1]].materials[link.n[2]]
+        elif link.target == Link.PRODUCT:
+            return self.offers[link.n[0]].groups[link.n[1]].products[link.n[2]]
+        elif link.target == Link.PART:
+            return self.offers[link.n[0]].groups[link.n[1]].products[link.n[2]].parts[link.n[3]]
         elif link.target == Link.DATA:
             return self
         else:
@@ -402,6 +526,32 @@ class Data:
 
         return treelist
 
+    def set(self, link, col, value):
+        """Set a value to a member at col to a object at link.
+
+        Args:
+            link (Link): Link to the object.
+            col (int): Column idx to the member which value is to be changed.
+            value (Any): Value to be changed.
+        """
+        try:
+            obj = self.get(link)
+        except IndexError:
+            obj = link.get_new_object()
+            arraylink = Link(link.target - 1, link.n[:-1])
+            try:
+                self.get(arraylink).append(obj)
+            except IndexError:
+                product_link = Link(Link.PRODUCT, link.n[:-1])
+                self.get(product_link).parts.append(obj)
+
+        if (link.target == Link.PREDEF or 
+            link.target == Link.MATERIAL or 
+            link.target == Link.PRODUCT or 
+            link.target == Link.PART):
+            obj.set(col, value)
+        self.to_print()
+
     def build_test(self):
         self.offers.append(Offer("Tarjous 1"))
         self.offers.append(Offer("Testi tarjous"))
@@ -414,6 +564,25 @@ class Data:
         self.offers[1].groups.append(Group("Two"))
         self.offers[1].groups.append(Group("Three"))
         self.offers[2].groups.append(Group("Kitchen"))
+
+        self.offers[0].groups[0].predefs.append(Predef("ovi", "MELVA16"))
+        self.offers[0].groups[0].predefs.append(Predef("hylly", "MELVA16"))
+    
+    def to_print(self):
+        print("")
+        for offer in self.offers:
+            print(f"offer: {offer.name}")
+            for group in offer.groups:
+                print(f"    group: {group.name}")
+                for predef in group.predefs:
+                    print(f"        predef: {predef.get_data()}")
+                for material in group.materials:
+                    print(f"        material: {material.get_data()}")
+                for product in group.products:
+                    print(f"        product: {product.get_data()}")
+                    for part in product.parts:
+                        print(f"            part: {part.get_data()}")
+        print("")
 
 
 class Offer:
@@ -433,15 +602,15 @@ class Info:
 class Group:
     def __init__(self, name="") -> None:
         self.name = name
-        self.predefs = [Predef()]
-        self.materials = [Material()]
-        self.products = [Product()]
+        self.predefs = []
+        self.materials = []
+        self.products = []
 
 
 class Predef:
-    def __init__(self) -> None:
-        self.part = ""
-        self.material = ""
+    def __init__(self, part="", material="") -> None:
+        self.part = part
+        self.material = material
 
     def get_labels(self) -> list:
         return ['Nimi', 'Materiaalikoodi']
@@ -454,11 +623,17 @@ class Predef:
         
     def get_data(self) -> list:
         return [self.part, self.material]
-        
+    
+    def set(self, col, value):
+        if col == 0:
+            self.part = value
+        elif col == 1:
+            self.material = value
+
 class Material:
-    def __init__(self) -> None:
-        self.code = ""
-        self.description = ""
+    def __init__(self, code="", desc="") -> None:
+        self.code = code
+        self.description = desc
 
     def get_labels(self) -> list:
         return ['Koodi', 'Kuvaus']
@@ -471,11 +646,17 @@ class Material:
         
     def get_data(self) -> list:
         return [self.code, self.description]
+    
+    def set(self, col, value):
+        if col == 0:
+            self.code = value
+        elif col == 1:
+            self.description = value
 
 class Product:
-    def __init__(self) -> None:
-        self.code = ""
-        self.description = ""
+    def __init__(self, code="", desc="") -> None:
+        self.code = code
+        self.description = desc
         self.parts = [Part()]
 
     def get_labels(self) -> list:
@@ -489,10 +670,16 @@ class Product:
         
     def get_data(self) -> list:
         return [self.code, self.description]
+ 
+    def set(self, col, value):
+        if col == 0:
+            self.code = value
+        elif col == 1:
+            self.description = value
 
 class Part:
-    def __init__(self) -> None:
-        self.code = ""
+    def __init__(self, code="") -> None:
+        self.code = code
 
     def get_labels(self) -> list:
         return ['Koodi']
@@ -504,24 +691,44 @@ class Part:
 
     def get_data(self) -> list:
         return [self.code]
+ 
+    def set(self, col, value):
+        if col == 0:
+            self.code = value
 
 
 class CustomDataTable(wx.grid.GridTableBase):
-    def __init__(self, objlist):
+    def __init__(self, objlist, link):
         """Custom table for lists of Predef, Material, Product or Part objects.
 
         Args:
             objlist (list): list with atleast one object.
+            link (Link): Link to the list of objects.
         """
         super().__init__()
-        if isinstance(objlist[0], (Predef, Material, Product, Part)):
-            self.column_labels = objlist[0].get_labels()
-            self.data_types = objlist[0].get_types()
-            self.data = []
+        if link is None:
+            obj = Part()
+        elif link.target == Link.PREDEFS:
+            obj = Predef()
+        elif link.target == Link.MATERIALS:
+            obj = Material()
+        elif link.target == Link.PRODUCTS:
+            obj = Product()
+        elif link.target == Link.PARTS:
+            obj = Part()
+        else:
+            raise TypeError(f"CustomDataTable.init: Invalide Link target {link.target}")
+
+        self.column_labels = obj.get_labels()
+        self.data_types = obj.get_types()
+
+        self.data = []
+        if objlist is not None:
             for n in range(len(objlist)):
                 self.data.append(objlist[n].get_data())
-        else:
-            raise TypeError(f"Tried to create a CustomDataTable for obj: {objlist[0]}")
+        if self.data == [] and link is not None:
+            self.data = [obj.get_data()]
+        print(f"CustomDataTable: data: {self.data}")
 
     def GetNumberRows(self):
         return len(self.data) + 1
@@ -553,6 +760,7 @@ class CustomDataTable(wx.grid.GridTableBase):
                 # Tell the grid a row was added.
                 msg = wx.grid.GridTableMessage(self, wx.grid.GRIDTABLE_NOTIFY_ROWS_APPENDED, 1)
                 self.GetView().ProcessTableMessage(msg)
+
         innerSetValue(row, col, value)
 
     def GetColLabelValue(self, col):
@@ -560,7 +768,31 @@ class CustomDataTable(wx.grid.GridTableBase):
 
     def GetTypeName(self, row, col):
         return self.data_types[col]
+    
+    def Clear(self):
+        rows = len(self.data)
+        msg = wx.grid.GridTableMessage(self, wx.grid.GRIDTABLE_NOTIFY_ROWS_DELETED, rows)
+        self.GetView().ProcessTableMessage(msg)
+        self.data = []
+    
+    def AppendRows(self, numRows=1):
+        for n in range(numRows):
+            self.data.append([''] * self.GetNumberCols())
+        msg = wx.grid.GridTableMessage(self, wx.grid.GRIDTABLE_NOTIFY_ROWS_APPENDED, numRows)
+        self.GetView().ProcessTableMessage(msg)
+        return True
 
+    def DeleteRows(self, pos=0, numRows=1):
+        for n in range(numRows):
+            try:
+                del self.data[pos]
+            except IndexError as e:
+                print(f"CustomTable.DeleteRows: {e}")
+                return False
+        msg = wx.grid.GridTableMessage(self, wx.grid.GRIDTABLE_NOTIFY_ROWS_DELETED, numRows)
+        self.GetView().ProcessTableMessage(msg)
+        print(f"DELETE_ROWS: n: {numRows}")
+        return True
 
 if __name__ == '__main__':
     app = wx.App(useBestVisual=True)
