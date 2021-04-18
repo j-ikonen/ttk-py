@@ -1,14 +1,18 @@
 """
 TODO:
-    Create CustomGrid Class for handling all grid stuff.
+    Implement filling Parts grid on product row selection.
     Add Saving/Loading an offer to/from a file.
     Add Dialog for uploading selected objects to a database.
     Add Windows to handle loading objects from a database.
 """
+
 import wx
 import wx.adv
 import wx.dataview as dv
 import wx.grid
+
+import grid
+import data as dt
 
 
 FRAME_TITLE = "Ttk-py"
@@ -124,24 +128,12 @@ class Panel(wx.Panel):
         gp_label_sizer.Add(self.gp_namelabel, 0, wx.ALL, BORDER)
         gp_label_sizer.Add(self.gp_namectrl, 0, wx.ALL, BORDER)
 
-        self.grid_predefs = self.init_grid(gridpage, Link(Link.PREDEFS, [0, 0]))
-        self.grid_materials = self.init_grid(gridpage, Link(Link.MATERIALS, [0, 0]))
-        self.grid_products = self.init_grid(gridpage, Link(Link.PRODUCTS, [0, 0]))
-        self.grid_parts = self.init_grid(gridpage, None)
+        self.grid_predefs = grid.CustomGrid(gridpage, dt.Predef())
+        self.grid_materials = grid.CustomGrid(gridpage, dt.Material())
+        self.grid_products = grid.CustomGrid(gridpage, dt.Product())
+        self.grid_parts = grid.CustomGrid(gridpage, dt.Part(), None)
 
-        self.Bind(wx.grid.EVT_GRID_CELL_LEFT_DCLICK, self.on_grid_cell_left_dclick)
-        self.Bind(wx.grid.EVT_GRID_SELECT_CELL, self.on_grid_product_selected_cell, self.grid_products)
-
-        self.Bind(wx.grid.EVT_GRID_TABBING, self.on_grid_predefs_tab, self.grid_predefs)
-        self.Bind(wx.grid.EVT_GRID_TABBING, self.on_grid_materials_tab, self.grid_materials)
-        self.Bind(wx.grid.EVT_GRID_TABBING, self.on_grid_products_tab, self.grid_products)
-        self.Bind(wx.grid.EVT_GRID_TABBING, self.on_grid_parts_tab, self.grid_parts)
-
-        self.Bind(wx.grid.EVT_GRID_CELL_CHANGED, self.on_grid_predefs_cell_changed, self.grid_predefs)
-        self.Bind(wx.grid.EVT_GRID_CELL_CHANGED, self.on_grid_materials_cell_changed, self.grid_materials)
-        self.Bind(wx.grid.EVT_GRID_CELL_CHANGED, self.on_grid_products_cell_changed, self.grid_products)
-        self.Bind(wx.grid.EVT_GRID_CELL_CHANGED, self.on_grid_parts_cell_changed, self.grid_parts)
-
+        self.Bind(wx.grid.EVT_GRID_SELECT_CELL, self.on_select_product, self.grid_products)
 
         gp_sizer = wx.BoxSizer(wx.VERTICAL)
         gp_sizer.Add(gp_label_sizer)
@@ -305,111 +297,16 @@ class Panel(wx.Panel):
         if isinstance(obj, Group):
             self.gp_namectrl.ChangeValue(obj.name)
             print(f"Panel.on_treeitem_activate: Change page content to {obj}")
-            self.update_grid(Link(Link.PREDEFS, link.n))
-            self.update_grid(Link(Link.MATERIALS, link.n))
-            self.update_grid(Link(Link.PRODUCTS, link.n))
-            self.update_grid(None)
+            self.grid_predefs.update_data(obj.predefs, True)
+            self.grid_materials.update_data(obj.materials, True)
+            self.grid_products.update_data(obj.products, True)
+            self.grid_parts.update_data(None, True)
         else:
             print(f"Panel.update_gridpage_content given object '{obj}' is not a Group class.")
 
-    def init_grid(self, parent, link):
-        """Initialize a grid
+    def on_select_product(self, evt):
+        print(f"Panel.on_select_grid_cell")
 
-        Args:
-            parent (wx.Panel): Parent window.
-            link (Link): Link to the list of data of this grid.
-
-        Returns:
-            wx.Grid: The initialized grid object.
-        """
-        grid = wx.grid.Grid(parent)
-        table = CustomDataTable(self.data.get(link), link)
-        grid.SetTable(table, True)
-        grid.SetRowLabelSize(0)
-        grid.SetMargins(0, 0)
-        grid.AutoSizeColumns(False)
-        return grid
-
-    def update_grid(self, link):
-        """Update the content of a grid matching the type of obj in the given list.
-
-        Args:
-            objlist (list): A list of Predef|Material|Product|Part objects.
-        """
-        grid = None
-        if link is None:
-            table = CustomDataTable(None, link)
-            self.grid_parts.SetTable(table, True)
-            self.grid_parts.Refresh()
-            return
-        elif link.target == Link.PARTS:
-            grid = self.grid_parts
-        elif link.target == Link.PREDEFS:
-            grid = self.grid_predefs
-        elif link.target == Link.MATERIALS:
-            grid = self.grid_materials
-        elif link.target == Link.PRODUCTS:
-            grid = self.grid_products
-
-        else:
-            raise TypeError(f"Panel.update_grid: No grid exists for link target: {link.tar}")
-
-        array = self.data.get(link)
-        print(f"Panel.update_grid: Update an array with {array}")
-        table = CustomDataTable(array, link)
-        grid.SetTable(table, True)
-        grid.Refresh()
-
-    def on_grid_cell_left_dclick(self, evt):
-        """Change default behaviour so that left doubleclick enables cell editing."""
-        if evt.GetEventObject().CanEnableCellControl():
-            evt.GetEventObject().EnableCellEditControl()
-
-    def on_grid_predefs_tab(self, evt):
-        print("Event grid predefs tab")
-    def on_grid_materials_tab(self, evt):
-        print("Event grid materials tab")
-    def on_grid_products_tab(self, evt):
-        print("Event grid products tab")
-    def on_grid_parts_tab(self, evt):
-        print("Event grid parts tab")
-
-    def on_grid_predefs_cell_changed(self, evt):
-        link = Link(Link.PREDEF, self.pagesel_link.n + [evt.GetRow()])
-        grid = self.grid_predefs
-        self.grid_cell_changed(evt, grid, link)
-
-    def on_grid_materials_cell_changed(self, evt):
-        link = Link(Link.MATERIAL, self.pagesel_link.n + [evt.GetRow()])
-        self.grid_cell_changed(evt, self.grid_materials, link)
-
-    def on_grid_products_cell_changed(self, evt):
-        link = Link(Link.PRODUCT, self.pagesel_link.n + [evt.GetRow()])
-        self.grid_cell_changed(evt, self.grid_products, link)
-
-    def on_grid_parts_cell_changed(self, evt):
-        link = Link(Link.PART, self.pagesel_link.n + [evt.GetRow()])
-        self.grid_cell_changed(evt, self.grid_parts, link)
-
-    def grid_cell_changed(self, evt, grid, link):
-        row = evt.GetRow()
-        col = evt.GetCol()
-        value = grid.GetCellValue(row, col)
-        print(f"Panel.grid_cell_changed: col: {col}, link.tar: {link.target}, row: {link.n[-1]}, value: {value}")
-        self.data.set(link, col, value)
-
-    def on_grid_product_selected_cell(self, evt):
-        row = evt.GetRow()
-        n = self.pagesel_link.n + [row]
-        self.selected_product = Link(Link.PRODUCT, [i for i in n])
-        self.update_grid(Link(Link.PARTS, [i for i in n]))
-
-        try:
-            part_label = self.data.get(self.selected_product).code
-        except (IndexError, AttributeError):
-            part_label = ""
-
-        self.gp_parts_label.SetLabel(GP_PARTS_LABEL.format(part_label))
 
 class Link:
     DATA = 0
@@ -469,13 +366,13 @@ class Link:
 
     def get_new_object(self):
         if self.target == Link.PREDEF:
-            return Predef()
+            return dt.Predef()
         elif self.target == Link.MATERIAL:
-            return Material()
+            return dt.Material()
         elif self.target == Link.PRODUCT:
-            return Product()
+            return dt.Product()
         elif self.target == Link.PART:
-            return Part()
+            return dt.Part()
 
 
 class Data:
@@ -565,8 +462,8 @@ class Data:
         self.offers[1].groups.append(Group("Three"))
         self.offers[2].groups.append(Group("Kitchen"))
 
-        self.offers[0].groups[0].predefs.append(Predef("ovi", "MELVA16"))
-        self.offers[0].groups[0].predefs.append(Predef("hylly", "MELVA16"))
+        self.offers[0].groups[0].predefs.append(dt.Predef("ovi", "MELVA16"))
+        self.offers[0].groups[0].predefs.append(dt.Predef("hylly", "MELVA16"))
     
     def to_print(self):
         print("")
@@ -605,97 +502,6 @@ class Group:
         self.predefs = []
         self.materials = []
         self.products = []
-
-
-class Predef:
-    def __init__(self, part="", material="") -> None:
-        self.part = part
-        self.material = material
-
-    def get_labels(self) -> list:
-        return ['Nimi', 'Materiaalikoodi']
-        
-    def get_types(self) -> list:
-        return [
-            wx.grid.GRID_VALUE_STRING,
-            wx.grid.GRID_VALUE_STRING
-        ]
-        
-    def get_data(self) -> list:
-        return [self.part, self.material]
-    
-    def set(self, col, value):
-        if col == 0:
-            self.part = value
-        elif col == 1:
-            self.material = value
-
-class Material:
-    def __init__(self, code="", desc="") -> None:
-        self.code = code
-        self.description = desc
-
-    def get_labels(self) -> list:
-        return ['Koodi', 'Kuvaus']
-        
-    def get_types(self) -> list:
-        return [
-            wx.grid.GRID_VALUE_STRING,
-            wx.grid.GRID_VALUE_STRING
-        ]
-        
-    def get_data(self) -> list:
-        return [self.code, self.description]
-    
-    def set(self, col, value):
-        if col == 0:
-            self.code = value
-        elif col == 1:
-            self.description = value
-
-class Product:
-    def __init__(self, code="", desc="") -> None:
-        self.code = code
-        self.description = desc
-        self.parts = [Part()]
-
-    def get_labels(self) -> list:
-        return ['Koodi', 'Kuvaus']
-
-    def get_types(self) -> list:
-        return [
-            wx.grid.GRID_VALUE_STRING,
-            wx.grid.GRID_VALUE_STRING
-        ]
-        
-    def get_data(self) -> list:
-        return [self.code, self.description]
- 
-    def set(self, col, value):
-        if col == 0:
-            self.code = value
-        elif col == 1:
-            self.description = value
-
-class Part:
-    def __init__(self, code="") -> None:
-        self.code = code
-
-    def get_labels(self) -> list:
-        return ['Koodi']
-
-    def get_types(self) -> list:
-        return [
-            wx.grid.GRID_VALUE_STRING
-        ]
-
-    def get_data(self) -> list:
-        return [self.code]
- 
-    def set(self, col, value):
-        if col == 0:
-            self.code = value
-
 
 
 if __name__ == '__main__':
