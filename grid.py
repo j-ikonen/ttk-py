@@ -176,12 +176,15 @@ class CustomGrid(wx.grid.Grid):
     def on_cell_changed(self, evt):
         row = evt.GetRow()
         col = evt.GetCol()
-        print(f"Grid.on_cell_changed - (row, col): ({row}, {col}), data: {self.data}")
         value = self.GetCellValue(row, col)
+        # Changing cell for uninitalized data.
+            
         try:
             self.data[row].set(col, value)
         except IndexError:
             print(f"Grid.on_cell_changed - IndexError Grid draws more cells than in data.")
+        if row >= len(self.data):
+            self.SetGridCursor(self.GetGridCursorCoords())
         evt.Skip()
 
     def on_select_cell(self, evt):
