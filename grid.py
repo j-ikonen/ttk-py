@@ -69,7 +69,7 @@ class CustomDataTable(wx.grid.GridTableBase):
             return False
     
     def CanSetValueAs(self, row, col, type_name):
-        return self.CanSetValueAs(row, col, type_name)
+        return self.CanGetValueAs(row, col, type_name)
 
     def AppendRows(self, numRows=1):
         for n in range(numRows):
@@ -177,8 +177,9 @@ class CustomGrid(wx.grid.Grid):
         row = evt.GetRow()
         col = evt.GetCol()
         value = self.GetCellValue(row, col)
+        print(f"CustomGrid.on_cell_changed")
         # Changing cell for uninitalized data.
-            
+
         try:
             self.data[row].set(col, value)
         except IndexError:

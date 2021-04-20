@@ -138,12 +138,9 @@ class Part(GridData):
         self.x = 0
         self.y = 0
         self.z = 0
-        self.code_x = "product.w - 2 * product.part('sivu').material_thickness"
-        self.code_y = "self.material_thickness"
-        self.code_z = "product.d - product.part('tausta').material_thickness"
-        self.product_w = 0
-        self.product_h = 0
-        self.product_d = 0
+        self.code_x = "product_w - (2 * thickness['sivu'])"
+        self.code_y = "thickness['sivu']"
+        self.code_z = "product_d - thickness['tausta']"
 
     def get(self, col):
         if col == 0: return self.code
@@ -164,9 +161,9 @@ class Part(GridData):
     def new(self):
         return Part()
     def get_labels(self):
-        return ['Koodi', 'Kuvaus', 'Materiaali', 'Leveys', 'Korkeus', 'Syvyys']
+        return ['Koodi', 'Kuvaus', 'Materiaali', 'Mat. Paksuus', 'Leveys', 'Korkeus', 'Syvyys']
     def get_types(self):
-        return ['string', 'string', 'string', 'long', 'long', 'long']
+        return ['string', 'string', 'string', 'long', 'long', 'long', 'long']
     def get_list(self):
         return [self.code, self.desc, self.material_code, self.x, self.y, self.z]
     def get_readonly(self): 
@@ -178,25 +175,36 @@ class Part(GridData):
     def __setitem__(self, col, value):
         self.set(col, value)
     def process_codes(self, product, materials):
-        try:
-            self.x = ast.literal_eval(self.code_x)
-            print(f"process code x: {self.x}")
-        except ValueError:
-            self.x = 0
-        try:
-            self.y = ast.literal_eval(self.code_y)
-            print(f"process code y: {self.y}")
-        except ValueError:
-            self.y = 0
-        try:
-            self.z = ast.literal_eval(self.code_z)
-            print(f"process code z: {self.z}")
-        except ValueError:
-            self.z = 0
-
+        print(f"Processing coded values of product: '{product.code}', part: '{self.code}'.")
+        material_found = False
         for n in range(len(materials)):
             if materials[n].code == self.material_code:
                 self.material_thickness = materials[n].thickness
+                material_found = True
+        if material_found:
+            print(f"Found thickness {self.material_thickness} for material '{self.material_code}'")
+        else:
+            print(f"Material with code '{self.material_code}' not found")
+
+        product_w = int(product.w)
+        product_h = int(product.h)
+        product_d = int(product.d)
+        thickness = {}
+        for part in product.parts:
+            thickness[part.code] = int(part.material_thickness)
+
+        try:
+            self.x = eval(self.code_x)
+        except ValueError as e:
+            self.x = 0
+        try:
+            self.y = eval(self.code_y)
+        except ValueError as e:
+            self.y = 0
+        try:
+            self.z = eval(self.code_z)
+        except ValueError as e:
+            self.z = 0
 
 
 class Data:

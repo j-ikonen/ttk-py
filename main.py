@@ -1,8 +1,8 @@
 """
 TODO:
-    Add cell edit done event to grid_parts for updating part codes.
-    Add Modify a code dialog instead of editing coded cells.
     Add Saving/Loading an offer to/from a file.
+    Add checkbox to automatically add predefs to parts when adding them.
+    Add Modify a code dialog instead of editing coded cells.
     Add Dialog for uploading selected objects to a database.
     Add Windows to handle loading objects from a database.
 """
@@ -136,6 +136,9 @@ class Panel(wx.Panel):
         self.grid_parts = grid.CustomGrid(gridpage, dt.Part(), None)
 
         self.Bind(wx.grid.EVT_GRID_SELECT_CELL, self.on_select_product, self.grid_products)
+        self.Bind(wx.grid.EVT_GRID_CELL_CHANGED, self.on_cell_changed, self.grid_parts)
+        self.Bind(wx.grid.EVT_GRID_CELL_CHANGED, self.on_cell_changed, self.grid_materials)
+        self.Bind(wx.grid.EVT_GRID_CELL_CHANGED, self.on_cell_changed, self.grid_products)
 
         gp_sizer = wx.BoxSizer(wx.VERTICAL)
         gp_sizer.Add(gp_label_sizer)
@@ -311,22 +314,45 @@ class Panel(wx.Panel):
     def on_select_product(self, evt):
         """Update parts grid and it's label."""
         row = evt.GetRow()
-        print(f"Panel.on_select_grid_cell row: {row}")
+        # print(f"Panel.on_select_grid_cell row: {row}")
         self.grid_products.selected_row = row
         try:
             product_code = self.grid_products.data[row].code
         except IndexError:
-            pass
+            print("Product selection in a row without any initialized data." +
+                  " Using previous row for part grid.")
         else:
             # Update part codes
             product = self.grid_products.data[row]
             parts = product.parts
             materials = self.grid_materials.data
             for part in parts:
-                print(f"Processing part {part.code}")
                 part.process_codes(product, materials)
             self.gp_parts_label.SetLabel(GP_PARTS_LABEL.format(product_code))
             self.grid_parts.update_data(parts, True)
+
+    def on_cell_changed(self, evt):
+        # print(f"Panel.on_cell_changed")
+        # Get selected product, return if no products are initiated.
+        product_row = self.grid_products.selected_row
+        if product_row is None:
+            return
+
+        # Get Product and materials data.
+        try:
+            product = self.grid_products.data[product_row]
+        except IndexError:
+            print("Product selection in a row without any initialized data." +
+                  " Using previous row for part grid.")
+            product = self.grid_products.data[product_row - 1]
+        materials = self.grid_materials.data
+
+        # Process part codes and update part data to the grid.
+        for part in product.parts:
+            # print(f"Processing part {part.code}")
+            part.process_codes(product, materials)
+        self.grid_parts.update_data(product.parts)
+        self.grid_parts.Refresh()
 
 
 if __name__ == '__main__':
