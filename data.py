@@ -24,6 +24,8 @@ class GridData:
         return self.get(col)
     def __setitem__(self, col, value):
         self.set(col, value)
+    def get_codes(self):
+        return None
 
 class Predef(GridData):
     def __init__(self, partcode="", materialcode="") -> None:
@@ -127,14 +129,12 @@ class Product(GridData):
                 return self.parts[n]
         raise ValueError(f"Part with code '{code}' was not found.")
 
-
 class Part(GridData):
     def __init__(self, code="", desc="") -> None:
         super().__init__()
         self.code = code
         self.desc = desc
         self.material_code = ""
-        self.material_thickness = 0
         self.x = 0
         self.y = 0
         self.z = 0
@@ -146,18 +146,13 @@ class Part(GridData):
         if col == 0: return self.code
         elif col == 1: return self.desc
         elif col == 2: return self.material_code
-        elif col == 3: return self.material_thickness
-        elif col == 4: return self.x
-        elif col == 5: return self.y
-        elif col == 6: return self.z
+        elif col == 3: return self.x
+        elif col == 4: return self.y
+        elif col == 5: return self.z
     def set(self, col, value):
         if col == 0: self.code = value
         elif col == 1: self.desc = value
         elif col == 2: self.material_code = value
-        # elif col == 3: self.material_thickness = value
-        # elif col == 4: self.x = value
-        # elif col == 5: self.y = value
-        # elif col == 6: self.z = value
     def new(self):
         return Part()
     def get_labels(self):
@@ -177,13 +172,14 @@ class Part(GridData):
     def process_codes(self, product, materials):
         print(f"Processing coded values of product: '{product.code}', part: '{self.code}'.")
         material_found = False
+        material_dict = {}
+
         for n in range(len(materials)):
+            material_dict[materials[n].code] = materials[n].thickness
             if materials[n].code == self.material_code:
-                self.material_thickness = materials[n].thickness
                 material_found = True
-        if material_found:
-            print(f"Found thickness {self.material_thickness} for material '{self.material_code}'")
-        else:
+
+        if not material_found:
             print(f"Material with code '{self.material_code}' not found")
 
         product_w = int(product.w)
@@ -191,21 +187,47 @@ class Part(GridData):
         product_d = int(product.d)
         thickness = {}
         for part in product.parts:
-            thickness[part.code] = int(part.material_thickness)
-
+            try:
+                thickness[part.code] = int(material_dict[part.material_code])
+            except KeyError:
+                thickness[part.code] = 0
         try:
             self.x = eval(self.code_x)
         except ValueError as e:
+            print(f"Could not evaluate code_x: '{self.code_x}' of part '{self.code}' - {e}")
             self.x = 0
+        except KeyError as e:
+            print(f"Could not find part or material with code: {e}")
+            self.x = 0
+
         try:
             self.y = eval(self.code_y)
         except ValueError as e:
+            print(f"Could not evaluate code_y: '{self.code_y}' of part '{self.code}' - {e}")
             self.y = 0
+        except KeyError as e:
+            print(f"Could not find part or material with code: {e}")
+            self.y = 0
+
         try:
             self.z = eval(self.code_z)
         except ValueError as e:
+            print(f"Could not evaluate code_z: '{self.code_z}' of part '{self.code}' - {e}")
+            self.z = 0
+        except KeyError as e:
+            print(f"Could not find part or material with code: {e}")
             self.z = 0
 
+    def get_codes(self):
+        return {
+            'Leveys': self.code_x,
+            'Korkeus': self.code_y,
+            'Syvyys': self.code_z
+        }
+    def set_codes(self, codes):
+        self.code_x = codes['Leveys']
+        self.code_y = codes['Korkeus']
+        self.code_z = codes['Syvyys']
 
 class Data:
     def __init__(self) -> None:

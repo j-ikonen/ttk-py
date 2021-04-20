@@ -1,8 +1,14 @@
 import wx
-from wx.core import DataObject
 import wx.grid
 
 import data
+
+
+GRIDMENU_EDIT_OBJECT = "Muokkaa"
+GOD_TITLE = "Muokkaa"
+GOD_LABEL = "Muokkaa valitun esineen ominaisuuksia."
+GOD_EDIT_SIZE = (250, -1)
+
 
 class CustomDataTable(wx.grid.GridTableBase):
     def __init__(self, labels, types, data, obj):
@@ -125,6 +131,7 @@ class CustomGrid(wx.grid.Grid):
         self.data = data
         self.obj = obj
         self.selected_row = None
+        self.rclick_row = None
 
         table = CustomDataTable(self.labels, self.types, self.data, obj)
         self.SetTable(table, True)
@@ -138,6 +145,7 @@ class CustomGrid(wx.grid.Grid):
         self.Bind(wx.grid.EVT_GRID_SELECT_CELL, self.on_select_cell)
         self.Bind(wx.grid.EVT_GRID_TABBING, self.on_tab)
         self.Bind(wx.grid.EVT_GRID_EDITOR_SHOWN, self.on_editor_shown)
+        self.Bind(wx.grid.EVT_GRID_CELL_RIGHT_CLICK, self.on_cell_rclick)
 
     def on_tab(self, evt):
         # print("On TAB")
@@ -199,6 +207,42 @@ class CustomGrid(wx.grid.Grid):
             evt.Veto()
         evt.Skip()
 
+    def on_cell_rclick(self, evt):
+        # codes = self.data[evt.GetRow()].get_codes()
+        self.rclick_row = evt.GetRow()
+        if not hasattr(self, 'edit_object_id'):
+            self.edit_object_id = wx.NewIdRef()
+            self.Bind(wx.EVT_MENU, self.on_edit_object, id=self.edit_object_id)
+        
+        menu = wx.Menu()
+        menu.Append(self.edit_object_id, GRIDMENU_EDIT_OBJECT)
+        # item = wx.MenuItem(menu, self.edit_object_id, GRIDMENU_EDIT_OBJECT")
+        # menu.Append(item)
+
+        self.PopupMenu(menu)
+        menu.Destroy()
+        self.rclick_row = None
+
+    def on_edit_object(self, evt):
+        row = self.rclick_row
+        # print(f"Grid.on_edit_object row: {row}")
+
+        codes = self.data[row].get_codes()
+        dlg = GridObjectDialog(self, codes, self.data[row].code)
+        dlg.CenterOnScreen()
+
+        val = dlg.ShowModal()
+        if val == wx.ID_OK:
+            print("Grid.on_edit_object RETURN OK FROM DIALOG")
+            for key, value in dlg.code_edits.items():
+                codes[key] = value.GetValue()
+            self.data[row].set_codes(codes)
+        else:
+            print("Grid.on_edit_object RETURN CANCEL FROM DIALOG")
+        
+        dlg.Destroy()
+        self.Refresh()
+
     def update_data(self, data, reset_selection=False):
         try:
             old = len(self.data)
@@ -217,6 +261,46 @@ class CustomGrid(wx.grid.Grid):
         if reset_selection:
             self.selected_row = None
             self.ClearSelection()
+
+
+class GridObjectDialog(wx.Dialog):
+    def __init__(self, parent, data: dict, title=GOD_TITLE):
+        super().__init__()
+        self.Create(parent, title=title)
+
+        self.code_edits = {}
+
+        label = wx.StaticText(self, label=GOD_LABEL)
+
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(label, 0, wx.ALIGN_CENTRE|wx.ALL, 5)
+
+        for key, value in data.items():
+            key_label = wx.StaticText(self, label=key)
+            value_ctrl = wx.TextCtrl(self, value=value, size=GOD_EDIT_SIZE)
+            self.code_edits[key] = value_ctrl
+            hsizer = wx.BoxSizer(wx.HORIZONTAL)
+            hsizer.Add(key_label, 0, wx.ALL, 5)
+            hsizer.Add(value_ctrl, 0, wx.ALL, 5)
+            sizer.Add(hsizer, 0, wx.ALL, 5)
+
+        line = wx.StaticLine(self, size=(20, -1), style=wx.LI_HORIZONTAL)
+        sizer.Add(line, 0, wx.EXPAND|wx.RIGHT|wx.TOP, 5)
+
+        btnsizer = wx.StdDialogButtonSizer()
+
+        btn = wx.Button(self, wx.ID_OK)
+        btn.SetDefault()
+        btnsizer.AddButton(btn)
+
+        btn = wx.Button(self, wx.ID_CANCEL)
+        btnsizer.AddButton(btn)
+        btnsizer.Realize()
+
+        sizer.Add(btnsizer, 0, wx.ALL, 5)
+        self.SetSizer(sizer)
+        sizer.Fit(self)
+
 
 if __name__ == '__main__':
     app = wx.App()

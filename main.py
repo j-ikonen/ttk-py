@@ -1,8 +1,8 @@
 """
 TODO:
+    Find where None is added to a cell for long values.
     Add Saving/Loading an offer to/from a file.
     Add checkbox to automatically add predefs to parts when adding them.
-    Add Modify a code dialog instead of editing coded cells.
     Add Dialog for uploading selected objects to a database.
     Add Windows to handle loading objects from a database.
 """
