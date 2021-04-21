@@ -1,11 +1,10 @@
 """
 TODO:
-    Add saved file path/name to Offer.info.
-    Add check for already opened file to menu_open event.
     Add workspace to data for remembering opened filepaths.
     Add checkbox to automatically add predefs to parts when adding them.
     Add Dialog for uploading selected objects to a database.
     Add Windows to handle loading objects from a database.
+    Add FoldPanelBar to fold grids hidden.
 """
 import os
 import json
@@ -21,6 +20,7 @@ import data as dt
 
 FRAME_TITLE = "Ttk-py"
 FRAME_SIZE = (1200, 750)
+WORKSPACE_FILE = "workspace.json"
 LEFTWIN_SIZE = (200, FRAME_SIZE[1])
 BOTWIN_SIZE = (FRAME_SIZE[0], 100)
 TREE_ROOT_TITLE = "Tarjoukset"
@@ -39,6 +39,12 @@ SAVEAS_CANCEL = "Tallennus peruttu."
 WILDCARD = "JSON file (*.json) |*.json"
 OPEN_FILE_MESSAGE = "Valitse tiedosto."
 OPENING_FILE = "Avataan tiedosto {}"
+SAVE_NO_PATH = ("Tarjoukselle ei ole määritetty tallenus tiedostoa." +
+                " Avataan Tallenna nimellä ...")
+BTN_NEW_GROUP = "Lisää ryhmä"
+BTN_DEL_GROUP = "Poista ryhmiä"
+BTN_NEW_OFFER = "Uusi tarjous"
+BTN_CLOSE_OFFER = "Sulje tarjous"
 
 
 class AppFrame(wx.Frame):
@@ -49,15 +55,40 @@ class AppFrame(wx.Frame):
             size=FRAME_SIZE,
             style=wx.DEFAULT_FRAME_STYLE|wx.FULL_REPAINT_ON_RESIZE
         )
+        self.workspace = {
+            "open_offers": []
+        }
+        
+        try:
+            with open(WORKSPACE_FILE, 'r') as rf:
+                self.workspace = json.load(rf)
+        except FileNotFoundError as e:
+            print(f"No workspace file found: {e}")
+        else:
+            for path in self.workspace['open_offers']:
+                with open(path, 'r') as rf:
+                    offer = dt.Offer.from_dict(json.load(rf))
+                    data.offers.append(offer)
+
         self.CenterOnScreen()
         self.create_menubar()
 
         self.panel = Panel(self, data)
 
         self.Bind(wx.EVT_CLOSE, self.on_close_window)
-    
+
     def on_close_window(self, evt):
         print("Closing frame.")
+        # Save open offers to session workspace file.
+        self.workspace['open_offers'] = []
+        for offer in self.panel.data.offers:
+            if offer.info.filepath != "":
+                self.workspace['open_offers'].append(offer.info.filepath)
+
+        # Save offer dictionary to selected file.
+        with open(WORKSPACE_FILE, 'w') as fp:
+            json.dump(self.workspace, fp, indent=4)
+
         self.Destroy()
 
     def create_menubar(self):
@@ -66,7 +97,7 @@ class AppFrame(wx.Frame):
 
         menu_file.Append(wx.ID_NEW)
         menu_file.Append(wx.ID_OPEN)
-        # menu_file.Append(wx.ID_SAVE)
+        menu_file.Append(wx.ID_SAVE)
         menu_file.Append(wx.ID_SAVEAS)
         menu_file.Append(wx.ID_SEPARATOR)
         menu_file.Append(wx.ID_EXIT)
@@ -77,7 +108,7 @@ class AppFrame(wx.Frame):
 
         self.Bind(wx.EVT_MENU, self.menu_new, id=wx.ID_NEW)
         self.Bind(wx.EVT_MENU, self.menu_open, id=wx.ID_OPEN)
-        # self.Bind(wx.EVT_MENU, self.menu_save, id=wx.ID_SAVE)
+        self.Bind(wx.EVT_MENU, self.menu_save, id=wx.ID_SAVE)
         self.Bind(wx.EVT_MENU, self.menu_saveas, id=wx.ID_SAVEAS)
         self.Bind(wx.EVT_MENU, self.menu_exit, id=wx.ID_EXIT)
 
@@ -100,9 +131,14 @@ class AppFrame(wx.Frame):
 
         # Get return code from dialog.
         if dlg.ShowModal() == wx.ID_OK:
-            paths = dlg.GetPaths()
-            for path in paths:
-                
+
+            for path in dlg.GetPaths():
+                # Check if an offer with 'path' is already open.
+                if self.panel.data.file_opened(path):
+                    print(f"Selected offer is already opened from path {path}.")
+                    dlg.Destroy()
+                    return
+
                 # Open and read the file at path.
                 print(OPENING_FILE.format(path))
                 with open(path, 'r') as rf:
@@ -110,6 +146,7 @@ class AppFrame(wx.Frame):
 
                 # Create offer object from dictionary
                 offer = dt.Offer.from_dict(offer_dict)
+                offer.info.filepath = path
                 self.panel.data.offers.append(offer)
 
             # Refresh TreeList with new offers.
@@ -117,11 +154,56 @@ class AppFrame(wx.Frame):
         dlg.Destroy()
 
     def menu_save(self, evt):
-        print(f"menu_save event - NOT IMPLEMENTED")
+        # Get dictionary of selected offer.
+        offer = self.get_selected_offer()
+        path = offer.info.filepath
+        if path != "":
+            print(f"Saving '{offer.name}' to '{path}'")
+            
+            # Save offer dictionary to selected file.
+            with open(path, 'w') as fp:
+                json.dump(offer.to_dict(), fp, indent=4)
+        else:
+            print(SAVE_NO_PATH)
+            self.menu_saveas(self, evt)
 
     def menu_saveas(self, evt):
         """Handle event for saving an offer with name."""
-        # Get the Link to selected offer.
+        # Get selected offer.
+        offer = self.get_selected_offer()
+        print(f"Saving '{offer.name}'")
+
+        # Open FileDialog for Saving.
+        dlg = wx.FileDialog(
+            self,
+            message=SAVE_FILE_MESSAGE,
+            defaultDir=os.getcwd(),
+            defaultFile=offer.name,
+            wildcard=WILDCARD,
+            style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT
+        )
+        # dlg.SetFilterIndex(1)     # For default WILDCARD
+
+        # Get return code from dialog.
+        if dlg.ShowModal() == wx.ID_OK:
+            path = dlg.GetPath()
+            offer.info.filepath = path
+            print(SAVING_TO.format(path))
+
+            # Save offer dictionary to selected file.
+            with open(path, 'w') as fp:
+                json.dump(offer.to_dict(), fp, indent=4)
+
+        else:
+            print(SAVEAS_CANCEL)
+
+        dlg.Destroy()
+
+    def menu_exit(self, evt):
+        self.Close()
+
+    def get_selected_offer(self):
+        """Return the offer selected in treelist."""
         offer_link = dt.Link(dt.Link.OFFER, n=[0])
         link = self.panel.pagesel_link
         if link.target == dt.Link.DATA:
@@ -133,35 +215,7 @@ class AppFrame(wx.Frame):
             offer_link.n = [i for i in link.n]
 
         # Get dictionary of selected offer.
-        offer = self.panel.data.get(offer_link).to_dict()
-        print(f"Saving '{offer['name']}'")
-
-        # Open FileDialog for Saving.
-        dlg = wx.FileDialog(
-            self,
-            message=SAVE_FILE_MESSAGE,
-            defaultDir=os.getcwd(),
-            defaultFile=offer['name'],
-            wildcard=WILDCARD,
-            style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT
-        )
-        # dlg.SetFilterIndex(1)     # For default WILDCARD
-
-        # Get return code from dialog.
-        if dlg.ShowModal() == wx.ID_OK:
-            path = dlg.GetPath()
-            print(SAVING_TO.format(path))
-
-            # Save offer dictionary to selected file.
-            with open(path, 'w') as fp:
-                json.dump(offer, fp, indent=4)
-        else:
-            print(SAVEAS_CANCEL)
-
-        dlg.Destroy()
-
-    def menu_exit(self, evt):
-        self.Close()
+        return self.panel.data.get(offer_link)
 
 
 class Panel(wx.Panel):
@@ -281,6 +335,36 @@ class Panel(wx.Panel):
         #------------------------------------------------------------------------------------------
         # Simplebook - infopage
         #------------------------------------------------------------------------------------------
+        btn_new_group = wx.Button(infopage, label=BTN_NEW_GROUP)
+        btn_del_group = wx.Button(infopage, label=BTN_DEL_GROUP)
+
+        self.Bind(wx.EVT_BUTTON, self.on_btn_new_group, btn_new_group)
+        self.Bind(wx.EVT_BUTTON, self.on_btn_del_group, btn_del_group)
+
+        btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        btn_sizer.Add(btn_new_group, 0, wx.ALL, BORDER)
+        btn_sizer.Add(btn_del_group, 0, wx.ALL, BORDER)
+
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(btn_sizer)
+        infopage.Sizer = sizer
+
+        #------------------------------------------------------------------------------------------
+        # Simplebook - rootpage
+        #------------------------------------------------------------------------------------------
+        btn_new_offer = wx.Button(rootpage, label=BTN_NEW_OFFER)
+        btn_close_offer = wx.Button(rootpage, label=BTN_CLOSE_OFFER)
+        
+        self.Bind(wx.EVT_BUTTON, self.on_btn_new_offer, btn_new_offer)
+        self.Bind(wx.EVT_BUTTON, self.on_btn_close_offer, btn_close_offer)
+
+        btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        btn_sizer.Add(btn_new_offer, 0, wx.ALL, BORDER)
+        btn_sizer.Add(btn_close_offer, 0, wx.ALL, BORDER)
+
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(btn_sizer)
+        rootpage.Sizer = sizer
 
     #----------------------------------------------------------------------------------------------
     # SashWindows functions
@@ -477,12 +561,29 @@ class Panel(wx.Panel):
         self.grid_parts.update_data(product.parts)
         self.grid_parts.Refresh()
 
+    #------------------------------------------------------------------------------------------
+    # Simplebook - infpage
+    #------------------------------------------------------------------------------------------
+    def on_btn_new_group(self, evt):
+        print("Panel.on_btn_new_group")
+
+    def on_btn_del_group(self, evt):
+        print("Panel.on_btn_del_group")
+
+    #------------------------------------------------------------------------------------------
+    # Simplebook - rootpage
+    #------------------------------------------------------------------------------------------
+    def on_btn_new_offer(self, evt):
+        print("Panel.on_btn_new_offer")
+
+    def on_btn_close_offer(self, evt):
+        print("Panel.on_btn_close_offer")
 
 if __name__ == '__main__':
     app = wx.App(useBestVisual=True)
 
     data = dt.Data()
-    data.build_test()
+    # data.build_test()
 
     frame = AppFrame(data)
     frame.Show()

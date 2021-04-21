@@ -1,19 +1,14 @@
 {
-    "name": "Tarjous 1",
-    "info": "",
+    "name": "Uusi tarjous",
+    "info": {
+        "first_name": "",
+        "last_name": "",
+        "address": ""
+    },
     "groups": [
         {
-            "name": "TestGroup",
-            "predefs": [
-                {
-                    "partcode": "ovi",
-                    "materialcode": "MELVA16"
-                },
-                {
-                    "partcode": "hylly",
-                    "materialcode": "MELVA16"
-                }
-            ],
+            "name": "Keitti\u00f6",
+            "predefs": [],
             "materials": [
                 {
                     "code": "mat",
@@ -23,24 +18,24 @@
                 {
                     "code": "mat2",
                     "desc": "",
-                    "thickness": "22"
+                    "thickness": "21"
                 }
             ],
             "products": [
                 {
                     "code": "tuote",
                     "desc": "",
-                    "w": "500",
-                    "h": "600",
-                    "d": "700",
+                    "w": "244",
+                    "h": "240",
+                    "d": "520",
                     "parts": [
                         {
                             "code": "sivu",
                             "desc": "",
                             "material_code": "mat2",
-                            "x": 456,
-                            "y": 22,
-                            "z": 690,
+                            "x": 202,
+                            "y": 21,
+                            "z": 510,
                             "code_x": "product_w - (2 * thickness['sivu'])",
                             "code_y": "thickness['sivu']",
                             "code_z": "product_d - thickness['tausta']"
@@ -49,9 +44,9 @@
                             "code": "tausta",
                             "desc": "",
                             "material_code": "mat",
-                            "x": 456,
-                            "y": 22,
-                            "z": 690,
+                            "x": 202,
+                            "y": 21,
+                            "z": 510,
                             "code_x": "product_w - (2 * thickness['sivu'])",
                             "code_y": "thickness['sivu']",
                             "code_z": "product_d - thickness['tausta']"
@@ -59,12 +54,6 @@
                     ]
                 }
             ]
-        },
-        {
-            "name": "Group2",
-            "predefs": [],
-            "materials": [],
-            "products": []
         }
     ]
 }

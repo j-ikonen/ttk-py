@@ -392,14 +392,6 @@ class Data:
             Group("Kitchen")
         ]))
 
-        # self.offers[0].groups.append()
-        # self.offers[0].groups.append()
-        # self.offers[1].groups.append(Group("DefName"))
-        # self.offers[1].groups.append(Group("One"))
-        # self.offers[1].groups.append(Group("Two"))
-        # self.offers[1].groups.append(Group("Three"))
-        # self.offers[2].groups.append(Group("Kitchen"))
-
         self.offers[0].groups[0].predefs.append(Predef("ovi", "MELVA16"))
         self.offers[0].groups[0].predefs.append(Predef("hylly", "MELVA16"))
 
@@ -422,29 +414,38 @@ class Data:
     def new_offer(self):
         self.offers.append(Offer(NEW_OFFER_NAME, groups=[Group(NEW_GROUP_NAME)]))
 
+    def file_opened(self, path: str) -> bool:
+        """Return True if an offer with 'path' exists in data."""
+        for offer in self.offers:
+            if offer.info.filepath == path:
+                return True
+        return False
+
+
 class Offer:
     def __init__(self, name="", groups=[]):
         self.name = name
-        self.info = ""
+        self.info = Info()
         self.groups = groups
 
     def to_dict(self) -> dict:
         return {
             "name": self.name,
-            "info": self.info,
+            "info": self.info.to_dict(),
             "groups": [group.to_dict() for group in self.groups]
         }
     @classmethod
     def from_dict(cls, dic: dict):
         obj = cls()
         obj.name = dic["name"]
-        obj.info = dic["info"]
+        obj.info = Info.from_dict(dic["info"])
         obj.groups = [Group.from_dict(gr) for gr in dic["groups"]]
         return obj
 
 
 class Info:
-    def __init__(self) -> None:
+    def __init__(self):
+        self.filepath = ""
         self.first_name = ""
         self.last_name = ""
         self.address = ""
