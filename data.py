@@ -1,4 +1,7 @@
-import ast
+
+
+NEW_OFFER_NAME = "Uusi tarjous"
+NEW_GROUP_NAME = "Uusi ryhmä"
 
 
 class GridData:
@@ -32,6 +35,11 @@ class Predef(GridData):
         super().__init__()
         self.partcode = partcode
         self.materialcode = materialcode
+    def to_dict(self) -> dict:
+        return {
+            "partcode": self.partcode,
+            "materialcode": self.materialcode
+        }
     def get(self, col):
         if col == 0: return self.partcode
         elif col == 1: return self.materialcode
@@ -54,6 +62,13 @@ class Predef(GridData):
         return self.get(col)
     def __setitem__(self, col, value):
         self.set(col, value)
+    
+    @classmethod
+    def from_dict(cls, dic: dict):
+        obj = cls()
+        obj.partcode = dic["partcode"]
+        obj.materialcode = dic["materialcode"]
+        return obj
 
 class Material(GridData):
     def __init__(self, code="", desc="") -> None:
@@ -61,6 +76,20 @@ class Material(GridData):
         self.code = code
         self.desc = desc
         self.thickness = 10
+    def to_dict(self) -> dict:
+        return {
+            "code": self.code,
+            "desc": self.desc,
+            "thickness": self.thickness
+        }
+    @classmethod
+    def from_dict(cls, dic: dict):
+        obj = cls()
+        obj.code = dic["code"]
+        obj.desc = dic["desc"]
+        obj.thickness = dic["thickness"]
+        return obj
+
     def get(self, col):
         if col == 0: return self.code
         elif col == 1: return self.desc
@@ -95,6 +124,26 @@ class Product(GridData):
         self.h = h
         self.d = d
         self.parts = []
+    def to_dict(self) -> dict:
+        return {
+            "code": self.code,
+            "desc": self.desc,
+            "w": self.w,
+            "h": self.h,
+            "d": self.d,
+            "parts": [p.to_dict() for p in self.parts]
+        }
+    @classmethod
+    def from_dict(cls, dic: dict):
+        obj = cls()
+        obj.code = dic["code"]
+        obj.desc = dic["desc"]
+        obj.w = dic["w"]
+        obj.h = dic["h"]
+        obj.d = dic["d"]
+        obj.parts = [Part.from_dict(part) for part in dic["parts"]]
+        return obj
+
     def get(self, col):
         if col == 0: return self.code
         elif col == 1: return self.desc
@@ -141,6 +190,31 @@ class Part(GridData):
         self.code_x = "product_w - (2 * thickness['sivu'])"
         self.code_y = "thickness['sivu']"
         self.code_z = "product_d - thickness['tausta']"
+    def to_dict(self) -> dict:
+        return {
+            "code": self.code,
+            "desc": self.desc,
+            "material_code": self.material_code,
+            "x": self.x,
+            "y": self.y,
+            "z": self.z,
+            "code_x": self.code_x,
+            "code_y": self.code_y,
+            "code_z": self.code_z
+        }
+    @classmethod
+    def from_dict(cls, dic: dict):
+        obj = cls()
+        obj.code = dic["code"]
+        obj.desc = dic["desc"]
+        obj.material_code = dic["material_code"]
+        obj.x = dic["x"]
+        obj.y = dic["y"]
+        obj.z = dic["z"]
+        obj.code_x = dic["code_x"]
+        obj.code_y = dic["code_y"]
+        obj.code_z = dic["code_z"]
+        return obj
 
     def get(self, col):
         if col == 0: return self.code
@@ -156,9 +230,9 @@ class Part(GridData):
     def new(self):
         return Part()
     def get_labels(self):
-        return ['Koodi', 'Kuvaus', 'Materiaali', 'Mat. Paksuus', 'Leveys', 'Korkeus', 'Syvyys']
+        return ['Koodi', 'Kuvaus', 'Materiaali', 'Leveys', 'Korkeus', 'Syvyys']
     def get_types(self):
-        return ['string', 'string', 'string', 'long', 'long', 'long', 'long']
+        return ['string', 'string', 'string', 'long', 'long', 'long']
     def get_list(self):
         return [self.code, self.desc, self.material_code, self.x, self.y, self.z]
     def get_readonly(self): 
@@ -304,21 +378,31 @@ class Data:
         self.to_print()
 
     def build_test(self):
-        self.offers.append(Offer("Tarjous 1"))
-        self.offers.append(Offer("Testi tarjous"))
-        self.offers.append(Offer("Matinkatu 15"))
+        self.offers.append(Offer("Tarjous 1", [
+            Group("TestGroup"),
+            Group("Group2")
+        ]))
+        self.offers.append(Offer("Testi tarjous", [
+            Group("DefName"),
+            Group("One"),
+            Group("Two"),
+            Group("Three")
+        ]))
+        self.offers.append(Offer("Matinkatu 15", [
+            Group("Kitchen")
+        ]))
 
-        self.offers[0].groups.append(Group("TestGroup"))
-        self.offers[0].groups.append(Group("Group2"))
-        self.offers[1].groups.append(Group("DefName"))
-        self.offers[1].groups.append(Group("One"))
-        self.offers[1].groups.append(Group("Two"))
-        self.offers[1].groups.append(Group("Three"))
-        self.offers[2].groups.append(Group("Kitchen"))
+        # self.offers[0].groups.append()
+        # self.offers[0].groups.append()
+        # self.offers[1].groups.append(Group("DefName"))
+        # self.offers[1].groups.append(Group("One"))
+        # self.offers[1].groups.append(Group("Two"))
+        # self.offers[1].groups.append(Group("Three"))
+        # self.offers[2].groups.append(Group("Kitchen"))
 
         self.offers[0].groups[0].predefs.append(Predef("ovi", "MELVA16"))
         self.offers[0].groups[0].predefs.append(Predef("hylly", "MELVA16"))
-    
+
     def to_print(self):
         print("")
         for offer in self.offers:
@@ -335,12 +419,28 @@ class Data:
                         print(f"            part: {part.get_data()}")
         print("")
 
+    def new_offer(self):
+        self.offers.append(Offer(NEW_OFFER_NAME, groups=[Group(NEW_GROUP_NAME)]))
 
 class Offer:
-    def __init__(self, name="") -> None:
+    def __init__(self, name="", groups=[]):
         self.name = name
         self.info = ""
-        self.groups = []
+        self.groups = groups
+
+    def to_dict(self) -> dict:
+        return {
+            "name": self.name,
+            "info": self.info,
+            "groups": [group.to_dict() for group in self.groups]
+        }
+    @classmethod
+    def from_dict(cls, dic: dict):
+        obj = cls()
+        obj.name = dic["name"]
+        obj.info = dic["info"]
+        obj.groups = [Group.from_dict(gr) for gr in dic["groups"]]
+        return obj
 
 
 class Info:
@@ -348,6 +448,20 @@ class Info:
         self.first_name = ""
         self.last_name = ""
         self.address = ""
+    
+    def to_dict(self) -> dict:
+        return {
+            "first_name": self.first_name,
+            "last_name": self.last_name,
+            "address": self.address
+        }
+    @classmethod
+    def from_dict(cls, dic: dict):
+        obj = cls()
+        obj.first_name = dic["first_name"]
+        obj.last_name = dic["last_name"]
+        obj.address = dic["address"]
+        return obj
 
 
 class Group:
@@ -356,6 +470,22 @@ class Group:
         self.predefs = []
         self.materials = []
         self.products = []
+
+    def to_dict(self) -> dict:
+        return {
+            "name": self.name,
+            "predefs": [pd.to_dict() for pd in self.predefs],
+            "materials": [mat.to_dict() for mat in self.materials],
+            "products": [pr.to_dict() for pr in self.products]
+        }
+    @classmethod
+    def from_dict(cls, dic: dict):
+        obj = cls()
+        obj.name = dic["name"]
+        obj.predefs = [Predef.from_dict(gr) for gr in dic["predefs"]]
+        obj.materials = [Material.from_dict(gr) for gr in dic["materials"]]
+        obj.products = [Product.from_dict(gr) for gr in dic["products"]]
+        return obj
 
 
 class Link:

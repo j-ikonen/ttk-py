@@ -1,11 +1,14 @@
 """
 TODO:
-    Find where None is added to a cell for long values.
-    Add Saving/Loading an offer to/from a file.
+    Add saved file path/name to Offer.info.
+    Add check for already opened file to menu_open event.
+    Add workspace to data for remembering opened filepaths.
     Add checkbox to automatically add predefs to parts when adding them.
     Add Dialog for uploading selected objects to a database.
     Add Windows to handle loading objects from a database.
 """
+import os
+import json
 
 import wx
 import wx.adv
@@ -29,6 +32,13 @@ GP_MATERIALS_LABEL = "Materiaalit"
 GP_PRODUCTS_LABEL = "Tuotteet"
 GP_PARTS_LABEL = "Tuotteen '{}' osat"
 GP_NO_PRODUCT_SELECTED = "Tuotetta ei ole valittu."
+NO_OFFER_SELECTED = "Tarjousta ei ole valittu."
+SAVE_FILE_MESSAGE = "Tallenna nimellä ..."
+SAVING_TO = "Tallennetaan tarjous tiedostoon {}"
+SAVEAS_CANCEL = "Tallennus peruttu."
+WILDCARD = "JSON file (*.json) |*.json"
+OPEN_FILE_MESSAGE = "Valitse tiedosto."
+OPENING_FILE = "Avataan tiedosto {}"
 
 
 class AppFrame(wx.Frame):
@@ -39,13 +49,119 @@ class AppFrame(wx.Frame):
             size=FRAME_SIZE,
             style=wx.DEFAULT_FRAME_STYLE|wx.FULL_REPAINT_ON_RESIZE
         )
+        self.CenterOnScreen()
+        self.create_menubar()
 
         self.panel = Panel(self, data)
 
         self.Bind(wx.EVT_CLOSE, self.on_close_window)
     
     def on_close_window(self, evt):
+        print("Closing frame.")
         self.Destroy()
+
+    def create_menubar(self):
+        menu_bar = wx.MenuBar()
+        menu_file = wx.Menu()
+
+        menu_file.Append(wx.ID_NEW)
+        menu_file.Append(wx.ID_OPEN)
+        # menu_file.Append(wx.ID_SAVE)
+        menu_file.Append(wx.ID_SAVEAS)
+        menu_file.Append(wx.ID_SEPARATOR)
+        menu_file.Append(wx.ID_EXIT)
+
+        menu_bar.Append(menu_file, wx.GetStockLabel(wx.ID_FILE))
+
+        self.SetMenuBar(menu_bar)
+
+        self.Bind(wx.EVT_MENU, self.menu_new, id=wx.ID_NEW)
+        self.Bind(wx.EVT_MENU, self.menu_open, id=wx.ID_OPEN)
+        # self.Bind(wx.EVT_MENU, self.menu_save, id=wx.ID_SAVE)
+        self.Bind(wx.EVT_MENU, self.menu_saveas, id=wx.ID_SAVEAS)
+        self.Bind(wx.EVT_MENU, self.menu_exit, id=wx.ID_EXIT)
+
+    def menu_new(self, evt):
+        print(f"menu_new event - ")
+        self.panel.data.new_offer()
+        self.panel.create_tree()
+
+    def menu_open(self, evt):
+        """Handle event for opening an offer from a file."""
+        dlg = wx.FileDialog(
+            self,
+            message=OPEN_FILE_MESSAGE,
+            defaultDir=os.getcwd(),
+            defaultFile="",
+            wildcard=WILDCARD,
+            style=wx.FD_OPEN | wx.FD_MULTIPLE | wx.FD_CHANGE_DIR |
+                  wx.FD_FILE_MUST_EXIST | wx.FD_PREVIEW
+        )
+
+        # Get return code from dialog.
+        if dlg.ShowModal() == wx.ID_OK:
+            paths = dlg.GetPaths()
+            for path in paths:
+                
+                # Open and read the file at path.
+                print(OPENING_FILE.format(path))
+                with open(path, 'r') as rf:
+                    offer_dict = json.load(rf)
+
+                # Create offer object from dictionary
+                offer = dt.Offer.from_dict(offer_dict)
+                self.panel.data.offers.append(offer)
+
+            # Refresh TreeList with new offers.
+            self.panel.create_tree()
+        dlg.Destroy()
+
+    def menu_save(self, evt):
+        print(f"menu_save event - NOT IMPLEMENTED")
+
+    def menu_saveas(self, evt):
+        """Handle event for saving an offer with name."""
+        # Get the Link to selected offer.
+        offer_link = dt.Link(dt.Link.OFFER, n=[0])
+        link = self.panel.pagesel_link
+        if link.target == dt.Link.DATA:
+            print(NO_OFFER_SELECTED)
+            return
+        elif link.target == dt.Link.GROUP:
+            offer_link.n = [i for i in link.n[:-1]]
+        elif link.target == dt.Link.OFFER:
+            offer_link.n = [i for i in link.n]
+
+        # Get dictionary of selected offer.
+        offer = self.panel.data.get(offer_link).to_dict()
+        print(f"Saving '{offer['name']}'")
+
+        # Open FileDialog for Saving.
+        dlg = wx.FileDialog(
+            self,
+            message=SAVE_FILE_MESSAGE,
+            defaultDir=os.getcwd(),
+            defaultFile=offer['name'],
+            wildcard=WILDCARD,
+            style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT
+        )
+        # dlg.SetFilterIndex(1)     # For default WILDCARD
+
+        # Get return code from dialog.
+        if dlg.ShowModal() == wx.ID_OK:
+            path = dlg.GetPath()
+            print(SAVING_TO.format(path))
+
+            # Save offer dictionary to selected file.
+            with open(path, 'w') as fp:
+                json.dump(offer, fp, indent=4)
+        else:
+            print(SAVEAS_CANCEL)
+
+        dlg.Destroy()
+
+    def menu_exit(self, evt):
+        self.Close()
 
 
 class Panel(wx.Panel):
@@ -141,13 +257,20 @@ class Panel(wx.Panel):
         self.Bind(wx.grid.EVT_GRID_CELL_CHANGED, self.on_cell_changed, self.grid_products)
 
         gp_sizer = wx.BoxSizer(wx.VERTICAL)
+        horgrids_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        predef_sizer = wx.BoxSizer(wx.VERTICAL)
+        mat_sizer = wx.BoxSizer(wx.VERTICAL)
+
         gp_sizer.Add(gp_label_sizer)
-        gp_sizer.Add(self.gp_predefs_label, 0, wx.EXPAND|wx.LEFT|wx.TOP, BORDER)
-        gp_sizer.Add(self.grid_predefs, 1, wx.EXPAND|wx.ALL, BORDER)
+        predef_sizer.Add(self.gp_predefs_label, 0, wx.EXPAND|wx.LEFT|wx.TOP, BORDER)
+        predef_sizer.Add(self.grid_predefs, 1, wx.EXPAND|wx.ALL, BORDER)
+        horgrids_sizer.Add(predef_sizer, 0, wx.EXPAND)
 
-        gp_sizer.Add(self.gp_materials_label, 0, wx.EXPAND|wx.LEFT|wx.TOP, BORDER)
-        gp_sizer.Add(self.grid_materials, 1, wx.EXPAND|wx.ALL, BORDER)
+        mat_sizer.Add(self.gp_materials_label, 0, wx.EXPAND|wx.LEFT|wx.TOP, BORDER)
+        mat_sizer.Add(self.grid_materials, 1, wx.EXPAND|wx.ALL, BORDER)
+        horgrids_sizer.Add(mat_sizer, 1, wx.EXPAND)
 
+        gp_sizer.Add(horgrids_sizer, 1, wx.EXPAND)
         gp_sizer.Add(self.gp_products_label, 0, wx.EXPAND|wx.LEFT|wx.TOP, BORDER)
         gp_sizer.Add(self.grid_products, 1, wx.EXPAND|wx.ALL, BORDER)
 
