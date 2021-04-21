@@ -452,6 +452,7 @@ class Info:
     
     def to_dict(self) -> dict:
         return {
+            "filepath": self.filepath,
             "first_name": self.first_name,
             "last_name": self.last_name,
             "address": self.address
@@ -459,6 +460,7 @@ class Info:
     @classmethod
     def from_dict(cls, dic: dict):
         obj = cls()
+        obj.filepath = dic["filepath"]
         obj.first_name = dic["first_name"]
         obj.last_name = dic["last_name"]
         obj.address = dic["address"]
