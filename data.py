@@ -1,7 +1,6 @@
-
-
 NEW_OFFER_NAME = "Uusi tarjous"
 NEW_GROUP_NAME = "Uusi ryhmä"
+NO_PREDEF_FOUND = "No predef found for part '{}'"
 
 
 class GridData:
@@ -183,7 +182,9 @@ class Part(GridData):
         super().__init__()
         self.code = code
         self.desc = desc
+        self.use_predef = ""
         self.material_code = ""
+        self.use_material = ""
         self.x = 0
         self.y = 0
         self.z = 0
@@ -194,7 +195,9 @@ class Part(GridData):
         return {
             "code": self.code,
             "desc": self.desc,
+            "use_predef": self.use_predef,
             "material_code": self.material_code,
+            "use_material": self.use_material,
             "x": self.x,
             "y": self.y,
             "z": self.z,
@@ -207,7 +210,9 @@ class Part(GridData):
         obj = cls()
         obj.code = dic["code"]
         obj.desc = dic["desc"]
+        obj.use_predef = dic["use_predef"]
         obj.material_code = dic["material_code"]
+        obj.use_material = dic["use_material"]
         obj.x = dic["x"]
         obj.y = dic["y"]
         obj.z = dic["z"]
@@ -219,42 +224,66 @@ class Part(GridData):
     def get(self, col):
         if col == 0: return self.code
         elif col == 1: return self.desc
-        elif col == 2: return self.material_code
-        elif col == 3: return self.x
-        elif col == 4: return self.y
-        elif col == 5: return self.z
+        elif col == 2: return self.use_predef
+        elif col == 3: return self.material_code
+        elif col == 4: return self.use_material
+        elif col == 5: return self.x
+        elif col == 6: return self.y
+        elif col == 7: return self.z
     def set(self, col, value):
         if col == 0: self.code = value
         elif col == 1: self.desc = value
-        elif col == 2: self.material_code = value
+        elif col == 2: self.use_predef = value
+        elif col == 3: self.material_code = value
     def new(self):
         return Part()
     def get_labels(self):
-        return ['Koodi', 'Kuvaus', 'Materiaali', 'Leveys', 'Korkeus', 'Syvyys']
+        return ['Koodi', 'Kuvaus', 'Käytä Esiasetusta', 'Materiaali', 'Materiaali käytössä', 'Leveys', 'Korkeus', 'Syvyys']
     def get_types(self):
-        return ['string', 'string', 'string', 'long', 'long', 'long']
+        return ['string', 'string', 'string', 'string', 'string', 'long', 'long', 'long']
     def get_list(self):
-        return [self.code, self.desc, self.material_code, self.x, self.y, self.z]
-    def get_readonly(self): 
-        return [3, 4, 5, 6]
+        return [self.code, self.desc, self.use_predef, self.material_code, self.use_material, self.x, self.y, self.z]
+    def get_readonly(self):
+        return [4, 5, 6, 7]
     def get_tab(self):
-        return [1, 2, 3, 4, 5, 0]
+        return [1, 2, 3, 4, 5, 6, 7, 0]
     def __getitem__(self, col):
         return self.get(col)
     def __setitem__(self, col, value):
         self.set(col, value)
-    def process_codes(self, product, materials):
+    def process_codes(self, product, materials, predefs):
         print(f"Processing coded values of product: '{product.code}', part: '{self.code}'.")
+        if (self.use_predef != ""
+            and self.use_predef != "n"
+            and self.use_predef != "no"
+            and self.use_predef != "e"
+            and self.use_predef != "ei"
+            and self.use_predef != "False"
+            and self.use_predef != "false"):
+            predef_found = False
+            for predef in predefs:
+                print(f"Check if predef == part: {predef.partcode} == {self.code}")
+                if predef.partcode == self.code:
+                    self.use_material = predef.materialcode
+                    predef_found = True
+                    break
+            if not predef_found:
+                self.use_material = self.material_code
+                print(NO_PREDEF_FOUND.format(self.code))
+                # print(f"    from predefs of len: {len(predefs)}")
+        else:
+            self.use_material = self.material_code
+
         material_found = False
         material_dict = {}
 
         for n in range(len(materials)):
             material_dict[materials[n].code] = materials[n].thickness
-            if materials[n].code == self.material_code:
+            if materials[n].code == self.use_material:
                 material_found = True
 
         if not material_found:
-            print(f"Material with code '{self.material_code}' not found")
+            print(f"Material with code '{self.use_material}' not found")
 
         product_w = int(product.w)
         product_h = int(product.h)
@@ -262,7 +291,7 @@ class Part(GridData):
         thickness = {}
         for part in product.parts:
             try:
-                thickness[part.code] = int(material_dict[part.material_code])
+                thickness[part.code] = int(material_dict[part.use_material])
             except KeyError:
                 thickness[part.code] = 0
         try:

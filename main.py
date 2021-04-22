@@ -1,9 +1,14 @@
 """
 TODO:
-    Add checkbox to automatically add predefs to parts when adding them.
     Add Dialog for uploading selected objects to a database.
     Add Windows to handle loading objects from a database.
     Add FoldPanelBar to fold grids hidden.
+
+Part:
+    In coded value calculations of Part material used is Part.use_material. 
+    Part.use_material is Part.material_code if predef does not exist or
+    Part.use_predef is ""|"n"|"no"|"e"|"ei"|"False"|"false" otherwise
+    Part.use_material is a Predef.materialcode of a matching Predef.partcode
 """
 import os
 import json
@@ -553,8 +558,9 @@ class Panel(wx.Panel):
             product = self.grid_products.data[row]
             parts = product.parts
             materials = self.grid_materials.data
+            predefs = self.grid_predefs.data
             for part in parts:
-                part.process_codes(product, materials)
+                part.process_codes(product, materials, predefs)
             self.gp_parts_label.SetLabel(GP_PARTS_LABEL.format(product_code))
             self.grid_parts.update_data(parts, True)
 
@@ -573,11 +579,12 @@ class Panel(wx.Panel):
                   " Using previous row for part grid.")
             product = self.grid_products.data[product_row - 1]
         materials = self.grid_materials.data
+        predefs = self.grid_predefs.data
 
         # Process part codes and update part data to the grid.
         for part in product.parts:
             # print(f"Processing part {part.code}")
-            part.process_codes(product, materials)
+            part.process_codes(product, materials, predefs)
         self.grid_parts.update_data(product.parts)
         self.grid_parts.Refresh()
 

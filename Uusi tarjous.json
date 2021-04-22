@@ -9,12 +9,31 @@
     "groups": [
         {
             "name": "Uusi ryhm\u00e4",
-            "predefs": [],
+            "predefs": [
+                {
+                    "partcode": "sivu",
+                    "materialcode": "mat2"
+                },
+                {
+                    "partcode": "tausta",
+                    "materialcode": "mat3"
+                }
+            ],
             "materials": [
                 {
                     "code": "mat",
                     "desc": "",
                     "thickness": 10
+                },
+                {
+                    "code": "mat2",
+                    "desc": "",
+                    "thickness": "21"
+                },
+                {
+                    "code": "mat3",
+                    "desc": "",
+                    "thickness": "32"
                 }
             ],
             "products": [
@@ -28,7 +47,9 @@
                         {
                             "code": "sivu",
                             "desc": "",
+                            "use_predef": "",
                             "material_code": "mat",
+                            "use_material": "mat",
                             "x": 480,
                             "y": 10,
                             "z": 540,
@@ -39,7 +60,9 @@
                         {
                             "code": "tausta",
                             "desc": "",
+                            "use_predef": "",
                             "material_code": "mat",
+                            "use_material": "mat",
                             "x": 480,
                             "y": 10,
                             "z": 540,

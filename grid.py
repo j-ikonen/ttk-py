@@ -185,6 +185,7 @@ class CustomGrid(wx.grid.Grid):
         row = evt.GetRow()
         col = evt.GetCol()
         value = self.GetCellValue(row, col)
+        # print(f"Grid.on_cell_changed: New Value: {value}")
         print(f"CustomGrid.on_cell_changed")
         # Changing cell for uninitalized data.
 
