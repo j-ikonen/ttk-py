@@ -332,6 +332,195 @@ class Part(GridData):
         self.code_y = codes['Korkeus']
         self.code_z = codes['Syvyys']
 
+
+class GridData:
+    def __init__(
+        self,
+        name="",
+        data=[],
+        defaults={},
+        child=None,
+        parent=None,
+        col_keys=[],
+        col_labels=[],
+        col_types=[],
+        col_readonly=[],
+        tab_to=[],
+        codes=[]
+    ):
+        self.name = name
+        self.data = data
+        self.defaults = defaults
+        child=child
+        parent=parent
+        self.col_keys = col_keys
+        self.col_labels = col_labels
+        self.col_types = col_types
+        self.col_readonly = col_readonly
+        self.tab_to = tab_to
+        self.codes = codes
+
+    def get(self, row, col):
+        if isinstance(col, int):
+            try:
+                return self.data[row][self.col_keys[col]]
+            except (IndexError, KeyError) as e:
+                print(f"{e}\n    row: {row}, col: {col}, len(self.data): {len(self.data)},"+
+                      f" len(self.col_keys): {len(self.col_keys)}")
+        elif isinstance(col, str):
+            try:
+                return self.data[row][col]
+            except (KeyError, IndexError) as e:
+                print(f"{e}\n    row: {row}, col: {col}, len(self.data): {len(self.data)},"+
+                      f" len(self.col_keys): {len(self.col_keys)}")
+
+    def set(self, row, col, value):
+        if isinstance(col, int):
+            try:
+                self.data[row][self.col_keys[col]] = value
+            except (IndexError, KeyError) as e:
+                print(f"{e}\n    row: {row}, col: {col}, len(self.data): {len(self.data)},"+
+                      f" len(self.col_keys): {len(self.col_keys)}")
+
+        elif isinstance(col, str):
+            try:
+                self.data[row][col] = value
+            except (IndexError, KeyError) as e:
+                print(f"{e}\n    row: {row}, col: {col}, len(self.data): {len(self.data)},"+
+                       " len(self.col_keys): {len(self.col_keys)}")
+    
+    def process_codes(self, osd):
+        for rowdata in self.data:
+            for target_key, code_key in self.codes.items():
+                rowdata[target_key] = eval(rowdata[code_key])
+
+    def find(self, target_key, target_value, return_key):
+        """Find a value matching the given keys.
+                
+        Attributes:
+            target_key (str): Key to the value used to check for correct row.
+            target_value (Any): Value used to check for correct row.
+            return_key (str): Key to the return value.
+        Return:
+            Value or None if no value is found.
+        """
+        for rowdata in self.data:
+            try:
+                if rowdata[target_key] == target_value:
+                    return rowdata[return_key]
+            except KeyError as e:
+                print(f"There is no field with key: {target_key} or {return_key} in"+
+                      f" GridData.name={self.name} - {e}")
+        return None
+
+    def is_true(self, value: str) -> bool:
+        false_keys = [
+            "",
+            'n',
+            'N',
+            'no',
+            'NO',
+            'e',
+            'E',
+            'ei',
+            'EI',
+            'false',
+            'False',
+            'FALSE'
+        ]
+        if value in false_keys:
+            return False
+        else:
+            return True
+
+    @classmethod
+    def new(cls, name):
+        if name == 'predefs':
+            return cls.predefs()
+        elif name == 'materials':
+            return cls.materials()
+        elif name == 'products':
+            return cls.products()
+        elif name == 'parts':
+            return cls.parts()
+
+    @classmethod
+    def predefs(cls) -> GridData:
+        return cls(
+            name="predefs",
+            data=[],
+            defaults={'part': "", 'mat': ""},
+            child=None,
+            parent=None,
+            col_keys=['part', 'mat'],
+            col_labels=['Osa', 'Materiaali'],
+            col_types=['string', 'string'],
+            col_readonly=[],
+            tab_to=[1, 0],
+            codes={}
+        )
+    @classmethod
+    def materials(cls) -> GridData:
+        return cls(
+            name="materials",
+            data=[],
+            defaults={'code': "", 'desc': "", 'thck': 0, 'prod': "", 'cost': 0.0, 'unit': ""},
+            child=None,
+            parent=None,
+            col_keys=['code', 'desc', 'thck', 'prod', 'cost', 'unit'],
+            col_labels=['Osa', 'Kuvaus', 'Paksuus (mm)', 'Valmistaja', 'Hinta', 'Hintayksikkö'],
+            col_types=['string', 'string', 'long', 'string', 'double', 'string'],
+            col_readonly=[],
+            tab_to=[1, 2, 3, 4, 5],
+            codes={}
+        )
+    @classmethod
+    def products(cls) -> GridData:
+        return cls(
+            name="products",
+            data=[],
+            defaults={'code': "", 'desc': "", 'prod': "", 'x': 0, 'y': 0, 'z': 0, 'cost': 0.0, 'code_cost': "self.parts.sum('cost')"},
+            child="parts",
+            parent=None,
+            col_keys=['code', 'desc', 'prod', 'x', 'y', 'z', 'cost'],
+            col_labels=['Osa', 'Kuvaus', 'Valmistaja', 'Leveys', 'Korkeus', 'Syvyys', 'Hinta (€)'],
+            col_types=['string', 'string', 'string', 'long', 'long', 'long', 'double'],
+            col_readonly=[],
+            tab_to=[1, 2, 3, 4],
+            codes={}
+        )
+    @classmethod
+    def parts(cls) -> GridData:
+        return cls(
+            name="parts",
+            data=[],
+            defaults={
+                'code': "",
+                'desc': "",
+                'use_predef': "",
+                'mat': "",
+                'use_mat': "",
+                'x': 0,
+                'y': 0,
+                'z': 0,
+                'cost': 0.0,
+                'code_use_mat': "osd['predef'].find('part', rowdata['code'], 'mat') if self.is_true(rowdata['use_predef']) else rowdata['mat'])",
+                'code_x': "0",
+                'code_y': "0",
+                'code_z': "0",
+                'code_cost': "rowdata['x'] * rowdata['y'] * osd['materials'].find('mat', 'rowdata['use_mat']', 'cost')"
+            },
+            child="parts",
+            parent="products",
+            col_keys=['code', 'desc', 'use_predef', 'mat', 'use_mat', 'x', 'y', 'z', 'cost'],
+            col_labels=['Osa', 'Kuvaus', 'Käytä Esimääritystä', 'Materiaali', 'Käytettävä Materiaali', 'Leveys', 'Korkeus', 'Syvyys', 'Hinta (€)'],
+            col_types=['string', 'string', 'string', 'string', 'string', 'long', 'long', 'long', 'double'],
+            col_readonly=[4, 5, 6, 7, 8],
+            tab_to=[1, 2, 3, 4, 5, 6, 7],
+            codes={'use_mat': "code_use_mat", 'x': "code_x", 'y': "code_y", 'z': "code_z", 'cost': "code_cost"}
+        )
+
+
 class Data:
     def __init__(self) -> None:
         self.offers = []
