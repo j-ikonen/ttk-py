@@ -1,6 +1,5 @@
 """
 TODO:
-    Add workspace to data for remembering opened filepaths.
     Add checkbox to automatically add predefs to parts when adding them.
     Add Dialog for uploading selected objects to a database.
     Add Windows to handle loading objects from a database.
@@ -21,7 +20,7 @@ import data as dt
 FRAME_TITLE = "Ttk-py"
 FRAME_SIZE = (1200, 750)
 WORKSPACE_FILE = "workspace.json"
-LEFTWIN_SIZE = (200, FRAME_SIZE[1])
+LEFTWIN_SIZE = (270, FRAME_SIZE[1])
 BOTWIN_SIZE = (FRAME_SIZE[0], 100)
 TREE_ROOT_TITLE = "Tarjoukset"
 GP_NAMELABEL = "Ryhmän nimi: "
@@ -45,6 +44,10 @@ BTN_NEW_GROUP = "Lisää ryhmä"
 BTN_DEL_GROUP = "Poista ryhmiä"
 BTN_NEW_OFFER = "Uusi tarjous"
 BTN_CLOSE_OFFER = "Sulje tarjous"
+DLG_CLOSE_OFFERS_MSG = "Valitse suljettavat tarjoukset."
+DLG_CLOSE_OFFERS_CAP = "Sulje tarjouksia"
+DLG_DEL_GROUPS_MSG = "Valitse poistettavat ryhmät tarjouksesta '{}'."
+DLG_DEL_GROUPS_CAP = "Poista ryhmiä"
 
 
 class AppFrame(wx.Frame):
@@ -155,7 +158,7 @@ class AppFrame(wx.Frame):
 
     def menu_save(self, evt):
         # Get dictionary of selected offer.
-        offer = self.get_selected_offer()
+        offer = self.panel.get_selected_offer()
         path = offer.info.filepath
         if path != "":
             print(f"Saving '{offer.name}' to '{path}'")
@@ -170,7 +173,7 @@ class AppFrame(wx.Frame):
     def menu_saveas(self, evt):
         """Handle event for saving an offer with name."""
         # Get selected offer.
-        offer = self.get_selected_offer()
+        offer = self.panel.get_selected_offer()
         print(f"Saving '{offer.name}'")
 
         # Open FileDialog for Saving.
@@ -202,21 +205,6 @@ class AppFrame(wx.Frame):
     def menu_exit(self, evt):
         self.Close()
 
-    def get_selected_offer(self):
-        """Return the offer selected in treelist."""
-        offer_link = dt.Link(dt.Link.OFFER, n=[0])
-        link = self.panel.pagesel_link
-        if link.target == dt.Link.DATA:
-            print(NO_OFFER_SELECTED)
-            return
-        elif link.target == dt.Link.GROUP:
-            offer_link.n = [i for i in link.n[:-1]]
-        elif link.target == dt.Link.OFFER:
-            offer_link.n = [i for i in link.n]
-
-        # Get dictionary of selected offer.
-        return self.panel.data.get(offer_link)
-
 
 class Panel(wx.Panel):
     def __init__(self, parent, data):
@@ -238,7 +226,12 @@ class Panel(wx.Panel):
         #------------------------------------------------------------------------------------------
         # DVC_TreeCtrl
         #------------------------------------------------------------------------------------------
-        self.tree_ctrl = dv.DataViewTreeCtrl(self.left_win)
+        
+        tree_panel = wx.Panel(self.left_win)
+        # treebtn_close_offer = wx.Button(tree_panel, label=BTN_CLOSE_OFFER)
+        # treebtn_new_group = wx.Button(tree_panel, label=BTN_NEW_GROUP)
+        # treebtn_del_group = wx.Button(tree_panel, label=BTN_DEL_GROUP)
+        self.tree_ctrl = dv.DataViewTreeCtrl(tree_panel)
         self.tree_root = self.tree_ctrl.AppendContainer(
             dv.NullDataViewItem,
             TREE_ROOT_TITLE,
@@ -248,10 +241,22 @@ class Panel(wx.Panel):
         self.create_tree()
 
         # Fill the left window with tree_ctrl
-        self.left_win.Sizer = wx.BoxSizer()
-        self.left_win.Sizer.Add(self.tree_ctrl, 1, wx.EXPAND)
+        lwin_sizer = wx.BoxSizer(wx.VERTICAL)
+        # btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
-        self.Bind(dv.EVT_DATAVIEW_ITEM_ACTIVATED, self.on_treeitem_activate)
+        # btn_sizer.Add(treebtn_close_offer, 0, wx.ALL, 2)
+        # btn_sizer.Add(treebtn_new_group, 0, wx.ALL, 2)
+        # btn_sizer.Add(treebtn_del_group, 0, wx.ALL, 2)
+
+        # lwin_sizer.Add(btn_sizer, 0, wx.ALIGN_CENTER)
+        lwin_sizer.Add(self.tree_ctrl, 1, wx.EXPAND)
+
+        tree_panel.SetSizer(lwin_sizer)
+
+        # self.Bind(wx.EVT_BUTTON, self.on_btn_close_offer, treebtn_close_offer)
+        # self.Bind(wx.EVT_BUTTON, self.on_btn_new_group, treebtn_new_group)
+        # self.Bind(wx.EVT_BUTTON, self.on_btn_del_group, treebtn_del_group)
+        self.Bind(dv.EVT_DATAVIEW_SELECTION_CHANGED, self.on_treeitem_activate)
         self.Bind(dv.EVT_DATAVIEW_ITEM_START_EDITING, self.on_treeitem_edit)
         self.Bind(dv.EVT_DATAVIEW_ITEM_COLLAPSING, self.on_treeitem_collapsing)
         self.Bind(dv.EVT_DATAVIEW_ITEM_EXPANDING, self.on_treeitem_expanding)
@@ -352,14 +357,14 @@ class Panel(wx.Panel):
         #------------------------------------------------------------------------------------------
         # Simplebook - rootpage
         #------------------------------------------------------------------------------------------
-        btn_new_offer = wx.Button(rootpage, label=BTN_NEW_OFFER)
+        # btn_new_offer = wx.Button(rootpage, label=BTN_NEW_OFFER)
         btn_close_offer = wx.Button(rootpage, label=BTN_CLOSE_OFFER)
         
-        self.Bind(wx.EVT_BUTTON, self.on_btn_new_offer, btn_new_offer)
+        # self.Bind(wx.EVT_BUTTON, self.on_btn_new_offer, btn_new_offer)
         self.Bind(wx.EVT_BUTTON, self.on_btn_close_offer, btn_close_offer)
 
         btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        btn_sizer.Add(btn_new_offer, 0, wx.ALL, BORDER)
+        # btn_sizer.Add(btn_new_offer, 0, wx.ALL, BORDER)
         btn_sizer.Add(btn_close_offer, 0, wx.ALL, BORDER)
 
         sizer = wx.BoxSizer(wx.VERTICAL)
@@ -478,6 +483,21 @@ class Panel(wx.Panel):
         self.is_treeitem_expanded[text] = False
         # print(f"Panel.on_treeitem_collapsed: Set {text} to False")
 
+    def get_selected_offer(self):
+        """Return the offer selected in treelist."""
+        offer_link = dt.Link(dt.Link.OFFER, n=[0])
+        link = self.pagesel_link
+        if link.target == dt.Link.DATA:
+            print(NO_OFFER_SELECTED)
+            return
+        elif link.target == dt.Link.GROUP:
+            offer_link.n = [i for i in link.n[:-1]]
+        elif link.target == dt.Link.OFFER:
+            offer_link.n = [i for i in link.n]
+
+        # Get dictionary of selected offer.
+        return self.data.get(offer_link)
+
     #------------------------------------------------------------------------------------------
     # Simplebook
     #------------------------------------------------------------------------------------------
@@ -565,10 +585,40 @@ class Panel(wx.Panel):
     # Simplebook - infpage
     #------------------------------------------------------------------------------------------
     def on_btn_new_group(self, evt):
-        print("Panel.on_btn_new_group")
+        """Add a new group to selected offer."""
+        offer = self.get_selected_offer()
+        if offer is not None:
+            offer.groups.append(dt.Group(dt.NEW_GROUP_NAME))
+            self.create_tree()
+        else:
+            print(NO_OFFER_SELECTED)
 
     def on_btn_del_group(self, evt):
-        print("Panel.on_btn_del_group")
+        """Delete a group from selected offer."""
+        offer = self.get_selected_offer()
+        if offer is not None:
+            lst = offer.get_group_names()
+            dlg = wx.MultiChoiceDialog(
+                self,
+                DLG_DEL_GROUPS_MSG.format(offer.name),
+                DLG_DEL_GROUPS_CAP,
+                lst
+            )
+            if dlg.ShowModal() == wx.ID_OK:
+                selections = dlg.GetSelections()
+                # Move selection to parent if a deleted group is selected.
+                if (self.pagesel_link.target == dt.Link.GROUP and
+                    self.pagesel_link.n[1] in selections):
+                    cur_sel = self.tree_ctrl.GetSelection()
+                    parent = self.tree_ctrl.GetModel().GetParent(cur_sel)
+                    self.tree_ctrl.Select(parent)
+                    self.tree_ctrl.Refresh()
+
+                offer.del_groups(selections)
+                self.create_tree()
+
+        else:
+            print(NO_OFFER_SELECTED)
 
     #------------------------------------------------------------------------------------------
     # Simplebook - rootpage
@@ -578,6 +628,20 @@ class Panel(wx.Panel):
 
     def on_btn_close_offer(self, evt):
         print("Panel.on_btn_close_offer")
+        lst = self.data.get_offer_names()
+        dlg = wx.MultiChoiceDialog(
+            self,
+            DLG_CLOSE_OFFERS_MSG,
+            DLG_CLOSE_OFFERS_CAP,
+            lst
+        )
+        if dlg.ShowModal() == wx.ID_OK:
+            selections = dlg.GetSelections()
+            self.data.del_offers(selections)
+            self.create_tree()
+
+        dlg.Destroy()
+
 
 if __name__ == '__main__':
     app = wx.App(useBestVisual=True)

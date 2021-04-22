@@ -421,6 +421,17 @@ class Data:
                 return True
         return False
 
+    def get_offer_names(self) -> list:
+        """Return a list of names of the offers."""
+        lst = []
+        for offer in self.offers:
+            lst.append(offer.name)
+        return lst
+
+    def del_offers(self, lst):
+        lst.reverse()
+        for idx in lst:
+            del self.offers[idx]
 
 class Offer:
     def __init__(self, name="", groups=[]):
@@ -441,6 +452,17 @@ class Offer:
         obj.info = Info.from_dict(dic["info"])
         obj.groups = [Group.from_dict(gr) for gr in dic["groups"]]
         return obj
+
+    def get_group_names(self):
+        lst = []
+        for group in self.groups:
+            lst.append(group.name)
+        return lst
+
+    def del_groups(self, lst):
+        lst.reverse()
+        for idx in lst:
+            del self.groups[idx]
 
 
 class Info:
