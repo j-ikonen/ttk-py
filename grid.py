@@ -1,7 +1,7 @@
 import wx
 import wx.grid
 
-import data
+from data import GridData
 
 
 GRIDMENU_EDIT_OBJECT = "Muokkaa"
@@ -11,48 +11,47 @@ GOD_EDIT_SIZE = (250, -1)
 
 
 class CustomDataTable(wx.grid.GridTableBase):
-    def __init__(self, labels, types, data, obj):
+    def __init__(self, data):
         """Custom table for lists of Predef, Material, Product or Part objects.
 
         Args:
             labels (list): Column label strings in a list.
             types (list): Column types in a list. (i.e. wx.grid.GRID_VALUE_STRING)
-            data (list): Data to fill the grid with. (i.e. [['r0c0', 'r0c1'], ['r1c0', 'r1c1']])
+            data (GridData): Data class
         """
         super().__init__()
 
-        self.column_labels = labels
-        self.data_types = types
-        self.data = data
-        self.obj = obj
+        self.obj: GridData = data
+
+        # self.column_labels = labels
+        # self.data_types = types
+        # self.obj = obj
 
     def GetNumberRows(self):
-        if self.data is None:
+        if self.obj is None or self.obj.data is None:
             return 0
-        return len(self.data) + 1
+        return len(self.obj.data)
 
     def GetNumberCols(self):
-        return len(self.column_labels)
+        return len(self.obj.columns)
 
     def IsEmptyCell(self, row, col):
         try:
-            return not self.data[row][col]
+            return not self.obj.get(row, col)
         except IndexError:
             return True
 
     def GetValue(self, row, col):
         try:
-            return self.data[row][col]
+            return self.obj.get(row, col)
         except IndexError:
             return ''
 
     def SetValue(self, row, col, value):
         def innerSetValue(row, col, value):
-            try:
-                self.data[row][col] = value
-            except IndexError:
+            if not self.obj.set(row, col, value):
                 # Add a new row.
-                self.data.append(self.obj.new())
+                self.obj.append()
                 innerSetValue(row, col, value)
 
                 # Tell the grid a row was added.
@@ -62,13 +61,13 @@ class CustomDataTable(wx.grid.GridTableBase):
         innerSetValue(row, col, value)
 
     def GetColLabelValue(self, col):
-        return self.column_labels[col]
+        return self.obj.get_label(col)
 
     def GetTypeName(self, row, col):
-        return self.data_types[col]
+        return self.obj.get_type(col)
 
     def CanGetValueAs(self, row, col, type_name):
-        col_type = self.data_types[col].split(':')[0]
+        col_type = self.obj.get_type(col).split(':')[0]
         if type_name == col_type:
             return True
         else:
@@ -79,25 +78,29 @@ class CustomDataTable(wx.grid.GridTableBase):
 
     def AppendRows(self, numRows=1):
         for n in range(numRows):
-            self.data.append(self.obj.new())
-        msg = wx.grid.GridTableMessage(self, wx.grid.GRIDTABLE_NOTIFY_ROWS_APPENDED, numRows)
+            self.obj.append()
+        msg = wx.grid.GridTableMessage(
+            self,
+            wx.grid.GRIDTABLE_NOTIFY_ROWS_APPENDED,
+            numRows
+        )
         self.GetView().ProcessTableMessage(msg)
         return True
 
     def DeleteRows(self, pos=0, numRows=1):
-        for n in range(numRows):
-            try:
-                del self.data[pos]
-            except IndexError as e:
-                print(f"CustomTable.DeleteRows: {e}")
-                msg = wx.grid.GridTableMessage(self, wx.grid.GRIDTABLE_NOTIFY_ROWS_DELETED, n)
-                self.GetView().ProcessTableMessage(msg)
-                print(f"DELETE_ROWS: n: {n}")
-                return False
-        msg = wx.grid.GridTableMessage(self, wx.grid.GRIDTABLE_NOTIFY_ROWS_DELETED, numRows)
-        self.GetView().ProcessTableMessage(msg)
-        print(f"DELETE_ROWS: n: {numRows}")
-        return True
+        n_del = self.obj.delete(pos, numRows)
+        
+        if n_del > 0:
+            msg = wx.grid.GridTableMessage(
+                self,
+                wx.grid.GRIDTABLE_NOTIFY_ROWS_DELETED,
+                n_del
+            )
+            self.GetView().ProcessTableMessage(msg)
+            print(f"DELETE_ROWS: n: {n_del}")
+            return True
+        else:
+            return False
 
     def NotifyRowChange(self, oldlen, newlen):
         if oldlen < newlen:
@@ -121,19 +124,14 @@ class CustomDataTable(wx.grid.GridTableBase):
         self.GetView().ProcessTableMessage(msg)
 
 class CustomGrid(wx.grid.Grid):
-    def __init__(self, parent, obj, data=[]):
+    def __init__(self, parent, data: GridData):
         super().__init__(parent)
 
-        self.labels = obj.get_labels()
-        self.types = obj.get_types()
-        self.read_only = obj.get_readonly()
-        self.tab = obj.get_tab()
         self.data = data
-        self.obj = obj
         self.selected_row = None
         self.rclick_row = None
 
-        table = CustomDataTable(self.labels, self.types, self.data, obj)
+        table = CustomDataTable(self.data)
         self.SetTable(table, True)
 
         self.SetRowLabelSize(25)
@@ -172,9 +170,15 @@ class CustomGrid(wx.grid.Grid):
                 # Do nothing if at the end of grid.
                 if row < self.GetNumberRows() - 1:
                     self.SetGridCursor(row + 1, 0)
-            # Move to next Column
             else:
-                self.SetGridCursor(row, self.tab[col])
+                try:
+                    # Move to next Column
+                    self.SetGridCursor(row, self.data.tab_to[col])
+                except IndexError:
+                    # Move to first cell of next row until at the end of grid.
+                    if row < self.GetNumberRows() - 1:
+                        self.SetGridCursor(row + 1, 0)
+
 
 
     def on_cell_changing(self, evt):
@@ -185,16 +189,24 @@ class CustomGrid(wx.grid.Grid):
         row = evt.GetRow()
         col = evt.GetCol()
         value = self.GetCellValue(row, col)
-        # print(f"Grid.on_cell_changed: New Value: {value}")
-        print(f"CustomGrid.on_cell_changed")
-        # Changing cell for uninitalized data.
 
-        try:
-            self.data[row].set(col, value)
-        except IndexError:
-            print(f"Grid.on_cell_changed - IndexError Grid draws more cells than in data.")
-        if row >= len(self.data):
-            self.SetGridCursor(self.GetGridCursorCoords())
+        print(f"CustomGrid.on_cell_changed r:{row}, c:{col}, v:{value}")
+
+        if not self.data.set(row, col, value):
+            print(f"TRIED TO CHANGE A CELL THAT IS NOT INITIALIZED.")
+
+        # Initialize new empty row if edit in last one.
+        print(f"\tROW: {row}, NUM ROWS: {self.GetNumberRows()}")
+        if row >= self.GetNumberRows() - 1:
+            self.data.append()
+            self.AppendRows()
+            print("\tREFRESHED")
+            # self.Refresh()
+
+        # Keep cursor within intialized data.
+        # if row >= len(self.data.data) - 1:
+        #     self.SetGridCursor(self.GetGridCursorCoords())
+
         evt.Skip()
 
     def on_select_cell(self, evt):
@@ -203,20 +215,24 @@ class CustomGrid(wx.grid.Grid):
         evt.Skip()
 
     def on_editor_shown(self, evt):
-        if evt.GetCol() in self.read_only:
-            print(f"Grid.on_editor_shown - Column {evt.GetCol()} is read only.")
+        col = evt.GetCol()
+        if self.data.is_readonly(col):
+            print(f"Grid.on_editor_shown - Column {col} is read only.")
             evt.Veto()
         evt.Skip()
 
     def on_cell_rclick(self, evt):
-        # codes = self.data[evt.GetRow()].get_codes()
         self.rclick_row = evt.GetRow()
+
+        # Do Event Binding only once.
         if not hasattr(self, 'edit_object_id'):
             self.edit_object_id = wx.NewIdRef()
             self.Bind(wx.EVT_MENU, self.on_edit_object, id=self.edit_object_id)
-        
+
         menu = wx.Menu()
         menu.Append(self.edit_object_id, GRIDMENU_EDIT_OBJECT)
+
+        # Alternate item initialization for editing MenuItem properties.
         # item = wx.MenuItem(menu, self.edit_object_id, GRIDMENU_EDIT_OBJECT")
         # menu.Append(item)
 
@@ -226,10 +242,9 @@ class CustomGrid(wx.grid.Grid):
 
     def on_edit_object(self, evt):
         row = self.rclick_row
-        # print(f"Grid.on_edit_object row: {row}")
 
-        codes = self.data[row].get_codes()
-        dlg = GridObjectDialog(self, codes, self.data[row].code)
+        codes = self.data.get_codes(row)
+        dlg = GridObjectDialog(self, codes)
         dlg.CenterOnScreen()
 
         val = dlg.ShowModal()
@@ -237,28 +252,30 @@ class CustomGrid(wx.grid.Grid):
             print("Grid.on_edit_object RETURN OK FROM DIALOG")
             for key, value in dlg.code_edits.items():
                 codes[key] = value.GetValue()
-            self.data[row].set_codes(codes)
+            self.data.set_codes(row, codes)
         else:
             print("Grid.on_edit_object RETURN CANCEL FROM DIALOG")
         
         dlg.Destroy()
         self.Refresh()
 
-    def update_data(self, data, reset_selection=False):
+    def update_data(self, data: list, reset_selection=False):
         try:
-            old = len(self.data)
+            oldlen = len(self.data.data)
         except TypeError:
-            old = -1
+            oldlen = -1
 
-        self.data = data
-        self.GetTable().data = data
+        self.data.data = data
+        self.GetTable().obj.data = data
 
-        if data is None:
-            self.GetTable().NotifyRowChange(old, -1)
+        # Updated grid is empty.
+        if data is None or data is []:
+            self.GetTable().NotifyRowChange(oldlen, -1)
         else:
             new = len(data)
-            self.GetTable().NotifyRowChange(old, new)
-
+            self.GetTable().NotifyRowChange(oldlen, new)
+        
+        # Reset selection when data is changed from one object to another.
         if reset_selection:
             self.selected_row = None
             self.ClearSelection()
@@ -301,40 +318,3 @@ class GridObjectDialog(wx.Dialog):
         sizer.Add(btnsizer, 0, wx.ALL, 5)
         self.SetSizer(sizer)
         sizer.Fit(self)
-
-
-if __name__ == '__main__':
-    app = wx.App()
-
-    griddata = [
-        data.Product("00", "01"),
-        data.Product("10", "11"),
-        data.Product("20", "21"),
-        data.Product("30", "31")
-    ]
-    griddata2 = [
-        data.Product("000", "010"),
-        data.Product("100", "110")
-    ]
-    empty = []
-
-    frame = wx.Frame(
-        None,
-        title="GridTest",
-        size=(800,600),
-        style=wx.DEFAULT_FRAME_STYLE|wx.FULL_REPAINT_ON_RESIZE
-    )
-
-    print("Frame init done")
-    panel = wx.Panel(frame)
-    grid = CustomGrid(panel, data.Product(), None)
-
-    gridsizer = wx.BoxSizer(wx.VERTICAL)
-    gridsizer.Add(grid, 1, wx.GROW|wx.ALL, 5)
-    panel.SetSizer(gridsizer)
-    print("Grid init done")
-    grid.update_data(griddata, True)
-    # griddata[2].desc = "Desc"
-    frame.Show()
-    frame.Layout()
-    app.MainLoop()

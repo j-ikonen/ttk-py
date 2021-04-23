@@ -1,5 +1,6 @@
 """
 TODO:
+    Find why rows are multiplied when saving and maybe loading from file.
     Add Dialog for uploading selected objects to a database.
     Add Windows to handle loading objects from a database.
     Add FoldPanelBar to fold grids hidden.
@@ -18,8 +19,8 @@ import wx.adv
 import wx.dataview as dv
 import wx.grid
 
-import grid
-import data as dt
+from grid import CustomGrid
+from data import GridData, Link, Info, Group, Offer, Data
 
 
 FRAME_TITLE = "Ttk-py"
@@ -67,16 +68,23 @@ class AppFrame(wx.Frame):
             "open_offers": []
         }
         
+        # Load workspace info from file.
         try:
             with open(WORKSPACE_FILE, 'r') as rf:
                 self.workspace = json.load(rf)
         except FileNotFoundError as e:
             print(f"No workspace file found: {e}")
         else:
+            # Load offers open in last session.
             for path in self.workspace['open_offers']:
-                with open(path, 'r') as rf:
-                    offer = dt.Offer.from_dict(json.load(rf))
-                    data.offers.append(offer)
+                try:
+                    with open(path, 'r') as rf:
+                        offer = Offer.from_dict(json.load(rf))
+                        data.offers.append(offer)
+                except FileNotFoundError as e:
+                    print(f"{e}")
+                except json.decoder.JSONDecodeError as e:
+                    print(f"{path}\n\tFile is not a valid json.")
 
         self.CenterOnScreen()
         self.create_menubar()
@@ -121,7 +129,7 @@ class AppFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self.menu_exit, id=wx.ID_EXIT)
 
     def menu_new(self, evt):
-        print(f"menu_new event - ")
+        """Create new offer."""
         self.panel.data.new_offer()
         self.panel.create_tree()
 
@@ -153,7 +161,7 @@ class AppFrame(wx.Frame):
                     offer_dict = json.load(rf)
 
                 # Create offer object from dictionary
-                offer = dt.Offer.from_dict(offer_dict)
+                offer = Offer.from_dict(offer_dict)
                 offer.info.filepath = path
                 self.panel.data.offers.append(offer)
 
@@ -162,6 +170,7 @@ class AppFrame(wx.Frame):
         dlg.Destroy()
 
     def menu_save(self, evt):
+        """Save selected offer to info.filepath if not empty."""
         # Get dictionary of selected offer.
         offer = self.panel.get_selected_offer()
         path = offer.info.filepath
@@ -176,7 +185,7 @@ class AppFrame(wx.Frame):
             self.menu_saveas(self, evt)
 
     def menu_saveas(self, evt):
-        """Handle event for saving an offer with name."""
+        """Handle event for 'save as'."""
         # Get selected offer.
         offer = self.panel.get_selected_offer()
         print(f"Saving '{offer.name}'")
@@ -215,7 +224,7 @@ class Panel(wx.Panel):
     def __init__(self, parent, data):
         super().__init__(parent)
 
-        self.data: dt.Data = data
+        self.data: Data = data
 
         #------------------------------------------------------------------------------------------
         # SashWindows
@@ -233,34 +242,22 @@ class Panel(wx.Panel):
         #------------------------------------------------------------------------------------------
         
         tree_panel = wx.Panel(self.left_win)
-        # treebtn_close_offer = wx.Button(tree_panel, label=BTN_CLOSE_OFFER)
-        # treebtn_new_group = wx.Button(tree_panel, label=BTN_NEW_GROUP)
-        # treebtn_del_group = wx.Button(tree_panel, label=BTN_DEL_GROUP)
         self.tree_ctrl = dv.DataViewTreeCtrl(tree_panel)
         self.tree_root = self.tree_ctrl.AppendContainer(
             dv.NullDataViewItem,
             TREE_ROOT_TITLE,
-            data=dt.Link(dt.Link.DATA, [])
+            data=Link(Link.DATA, [])
         )
+        # Save expanded status for refreshing the tree.
         self.is_treeitem_expanded = {TREE_ROOT_TITLE: True}
         self.create_tree()
 
         # Fill the left window with tree_ctrl
         lwin_sizer = wx.BoxSizer(wx.VERTICAL)
-        # btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
-
-        # btn_sizer.Add(treebtn_close_offer, 0, wx.ALL, 2)
-        # btn_sizer.Add(treebtn_new_group, 0, wx.ALL, 2)
-        # btn_sizer.Add(treebtn_del_group, 0, wx.ALL, 2)
-
-        # lwin_sizer.Add(btn_sizer, 0, wx.ALIGN_CENTER)
         lwin_sizer.Add(self.tree_ctrl, 1, wx.EXPAND)
 
         tree_panel.SetSizer(lwin_sizer)
 
-        # self.Bind(wx.EVT_BUTTON, self.on_btn_close_offer, treebtn_close_offer)
-        # self.Bind(wx.EVT_BUTTON, self.on_btn_new_group, treebtn_new_group)
-        # self.Bind(wx.EVT_BUTTON, self.on_btn_del_group, treebtn_del_group)
         self.Bind(dv.EVT_DATAVIEW_SELECTION_CHANGED, self.on_treeitem_activate)
         self.Bind(dv.EVT_DATAVIEW_ITEM_START_EDITING, self.on_treeitem_edit)
         self.Bind(dv.EVT_DATAVIEW_ITEM_COLLAPSING, self.on_treeitem_collapsing)
@@ -280,8 +277,8 @@ class Panel(wx.Panel):
         self.book.AddPage(gridpage, "gridpage")
         self.book.AddPage(infopage, "infopage")
         self.book.AddPage(rootpage, "rootpage")
-        self.pageidx = {dt.Link.GROUP: 0, dt.Link.OFFER: 1, dt.Link.DATA: 2}
-        self.pagesel_link = dt.Link(dt.Link.DATA, [])
+        self.pageidx = {Link.GROUP: 0, Link.OFFER: 1, Link.DATA: 2}
+        self.pagesel_link = Link(Link.DATA, [])
         self.book.SetSelection(2)
 
         # self.Bind(wx.EVT_BOOKCTRL_PAGE_CHANGING, self.on_book_pagechanged, self.book)
@@ -310,10 +307,10 @@ class Panel(wx.Panel):
         gp_label_sizer.Add(self.gp_namelabel, 0, wx.ALL, BORDER)
         gp_label_sizer.Add(self.gp_namectrl, 0, wx.ALL, BORDER)
 
-        self.grid_predefs = grid.CustomGrid(gridpage, dt.Predef())
-        self.grid_materials = grid.CustomGrid(gridpage, dt.Material())
-        self.grid_products = grid.CustomGrid(gridpage, dt.Product())
-        self.grid_parts = grid.CustomGrid(gridpage, dt.Part(), None)
+        self.grid_predefs = CustomGrid(gridpage, GridData.predefs())
+        self.grid_materials = CustomGrid(gridpage, GridData.materials())
+        self.grid_products = CustomGrid(gridpage, GridData.products())
+        self.grid_parts = CustomGrid(gridpage, GridData.parts())
 
         self.Bind(wx.grid.EVT_GRID_SELECT_CELL, self.on_select_product, self.grid_products)
         self.Bind(wx.grid.EVT_GRID_CELL_CHANGED, self.on_cell_changed, self.grid_parts)
@@ -427,13 +424,21 @@ class Panel(wx.Panel):
     def create_tree(self):
         """Add items from data to dv_treectrl."""
 
+        # Clear the tree.
         self.tree_ctrl.DeleteChildren(self.tree_root)
         list = self.data.get_treelist()
 
         last = None
         for n in range(len(list)):
-            if list[n][0].target == dt.Link.OFFER:
-                last = self.tree_ctrl.AppendContainer(self.tree_root, list[n][1], data=list[n][0])
+            # Attach offers to rootitem
+            if list[n][0].target == Link.OFFER:
+                last = self.tree_ctrl.AppendContainer(
+                    self.tree_root,
+                    list[n][1],
+                    data=list[n][0]
+                )
+                
+                # Set expanded status from saved.
                 is_expanded = self.is_treeitem_expanded.get(list[n][1])
                 if is_expanded:
                     self.tree_ctrl.Expand(last)
@@ -441,7 +446,8 @@ class Panel(wx.Panel):
                     self.is_treeitem_expanded[list[n][1]] = True
                     self.tree_ctrl.Expand(last)
 
-            elif list[n][0].target == dt.Link.GROUP:
+            # Attach Groups to previous offer.
+            elif list[n][0].target == Link.GROUP:
                 if last:
                     self.tree_ctrl.AppendItem(last, list[n][1], data=list[n][0])
 
@@ -459,13 +465,13 @@ class Panel(wx.Panel):
                 self.pagesel_link = link
                 print(f"Panel.on_treeitem_activate: Change page to {obj}")
 
-                if link.target == dt.Link.GROUP:
+                if link.target == Link.GROUP:
                     self.update_gridpage_content(link)
 
             elif self.pagesel_link.n != link.n:
                 # Change content of the page to obj.
                 self.pagesel_link = link
-                if link.target == dt.Link.GROUP:
+                if link.target == Link.GROUP:
                     self.update_gridpage_content(link)
 
             else:
@@ -489,18 +495,20 @@ class Panel(wx.Panel):
         # print(f"Panel.on_treeitem_collapsed: Set {text} to False")
 
     def get_selected_offer(self):
-        """Return the offer selected in treelist."""
-        offer_link = dt.Link(dt.Link.OFFER, n=[0])
+        """Return the offer selected or whose child is selected in treelist."""
+        offer_link = Link(Link.OFFER, n=[0])
         link = self.pagesel_link
-        if link.target == dt.Link.DATA:
+
+        # Check if offer or it's child is selected.
+        if link.target == Link.DATA:
             print(NO_OFFER_SELECTED)
             return
-        elif link.target == dt.Link.GROUP:
+        elif link.target == Link.GROUP:
             offer_link.n = [i for i in link.n[:-1]]
-        elif link.target == dt.Link.OFFER:
+        elif link.target == Link.OFFER:
             offer_link.n = [i for i in link.n]
 
-        # Get dictionary of selected offer.
+        # Return the selected offer.
         return self.data.get(offer_link)
 
     #------------------------------------------------------------------------------------------
@@ -516,7 +524,7 @@ class Panel(wx.Panel):
     def on_gp_namectrl_text(self, evt):
         """Update the group name with content of textctrl."""
         group = self.data.get(self.pagesel_link)
-        if self.pagesel_link.target == dt.Link.GROUP:
+        if self.pagesel_link.target == Link.GROUP:
             group.name = evt.GetString()
             self.create_tree()
             print(f"Panel.on_gp_namectrl_text: {evt.GetString()}")
@@ -531,13 +539,13 @@ class Panel(wx.Panel):
         """
         obj = self.data.get(link)
 
-        if isinstance(obj, dt.Group):
-            self.gp_namectrl.ChangeValue(obj.name)
+        if isinstance(obj, Group):
             print(f"Panel.on_treeitem_activate: Change page content to {obj}")
-            self.grid_predefs.update_data(obj.predefs, True)
-            self.grid_materials.update_data(obj.materials, True)
-            self.grid_products.update_data(obj.products, True)
-            self.grid_parts.update_data(None, True)
+            self.gp_namectrl.ChangeValue(obj.name)
+            self.grid_predefs.update_data(obj.predefs.data, True)
+            self.grid_materials.update_data(obj.materials.data, True)
+            self.grid_products.update_data(obj.products.data, True)
+            self.grid_parts.update_data([], True)
             self.gp_parts_label.SetLabel(GP_NO_PRODUCT_SELECTED)
 
         else:
@@ -549,44 +557,48 @@ class Panel(wx.Panel):
         # print(f"Panel.on_select_grid_cell row: {row}")
         self.grid_products.selected_row = row
         try:
-            product_code = self.grid_products.data[row].code
+            product_code = self.grid_products.data.get(row, 'code')
         except IndexError:
             print("Product selection in a row without any initialized data." +
                   " Using previous row for part grid.")
         else:
             # Update part codes
-            product = self.grid_products.data[row]
-            parts = product.parts
-            materials = self.grid_materials.data
-            predefs = self.grid_predefs.data
-            for part in parts:
-                part.process_codes(product, materials, predefs)
+            product = self.grid_products.data.get(row)
+            parts = product['parts']
+            print(f"Panel.on_select_product - parts type: {type(parts)}")
+            outside_data = {
+                self.grid_predefs.data.name: self.grid_predefs.data,
+                self.grid_materials.data.name: self.grid_materials.data,
+                self.grid_parts.data.name: product['parts'],
+                'parent': product
+            }
+            parts.process_codes(outside_data)
             self.gp_parts_label.SetLabel(GP_PARTS_LABEL.format(product_code))
-            self.grid_parts.update_data(parts, True)
+            self.grid_parts.update_data(parts.data, True)
 
     def on_cell_changed(self, evt):
-        # print(f"Panel.on_cell_changed")
+        print(f"Panel.on_cell_changed")
         # Get selected product, return if no products are initiated.
-        product_row = self.grid_products.selected_row
-        if product_row is None:
-            return
+        # product_row = self.grid_products.selected_row
+        # if product_row is None:
+        #     return
 
-        # Get Product and materials data.
-        try:
-            product = self.grid_products.data[product_row]
-        except IndexError:
-            print("Product selection in a row without any initialized data." +
-                  " Using previous row for part grid.")
-            product = self.grid_products.data[product_row - 1]
-        materials = self.grid_materials.data
-        predefs = self.grid_predefs.data
+        # # Get Product and materials data.
+        # try:
+        #     product = self.grid_products.data.get(product_row)
+        # except IndexError:
+        #     print("Product selection in a row without any initialized data." +
+        #           " Using previous row for part grid.")
+        #     product = self.grid_products.data.get(product_row - 1)
+        # materials = self.grid_materials.data
+        # predefs = self.grid_predefs.data
 
-        # Process part codes and update part data to the grid.
-        for part in product.parts:
-            # print(f"Processing part {part.code}")
-            part.process_codes(product, materials, predefs)
-        self.grid_parts.update_data(product.parts)
-        self.grid_parts.Refresh()
+        # # Process part codes and update part data to the grid.
+        # for part in product.parts:
+        #     # print(f"Processing part {part.code}")
+        #     part.process_codes(product, materials, predefs)
+        # self.grid_parts.update_data(product.parts)
+        # self.grid_parts.Refresh()
 
     #------------------------------------------------------------------------------------------
     # Simplebook - infpage
@@ -595,7 +607,7 @@ class Panel(wx.Panel):
         """Add a new group to selected offer."""
         offer = self.get_selected_offer()
         if offer is not None:
-            offer.groups.append(dt.Group(dt.NEW_GROUP_NAME))
+            offer.groups.append(Group())
             self.create_tree()
         else:
             print(NO_OFFER_SELECTED)
@@ -614,7 +626,7 @@ class Panel(wx.Panel):
             if dlg.ShowModal() == wx.ID_OK:
                 selections = dlg.GetSelections()
                 # Move selection to parent if a deleted group is selected.
-                if (self.pagesel_link.target == dt.Link.GROUP and
+                if (self.pagesel_link.target == Link.GROUP and
                     self.pagesel_link.n[1] in selections):
                     cur_sel = self.tree_ctrl.GetSelection()
                     parent = self.tree_ctrl.GetModel().GetParent(cur_sel)
@@ -653,7 +665,7 @@ class Panel(wx.Panel):
 if __name__ == '__main__':
     app = wx.App(useBestVisual=True)
 
-    data = dt.Data()
+    data = Data()
     # data.build_test()
 
     frame = AppFrame(data)
