@@ -334,65 +334,76 @@ class Part(GridData):
 
 
 class GridData:
+    DEFAULT = 0
+    TYPE = 1
+    LABEL = 2
+    READONLY = 3
+
     def __init__(
         self,
         name="",
         data=[],
-        defaults={},
+        fields={},
         child=None,
         parent=None,
-        col_keys=[],
-        col_labels=[],
-        col_types=[],
-        col_readonly=[],
+        columns=[],
         tab_to=[],
-        codes=[]
+        codes={}
     ):
+        """GridData class for containing and formatting data for grid windows.
+        
+        Args:
+            name (str): Name string of this GridData object.
+            data (list): Contained data as list of dictionaries.
+            fields (dict): All field definitions {key: [DEFAULT, TYPE, LABEL, READONLY]}
+            child (str|None): GridData.name of child.
+            parent (str|None): GridData.name of parent.
+            columns (list): Keys that will be shown in grid.
+            tab_to (list): Column index for the target column for tab.
+            codes (dict): target_key: code_key i.e. 'price': 'code_price'
+        """
         self.name = name
         self.data = data
-        self.defaults = defaults
+        self.fields = fields
         child=child
         parent=parent
-        self.col_keys = col_keys
-        self.col_labels = col_labels
-        self.col_types = col_types
-        self.col_readonly = col_readonly
+        self.columns = columns
         self.tab_to = tab_to
         self.codes = codes
 
     def get(self, row, col):
         if isinstance(col, int):
             try:
-                return self.data[row][self.col_keys[col]]
+                return self.data[row][self.columns[col]]
             except (IndexError, KeyError) as e:
                 print(f"{e}\n    row: {row}, col: {col}, len(self.data): {len(self.data)},"+
-                      f" len(self.col_keys): {len(self.col_keys)}")
+                      f" len(self.col_keys): {len(self.columns)}")
         elif isinstance(col, str):
             try:
                 return self.data[row][col]
             except (KeyError, IndexError) as e:
                 print(f"{e}\n    row: {row}, col: {col}, len(self.data): {len(self.data)},"+
-                      f" len(self.col_keys): {len(self.col_keys)}")
+                      f" len(self.col_keys): {len(self.columns)}")
 
     def set(self, row, col, value):
         if isinstance(col, int):
             try:
-                self.data[row][self.col_keys[col]] = value
+                self.data[row][self.columns[col]] = value
             except (IndexError, KeyError) as e:
                 print(f"{e}\n    row: {row}, col: {col}, len(self.data): {len(self.data)},"+
-                      f" len(self.col_keys): {len(self.col_keys)}")
+                      f" len(self.col_keys): {len(self.columns)}")
 
         elif isinstance(col, str):
             try:
                 self.data[row][col] = value
             except (IndexError, KeyError) as e:
                 print(f"{e}\n    row: {row}, col: {col}, len(self.data): {len(self.data)},"+
-                       " len(self.col_keys): {len(self.col_keys)}")
+                      f" len(self.col_keys): {len(self.columns)}")
     
     def process_codes(self, osd):
-        for rowdata in self.data:
+        for obj in self.data:
             for target_key, code_key in self.codes.items():
-                rowdata[target_key] = eval(rowdata[code_key])
+                obj[target_key] = eval(obj[code_key])
 
     def find(self, target_key, target_value, return_key):
         """Find a value matching the given keys.
@@ -413,6 +424,12 @@ class GridData:
                       f" GridData.name={self.name} - {e}")
         return None
 
+    def sum(self, key: str):
+        s = 0
+        for obj in self.data:
+            s += obj[key]
+        return s
+
     def is_true(self, value: str) -> bool:
         false_keys = [
             "",
@@ -428,10 +445,7 @@ class GridData:
             'False',
             'FALSE'
         ]
-        if value in false_keys:
-            return False
-        else:
-            return True
+        return False if value in false_keys else True
 
     @classmethod
     def new(cls, name):
@@ -449,13 +463,13 @@ class GridData:
         return cls(
             name="predefs",
             data=[],
-            defaults={'part': "", 'mat': ""},
+            fields={
+                'part': ['', 'string', 'Osa', False],
+                'mat': ['', 'string', 'Materiaali', False]
+            },
             child=None,
             parent=None,
-            col_keys=['part', 'mat'],
-            col_labels=['Osa', 'Materiaali'],
-            col_types=['string', 'string'],
-            col_readonly=[],
+            columns=['part', 'mat'],
             tab_to=[1, 0],
             codes={}
         )
@@ -464,13 +478,17 @@ class GridData:
         return cls(
             name="materials",
             data=[],
-            defaults={'code': "", 'desc': "", 'thck': 0, 'prod': "", 'cost': 0.0, 'unit': ""},
+            fields={
+                'code': ['', 'string', 'Koodi', False],
+                'desc': ['', 'string', 'Kuvaus', False],
+                'thck': [0, 'long', 'Paksuus (mm)', False],
+                'prod': ['', 'string', 'Valmistaja', False],
+                'cost': [0.0, 'double', 'Hinta', False],
+                'unit': ['', 'string', 'Hintayksikkö', False]
+            },
             child=None,
             parent=None,
-            col_keys=['code', 'desc', 'thck', 'prod', 'cost', 'unit'],
-            col_labels=['Osa', 'Kuvaus', 'Paksuus (mm)', 'Valmistaja', 'Hinta', 'Hintayksikkö'],
-            col_types=['string', 'string', 'long', 'string', 'double', 'string'],
-            col_readonly=[],
+            columns=['code', 'desc', 'thck', 'prod', 'cost', 'unit'],
             tab_to=[1, 2, 3, 4, 5],
             codes={}
         )
@@ -479,45 +497,65 @@ class GridData:
         return cls(
             name="products",
             data=[],
-            defaults={'code': "", 'desc': "", 'prod': "", 'x': 0, 'y': 0, 'z': 0, 'cost': 0.0, 'code_cost': "self.parts.sum('cost')"},
+            fields={
+                'code': ['', 'string', 'Koodi', False],
+                'desc': ['', 'string', 'Kuvaus', False],
+                'prod': ['', 'string', 'Valmistaja', False],
+                'x': [0, 'long', 'Leveys', True],
+                'y': [0, 'long', 'Korkeus', True],
+                'z': [0, 'long', 'Syvyys', True],
+                'cost': [0.0, 'double', 'Hinta', True],
+                'code_cost': ["obj['parts'].sum('cost')", 'string', 'Hinta koodi', False]
+            },
             child="parts",
             parent=None,
-            col_keys=['code', 'desc', 'prod', 'x', 'y', 'z', 'cost'],
-            col_labels=['Osa', 'Kuvaus', 'Valmistaja', 'Leveys', 'Korkeus', 'Syvyys', 'Hinta (€)'],
-            col_types=['string', 'string', 'string', 'long', 'long', 'long', 'double'],
-            col_readonly=[],
+            columns=['code', 'desc', 'prod', 'x', 'y', 'z', 'cost'],
             tab_to=[1, 2, 3, 4],
-            codes={}
+            codes={'cost': 'code_cost'}
         )
     @classmethod
     def parts(cls) -> GridData:
         return cls(
             name="parts",
             data=[],
-            defaults={
-                'code': "",
-                'desc': "",
-                'use_predef': "",
-                'mat': "",
-                'use_mat': "",
-                'x': 0,
-                'y': 0,
-                'z': 0,
-                'cost': 0.0,
-                'code_use_mat': "osd['predef'].find('part', rowdata['code'], 'mat') if self.is_true(rowdata['use_predef']) else rowdata['mat'])",
-                'code_x': "0",
-                'code_y': "0",
-                'code_z': "0",
-                'code_cost': "rowdata['x'] * rowdata['y'] * osd['materials'].find('mat', 'rowdata['use_mat']', 'cost')"
+            fields={
+                'code': ['', 'string', 'Koodi', False],
+                'desc': ['', 'string', 'Kuvaus', False],
+                'use_predef': ['', 'string', 'Esimääritys', False],
+                'mat': ['', 'string', 'Materiaali', False],
+                'use_mat': ['', 'string', 'Käyt. Mat.', True],
+                'x': [0, 'long', 'Leveys', True],
+                'y': [0, 'long', 'Korkeus', True],
+                'z': [0, 'long', 'Syvyys', True],
+                'cost': [0.0, 'double', 'Hinta', True],
+                'code_use_mat': 
+                [
+                    "osd['predef'].find('part', obj['code'], 'mat') "+
+                    "if self.is_true(obj['use_predef']) else obj['mat'])",
+                    'string', 'Leveys koodi', False
+                ],
+                'code_x': ["0", 'string', 'Leveys koodi', False],
+                'code_y': ["0", 'string', 'Korkeus koodi', False],
+                'code_z': ["0", 'string', 'Syvyys koodi', False],
+                'code_cost': 
+                [
+                    "obj['x'] * obj['y'] * "+
+                    "osd['materials'].find('mat', 'obj['use_mat']', 'cost')",
+                    'string', 'Hinta koodi', False
+                ]
             },
-            child="parts",
+            child=None,
             parent="products",
-            col_keys=['code', 'desc', 'use_predef', 'mat', 'use_mat', 'x', 'y', 'z', 'cost'],
-            col_labels=['Osa', 'Kuvaus', 'Käytä Esimääritystä', 'Materiaali', 'Käytettävä Materiaali', 'Leveys', 'Korkeus', 'Syvyys', 'Hinta (€)'],
-            col_types=['string', 'string', 'string', 'string', 'string', 'long', 'long', 'long', 'double'],
-            col_readonly=[4, 5, 6, 7, 8],
+            columns=['code', 'desc', 'use_predef', 'mat', 'use_mat', 'x', 'y', 'z', 'cost'],
             tab_to=[1, 2, 3, 4, 5, 6, 7],
-            codes={'use_mat': "code_use_mat", 'x': "code_x", 'y': "code_y", 'z': "code_z", 'cost': "code_cost"}
+            codes=
+            {
+                'use_mat': "code_use_mat",
+                'x': "code_x",
+                'y': "code_y",
+                'z': "code_z",
+                'cost': "code_cost"
+            }
         )
 
 
