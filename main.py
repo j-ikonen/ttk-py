@@ -1,8 +1,8 @@
 """
 TODO:
-    Find why rows are multiplied when saving and maybe loading from file.
-    Add Dialog for uploading selected objects to a database.
-    Add Windows to handle loading objects from a database.
+    Move Frame to frame.py
+    Add Dialog or page for creating new objects to database.
+    Add Dialog to handle loading objects from a database.
     Add FoldPanelBar to fold grids hidden.
 
 Part:
@@ -10,6 +10,28 @@ Part:
     Part.use_material is Part.material_code if predef does not exist or
     Part.use_predef is ""|"n"|"no"|"e"|"ei"|"False"|"false" otherwise
     Part.use_material is a Predef.materialcode of a matching Predef.partcode
+
+Codes:
+    VALUES:
+        osd: Outside Data
+            osd['predefs']      - GridData
+            osd['materials']    - GridData
+            osd['parts']        - GridData
+            osd['parent']       - Dictionary
+        self: GridData where the code is.
+        obj: self[row] - Dictionary where the code is.
+
+    FUNCTIONS:
+        GridData.find(target_key, target_key, value_key):
+            Find a value in another grid.
+            Args:
+                target_key: Key for matching.
+                target_key: Value for matching.
+                value_key:  Key for return value.
+        GridData.is_true(value):
+            Return False if value is ""|"n"|"no"|"e"|"ei"|"False"|"false" else True
+        GridData.sum(key):
+            Return sum of values in all rows at key in grid.
 """
 import os
 import json
@@ -31,7 +53,10 @@ BOTWIN_SIZE = (FRAME_SIZE[0], 100)
 TREE_ROOT_TITLE = "Tarjoukset"
 GP_NAMELABEL = "Ryhmän nimi: "
 GP_NAMECTRL_SIZE = (125, -1)
+IP_TEXTCTRL_SIZE = (400,-1)
+IP_LABEL_SIZE = (150, -1)
 BORDER = 5
+GP_BTN_REFRESH = "Päivitä"
 GP_PREDEFS_LABEL = "Osien esimääritellyt materiaalit"
 GP_MATERIALS_LABEL = "Materiaalit"
 GP_PRODUCTS_LABEL = "Tuotteet"
@@ -54,6 +79,12 @@ DLG_CLOSE_OFFERS_MSG = "Valitse suljettavat tarjoukset."
 DLG_CLOSE_OFFERS_CAP = "Sulje tarjouksia"
 DLG_DEL_GROUPS_MSG = "Valitse poistettavat ryhmät tarjouksesta '{}'."
 DLG_DEL_GROUPS_CAP = "Poista ryhmiä"
+REFRESH_TIMES = 3
+MENU_TITLE_DB = "Tietokanta"
+LABEL_ADD_TO_DB = "Lisää"
+HELP_ADD_TO_DB = "Lisää tietokantaan."
+
+ID_ADD_TO_DB = wx.NewIdRef()
 
 
 class AppFrame(wx.Frame):
@@ -110,6 +141,7 @@ class AppFrame(wx.Frame):
     def create_menubar(self):
         menu_bar = wx.MenuBar()
         menu_file = wx.Menu()
+        menu_db = wx.Menu()
 
         menu_file.Append(wx.ID_NEW)
         menu_file.Append(wx.ID_OPEN)
@@ -118,7 +150,11 @@ class AppFrame(wx.Frame):
         menu_file.Append(wx.ID_SEPARATOR)
         menu_file.Append(wx.ID_EXIT)
 
+        menu_db.Append(ID_ADD_TO_DB, LABEL_ADD_TO_DB, HELP_ADD_TO_DB)
+        # menu_db.Append(wx.ID_OPEN)
+
         menu_bar.Append(menu_file, wx.GetStockLabel(wx.ID_FILE))
+        menu_bar.Append(menu_db, MENU_TITLE_DB)
 
         self.SetMenuBar(menu_bar)
 
@@ -127,6 +163,8 @@ class AppFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self.menu_save, id=wx.ID_SAVE)
         self.Bind(wx.EVT_MENU, self.menu_saveas, id=wx.ID_SAVEAS)
         self.Bind(wx.EVT_MENU, self.menu_exit, id=wx.ID_EXIT)
+
+        self.Bind(wx.EVT_MENU, self.menu_db_add, id=ID_ADD_TO_DB)
 
     def menu_new(self, evt):
         """Create new offer."""
@@ -175,7 +213,7 @@ class AppFrame(wx.Frame):
         offer = self.panel.get_selected_offer()
         path = offer.info.filepath
         if path != "":
-            print(f"Saving '{offer.name}' to '{path}'")
+            print(f"Saving '{offer.info.offer_name}' to '{path}'")
             
             # Save offer dictionary to selected file.
             with open(path, 'w') as fp:
@@ -188,14 +226,14 @@ class AppFrame(wx.Frame):
         """Handle event for 'save as'."""
         # Get selected offer.
         offer = self.panel.get_selected_offer()
-        print(f"Saving '{offer.name}'")
+        print(f"Saving '{offer.info.offer_name}'")
 
         # Open FileDialog for Saving.
         dlg = wx.FileDialog(
             self,
             message=SAVE_FILE_MESSAGE,
             defaultDir=os.getcwd(),
-            defaultFile=offer.name,
+            defaultFile=offer.info.offer_name,
             wildcard=WILDCARD,
             style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT
         )
@@ -219,9 +257,18 @@ class AppFrame(wx.Frame):
     def menu_exit(self, evt):
         self.Close()
 
+    def menu_db_add(self, evt):
+        print("Frame.menu_db_add")
+
 
 class Panel(wx.Panel):
     def __init__(self, parent, data):
+        """Handle MainPanel windows.
+        
+        Args:
+            parent: Parent wx.Frame.
+            data (data.Data): Data class.
+        """
         super().__init__(parent)
 
         self.data: Data = data
@@ -300,12 +347,15 @@ class Panel(wx.Panel):
 
         self.gp_parts_label = wx.StaticText(gridpage,label=GP_PARTS_LABEL.format(part_label))
         self.gp_namectrl = wx.TextCtrl(gridpage, size=GP_NAMECTRL_SIZE)
+        self.gp_btn_refresh = wx.Button(gridpage, label=GP_BTN_REFRESH)
 
         self.Bind(wx.EVT_TEXT, self.on_gp_namectrl_text, self.gp_namectrl)
+        self.Bind(wx.EVT_BUTTON, self.on_gp_btn_refresh, self.gp_btn_refresh)
 
         gp_label_sizer = wx.BoxSizer(wx.HORIZONTAL)
         gp_label_sizer.Add(self.gp_namelabel, 0, wx.ALL, BORDER)
         gp_label_sizer.Add(self.gp_namectrl, 0, wx.ALL, BORDER)
+        gp_label_sizer.Add(self.gp_btn_refresh, 0, wx.ALL, BORDER)
 
         self.grid_predefs = CustomGrid(gridpage, GridData.predefs())
         self.grid_materials = CustomGrid(gridpage, GridData.materials())
@@ -342,8 +392,12 @@ class Panel(wx.Panel):
         #------------------------------------------------------------------------------------------
         # Simplebook - infopage
         #------------------------------------------------------------------------------------------
-        btn_new_group = wx.Button(infopage, label=BTN_NEW_GROUP)
-        btn_del_group = wx.Button(infopage, label=BTN_DEL_GROUP)
+        info_sizer = wx.BoxSizer(wx.VERTICAL)
+        infopanel = wx.Panel(infopage)
+
+        # Buttons
+        btn_new_group = wx.Button(infopanel, label=BTN_NEW_GROUP)
+        btn_del_group = wx.Button(infopanel, label=BTN_DEL_GROUP)
 
         self.Bind(wx.EVT_BUTTON, self.on_btn_new_group, btn_new_group)
         self.Bind(wx.EVT_BUTTON, self.on_btn_del_group, btn_del_group)
@@ -352,9 +406,49 @@ class Panel(wx.Panel):
         btn_sizer.Add(btn_new_group, 0, wx.ALL, BORDER)
         btn_sizer.Add(btn_del_group, 0, wx.ALL, BORDER)
 
-        sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer.Add(btn_sizer)
-        infopage.Sizer = sizer
+        info_sizer.Add(btn_sizer, 0, wx.EXPAND)
+        info_sizer.Add((400, 20))
+
+        # Info() edits.
+        info_labels = {}
+        self.info_textctrls = {}
+        biggest_width = 0
+        test_text = wx.StaticText(infopanel)
+        init_info = Info.get_labels()
+
+        for label in init_info.values():
+            size = test_text.GetTextExtent(label)
+            if biggest_width < size.GetWidth():
+                biggest_width = size.GetWidth()
+
+        for key, label in init_info.items():
+            info_labels[key] = wx.StaticText(
+                infopanel,
+                label=label,
+                size=(biggest_width, -1),
+                style=wx.ALIGN_RIGHT
+            )
+            self.info_textctrls[key] = wx.TextCtrl(
+                infopanel,
+                value="",
+                size=IP_TEXTCTRL_SIZE
+            )
+            size = info_labels[key].GetSizeFromText(label)
+            if size.GetWidth() > biggest_width:
+                biggest_width = size.GetWidth()
+
+            info_row_sizer = wx.BoxSizer(wx.HORIZONTAL)
+            info_row_sizer.Add(info_labels[key], 0, wx.ALL, BORDER)
+            info_row_sizer.Add(self.info_textctrls[key], 0, wx.ALL, BORDER)
+            info_sizer.Add(info_row_sizer, 0, wx.EXPAND)
+
+            self.Bind(wx.EVT_TEXT, self.on_info_text, self.info_textctrls[key])
+
+        infopanel.SetSizer(info_sizer)
+        infopage_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        infopage_sizer.Add(infopanel, 1, wx.EXPAND)
+        infopage.SetSizer(infopage_sizer)
+
 
         #------------------------------------------------------------------------------------------
         # Simplebook - rootpage
@@ -467,12 +561,18 @@ class Panel(wx.Panel):
 
                 if link.target == Link.GROUP:
                     self.update_gridpage_content(link)
+                elif link.target == Link.OFFER:
+                    self.update_infopage_content()
+                    # print("Panel.on_treeitem_activate CHANGE TO INFOPAGE")
 
             elif self.pagesel_link.n != link.n:
                 # Change content of the page to obj.
                 self.pagesel_link = link
                 if link.target == Link.GROUP:
                     self.update_gridpage_content(link)
+                elif link.target == Link.OFFER:
+                    self.update_infopage_content()
+                    # print("Panel.on_treeitem_activate CHANGE CONTENT OF INFOPAGE")
 
             else:
                 print(f"Panel.on_treeitem_activate: Page already activated {obj}")
@@ -556,49 +656,59 @@ class Panel(wx.Panel):
         row = evt.GetRow()
         # print(f"Panel.on_select_grid_cell row: {row}")
         self.grid_products.selected_row = row
-        try:
-            product_code = self.grid_products.data.get(row, 'code')
-        except IndexError:
+        product_code = self.grid_products.data.get(row, 'code')
+
+        # Update parts grid label.
+        if product_code is None:
             print("Product selection in a row without any initialized data." +
                   " Using previous row for part grid.")
-        else:
-            # Update part codes
-            product = self.grid_products.data.get(row)
-            parts = product['parts']
+            self.gp_parts_label.SetLabel(GP_NO_PRODUCT_SELECTED)
+        else:   
+            self.gp_parts_label.SetLabel(GP_PARTS_LABEL.format(product_code))
+
+        # Update part codes
+        parts = self.grid_products.data.get(row, 'parts')
+        if parts:
             print(f"Panel.on_select_product - parts type: {type(parts)}")
             outside_data = {
                 self.grid_predefs.data.name: self.grid_predefs.data,
                 self.grid_materials.data.name: self.grid_materials.data,
-                self.grid_parts.data.name: product['parts'],
-                'parent': product
+                self.grid_parts.data.name: self.grid_products.data.get(
+                    row, self.grid_parts.data.name),
+                'parent': self.grid_products.data.get(row)
             }
             parts.process_codes(outside_data)
-            self.gp_parts_label.SetLabel(GP_PARTS_LABEL.format(product_code))
             self.grid_parts.update_data(parts.data, True)
+        else:
+            self.grid_parts.update_data([], True)
 
     def on_cell_changed(self, evt):
         print(f"Panel.on_cell_changed")
-        # Get selected product, return if no products are initiated.
-        # product_row = self.grid_products.selected_row
-        # if product_row is None:
-        #     return
 
-        # # Get Product and materials data.
-        # try:
-        #     product = self.grid_products.data.get(product_row)
-        # except IndexError:
-        #     print("Product selection in a row without any initialized data." +
-        #           " Using previous row for part grid.")
-        #     product = self.grid_products.data.get(product_row - 1)
-        # materials = self.grid_materials.data
-        # predefs = self.grid_predefs.data
+    def on_gp_btn_refresh(self, evt):
+        """Handle refresh button event for GridData.process_codes()."""
+        print(f"Panel.on_gp_btn_refresh")
+        def inner_refresh():
+            outside_data = {
+                self.grid_predefs.data.name: self.grid_predefs.data,
+                self.grid_materials.data.name: self.grid_materials.data,
+                self.grid_products.data.name: self.grid_products.data
+            }
+            self.grid_predefs.data.process_codes(outside_data)
+            self.grid_materials.data.process_codes(outside_data)
+            self.grid_products.data.process_codes(outside_data)
+            self.grid_predefs.Refresh()
+            self.grid_materials.Refresh()
+            self.grid_products.Refresh()
+            for row in range(self.grid_products.GetNumberRows() - 1):
+                parent = self.grid_products.data.get(row)
+                parts = self.grid_products.data.get(row, 'parts')
+                outside_data['parent'] = parent
+                parts.process_codes(outside_data)
 
-        # # Process part codes and update part data to the grid.
-        # for part in product.parts:
-        #     # print(f"Processing part {part.code}")
-        #     part.process_codes(product, materials, predefs)
-        # self.grid_parts.update_data(product.parts)
-        # self.grid_parts.Refresh()
+            self.grid_parts.Refresh()
+        for n in range(REFRESH_TIMES):
+            inner_refresh()
 
     #------------------------------------------------------------------------------------------
     # Simplebook - infpage
@@ -619,7 +729,7 @@ class Panel(wx.Panel):
             lst = offer.get_group_names()
             dlg = wx.MultiChoiceDialog(
                 self,
-                DLG_DEL_GROUPS_MSG.format(offer.name),
+                DLG_DEL_GROUPS_MSG.format(offer.info.offer_name),
                 DLG_DEL_GROUPS_CAP,
                 lst
             )
@@ -638,6 +748,33 @@ class Panel(wx.Panel):
 
         else:
             print(NO_OFFER_SELECTED)
+
+    def on_info_text(self, evt):
+        """Handle event for infopage textctrls."""
+        eobj = None
+        key = ""
+        # Find the key for edited ctrl.
+        for k, ctrl in self.info_textctrls.items():
+            if ctrl == evt.GetEventObject():
+                eobj = ctrl
+                key = k
+                break
+
+        # Update data with new value.
+        info = self.get_selected_offer().info.to_dict()
+        info[key] = eobj.GetValue()
+        self.get_selected_offer().info = Info.from_dict(info)
+
+        # Update tree with new name.
+        if key == "offer_name":
+            self.create_tree()
+
+    def update_infopage_content(self):
+        """Get values from selected offer to TextCtrls."""
+        print("Panel.update_infopage_content")
+        info_dict = self.get_selected_offer().info.to_dict()
+        for key, ctrl in self.info_textctrls.items():
+            ctrl.ChangeValue(info_dict[key])
 
     #------------------------------------------------------------------------------------------
     # Simplebook - rootpage

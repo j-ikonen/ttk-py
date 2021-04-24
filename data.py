@@ -1,7 +1,7 @@
-
 NEW_OFFER_NAME = "Uusi tarjous"
 NEW_GROUP_NAME = "Uusi ryhmä"
-NO_PREDEF_FOUND = "No predef found for part '{}'"
+NO_PREDEF_FOUND = "Esimääritystä ei löytynyt osalle: '{}'"
+GD_TO_DICT = "Muodosta (dict) kopio '{}' sisällötä, jonka pituus on: {}"
 
 PART_DEFAULT = {
     'code': '',
@@ -21,7 +21,7 @@ PART_DEFAULT = {
     'code_z': "0",
     'code_cost':
         "obj['x'] * obj['y'] * "+
-        "osd['materials'].find('mat', obj['use_mat'], 'cost')"
+        "osd['materials'].find('code', obj['use_mat'], 'cost')"
 }
 PREDEF_DEFAULT = {
     'part': "",
@@ -95,21 +95,20 @@ class GridData:
         if col is None:
             try:
                 return self.data[row]
-            except IndexError as e:
-                print(f"{e}\n    row: {row}, len(self.data): {len(self.data)}")
+            except IndexError:
+                return None
 
         elif isinstance(col, int):
             try:
                 return self.data[row][self.columns[col]]
-            except (IndexError, KeyError) as e:
-                print(f"{e}\n    row: {row}, col: {col}, len(self.data): {len(self.data)},"+
-                      f" len(self.col_keys): {len(self.columns)}")
+            except (IndexError, KeyError):
+                return None
+
         elif isinstance(col, str):
             try:
                 return self.data[row][col]
-            except (KeyError, IndexError) as e:
-                print(f"{e}\n    row: {row}, col: {col}, len(self.data): {len(self.data)},"+
-                      f" len(self.col_keys): {len(self.columns)}")
+            except (KeyError, IndexError):
+                return None
 
     def set(self, row, col, value) -> bool:
         """Return True if value was successfully set.
@@ -137,7 +136,7 @@ class GridData:
                 return False
 
     def process_codes(self, osd):
-        print(f"GridData.process_codes - type(self.data): {type(self.data)}")
+        # print(f"GridData.process_codes - type(self.data): {type(self.data)}")
         for obj in self.data:
             for target_key, code_key in self.codes.items():
                 obj[target_key] = eval(obj[code_key])
@@ -234,21 +233,30 @@ class GridData:
         """Return True if column is specified as read only."""
         return self.fields[self.columns[col]][GridData.READONLY]
 
-    def to_dict(self) -> dict:
-        if self.child is None:
-            return self.data
-        else:
-            data = []
-            for obj in self.data:
-                new_obj = {}
-                for key, value in obj.items():
-                    if key == self.child:
-                        new_obj[key] = value.to_dict()
-                    else:
-                        new_obj[key] = value
-                data.append(new_obj)
-            return data
-    
+    def to_dict(self) -> list:
+        print("GridData.to_dict()")
+        print(f"\ttype(self): {type(self)}")
+        print(f"\tself.name: {self.name}")
+        print("\t" + GD_TO_DICT.format(self.name, len(self.data)))
+        # if self.child is None:
+        #     return [{k: v for k, v in dic.items()} for dic in self.data]
+        # else:
+        return [
+            {k: (v.to_dict() if k == self.child else v) 
+            for k, v in dic.items()}
+                for dic in self.data
+            ]
+            # data = []
+            # for obj in self.data:
+            #     new_obj = {}
+            #     for key, value in obj.items():
+            #         if key == self.child:
+            #             new_obj[key] = value.to_dict()
+            #         else:
+            #             new_obj[key] = value
+            #     data.append(new_obj)
+            # return data
+
     @classmethod
     def from_dict(cls, name, data):
         griddata = cls.new(name)
@@ -272,7 +280,7 @@ class GridData:
             return cls.parts()
 
     @classmethod
-    def predefs(cls, data=[PREDEF_DEFAULT]):
+    def predefs(cls, data=[]):
         return cls(
             name="predefs",
             data=data,
@@ -287,7 +295,7 @@ class GridData:
             codes={}
         )
     @classmethod
-    def materials(cls, data=[MATERIAL_DEFAULT]):
+    def materials(cls, data=[]):
         return cls(
             name="materials",
             data=data,
@@ -306,7 +314,7 @@ class GridData:
             codes={}
         )
     @classmethod
-    def products(cls, data=[PRODUCT_DEFAULT]):
+    def products(cls, data=[]):
         for obj in data:
             if isinstance(obj['parts'], GridData):
                 parts = GridData.parts(obj['parts'].data)
@@ -321,12 +329,12 @@ class GridData:
                 'code': ['', 'string', 'Koodi', False],
                 'desc': ['', 'string', 'Kuvaus', False],
                 'prod': ['', 'string', 'Valmistaja', False],
-                'x': [0, 'long', 'Leveys', True],
-                'y': [0, 'long', 'Korkeus', True],
-                'z': [0, 'long', 'Syvyys', True],
+                'x': [0, 'long', 'Leveys', False],
+                'y': [0, 'long', 'Korkeus', False],
+                'z': [0, 'long', 'Syvyys', False],
                 'cost': [0.0, 'double', 'Hinta', True],
                 'code_cost': ["obj['parts'].sum('cost')", 'string', 'Hinta koodi', False],
-                'parts': [GridData.parts(), 'griddata', 'Osat', True]
+                'parts': [GridData.parts(), 'griddata', 'Osat', False]
             },
             child="parts",
             parent=None,
@@ -335,7 +343,7 @@ class GridData:
             codes={'cost': 'code_cost'}
         )
     @classmethod
-    def parts(cls, data=[PART_DEFAULT]):
+    def parts(cls, data=[]):
         if isinstance(data, GridData):
             raise TypeError("GridData.parts(data), data can not be class GridData")
         return cls(
@@ -363,7 +371,7 @@ class GridData:
                 'code_cost': 
                 [
                     "obj['x'] * obj['y'] * "+
-                    "osd['materials'].find('mat', obj['use_mat'], 'cost')",
+                    "osd['materials'].find('code', obj['use_mat'], 'cost')",
                     'string', 'Hinta koodi', False
                 ]
             },
@@ -383,7 +391,7 @@ class GridData:
 
 
 class Group:
-    def __init__(self, name=NEW_GROUP_NAME) -> None:
+    def __init__(self, name=NEW_GROUP_NAME):
         self.name = name
         self.predefs = GridData.predefs()
         self.materials = GridData.materials()
@@ -407,7 +415,8 @@ class Group:
 
 
 class Info:
-    def __init__(self):
+    def __init__(self, name=NEW_OFFER_NAME):
+        self.offer_name = name
         self.filepath = ""
         self.first_name = ""
         self.last_name = ""
@@ -415,6 +424,7 @@ class Info:
     
     def to_dict(self) -> dict:
         return {
+            "offer_name": self.offer_name,
             "filepath": self.filepath,
             "first_name": self.first_name,
             "last_name": self.last_name,
@@ -423,29 +433,36 @@ class Info:
     @classmethod
     def from_dict(cls, dic: dict):
         obj = cls()
+        obj.offer_name = dic["offer_name"]
         obj.filepath = dic["filepath"]
         obj.first_name = dic["first_name"]
         obj.last_name = dic["last_name"]
         obj.address = dic["address"]
         return obj
 
+    @classmethod
+    def get_labels(cls) -> dict:
+        return {
+            "offer_name": "Tarjouksen nimi",
+            "filepath": "Tiedosto",
+            "first_name": "Etunimi",
+            "last_name": "Sukunimi",
+            "address": "Osoite"
+        }
 
 class Offer:
-    def __init__(self, name=NEW_OFFER_NAME, groups=[Group()]):
-        self.name = name
+    def __init__(self, groups=[Group()]):
         self.info = Info()
         self.groups = groups
 
     def to_dict(self) -> dict:
         return {
-            "name": self.name,
             "info": self.info.to_dict(),
             "groups": [group.to_dict() for group in self.groups]
         }
     @classmethod
     def from_dict(cls, dic: dict):
         obj = cls()
-        obj.name = dic["name"]
         obj.info = Info.from_dict(dic["info"])
         obj.groups = [Group.from_dict(gr) for gr in dic["groups"]]
         return obj
@@ -500,7 +517,7 @@ class Data:
         treelist = []
         for n_offer in range(len(self.offers)):
             link = Link(Link.OFFER, [n_offer])
-            name = self.offers[n_offer].name
+            name = self.offers[n_offer].info.offer_name
             treelist.append((link, name))
 
             for n_group in range(len(self.offers[n_offer].groups)):

@@ -23,14 +23,10 @@ class CustomDataTable(wx.grid.GridTableBase):
 
         self.obj: GridData = data
 
-        # self.column_labels = labels
-        # self.data_types = types
-        # self.obj = obj
-
     def GetNumberRows(self):
         if self.obj is None or self.obj.data is None:
             return 0
-        return len(self.obj.data)
+        return len(self.obj.data) + 1
 
     def GetNumberCols(self):
         return len(self.obj.columns)
@@ -42,10 +38,8 @@ class CustomDataTable(wx.grid.GridTableBase):
             return True
 
     def GetValue(self, row, col):
-        try:
-            return self.obj.get(row, col)
-        except IndexError:
-            return ''
+        value = self.obj.get(row, col)
+        return value if value else ''
 
     def SetValue(self, row, col, value):
         def innerSetValue(row, col, value):
@@ -186,21 +180,21 @@ class CustomGrid(wx.grid.Grid):
         pass
 
     def on_cell_changed(self, evt):
-        row = evt.GetRow()
-        col = evt.GetCol()
-        value = self.GetCellValue(row, col)
+        # row = evt.GetRow()
+        # col = evt.GetCol()
+        # value = self.GetCellValue(row, col)
 
-        print(f"CustomGrid.on_cell_changed r:{row}, c:{col}, v:{value}")
+        # print(f"CustomGrid.on_cell_changed r:{row}, c:{col}, v:{value}")
 
-        if not self.data.set(row, col, value):
-            print(f"TRIED TO CHANGE A CELL THAT IS NOT INITIALIZED.")
+        # if not self.data.set(row, col, value):
+        #     print(f"TRIED TO CHANGE A CELL THAT IS NOT INITIALIZED.")
 
         # Initialize new empty row if edit in last one.
-        print(f"\tROW: {row}, NUM ROWS: {self.GetNumberRows()}")
-        if row >= self.GetNumberRows() - 1:
-            self.data.append()
-            self.AppendRows()
-            print("\tREFRESHED")
+        # print(f"\tROW: {row}, NUM ROWS: {self.GetNumberRows()}")
+        # if row >= self.GetNumberRows() - 1:
+        #     self.data.append()
+        #     self.AppendRows()
+        #     print("\tREFRESHED")
             # self.Refresh()
 
         # Keep cursor within intialized data.
@@ -241,6 +235,7 @@ class CustomGrid(wx.grid.Grid):
         self.rclick_row = None
 
     def on_edit_object(self, evt):
+        """Handle event for editing code values."""
         row = self.rclick_row
 
         codes = self.data.get_codes(row)
@@ -249,17 +244,23 @@ class CustomGrid(wx.grid.Grid):
 
         val = dlg.ShowModal()
         if val == wx.ID_OK:
-            print("Grid.on_edit_object RETURN OK FROM DIALOG")
+            # print("Grid.on_edit_object RETURN OK FROM DIALOG")
             for key, value in dlg.code_edits.items():
                 codes[key] = value.GetValue()
             self.data.set_codes(row, codes)
-        else:
-            print("Grid.on_edit_object RETURN CANCEL FROM DIALOG")
-        
+        # else:
+            # print("Grid.on_edit_object RETURN CANCEL FROM DIALOG")
+
         dlg.Destroy()
         self.Refresh()
 
     def update_data(self, data: list, reset_selection=False):
+        """Update GridData with given data.
+        
+        Args:
+            data (list): New data to replace GridData.data with.
+            reset_selection (bool): Will the selection be reset with update.
+        """
         try:
             oldlen = len(self.data.data)
         except TypeError:
@@ -283,6 +284,13 @@ class CustomGrid(wx.grid.Grid):
 
 class GridObjectDialog(wx.Dialog):
     def __init__(self, parent, data: dict, title=GOD_TITLE):
+        """Handle dialog for updating object data not shown in grid.
+        
+        Args:
+            parent: Parent wxWindow.
+            data (dict): Dictionary of data to edit.
+            title (str): Title string of dialog.
+        """
         super().__init__()
         self.Create(parent, title=title)
 
