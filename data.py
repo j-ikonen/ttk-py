@@ -1,3 +1,6 @@
+import collections
+
+
 NEW_OFFER_NAME = "Uusi tarjous"
 NEW_GROUP_NAME = "Uusi ryhmä"
 NO_PREDEF_FOUND = "Esimääritystä ei löytynyt osalle: '{}'"
@@ -201,10 +204,19 @@ class GridData:
 
 
     def get_label(self, col) -> str:
-        return self.fields[self.columns[col]][self.LABEL]
+        if isinstance(col, int):
+            return self.fields[self.columns[col]][self.LABEL]
+        elif isinstance(col, str):
+            return self.fields[col][self.LABEL]
 
     def get_type(self, col) -> str:
-        return self.fields[self.columns[col]][self.TYPE]
+        if isinstance(col, int):
+            return self.fields[self.columns[col]][self.TYPE]
+        elif isinstance(col, str):
+            return self.fields[col][self.TYPE]
+
+    def get_keys(self):
+        return self.fields.keys()
 
     def sum(self, key: str):
         s = 0
@@ -234,28 +246,13 @@ class GridData:
         return self.fields[self.columns[col]][GridData.READONLY]
 
     def to_dict(self) -> list:
-        print("GridData.to_dict()")
-        print(f"\ttype(self): {type(self)}")
-        print(f"\tself.name: {self.name}")
-        print("\t" + GD_TO_DICT.format(self.name, len(self.data)))
-        # if self.child is None:
-        #     return [{k: v for k, v in dic.items()} for dic in self.data]
-        # else:
+        """Return a list of dictionaries of self.data."""
+        # print("GridData.to_dict()")
         return [
             {k: (v.to_dict() if k == self.child else v) 
             for k, v in dic.items()}
                 for dic in self.data
             ]
-            # data = []
-            # for obj in self.data:
-            #     new_obj = {}
-            #     for key, value in obj.items():
-            #         if key == self.child:
-            #             new_obj[key] = value.to_dict()
-            #         else:
-            #             new_obj[key] = value
-            #     data.append(new_obj)
-            # return data
 
     @classmethod
     def from_dict(cls, name, data):
@@ -263,9 +260,10 @@ class GridData:
         if griddata.child is None:
             griddata.data = data
         else:
-            child_data = cls.from_dict(griddata.child, data[griddata.child])
-            data[griddata.child] = child_data
-            griddata.data = data
+            for item in data:
+                child_data = cls.from_dict(griddata.child, item[griddata.child])
+                item[griddata.child] = child_data
+                griddata.data.append(item)
         return griddata
 
     @classmethod

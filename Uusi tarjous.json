@@ -26,19 +26,19 @@
             "materials": [
                 {
                     "code": "MAT16",
-                    "desc": "",
+                    "desc": "Materiaali 16",
                     "thck": 16,
-                    "prod": "",
+                    "prod": "Valmistaja",
                     "cost": 9.0,
-                    "unit": ""
+                    "unit": "\u20ac/m2"
                 },
                 {
                     "code": "MAT6",
-                    "desc": "",
+                    "desc": "Materiaali 6",
                     "thck": 6,
-                    "prod": "",
+                    "prod": "Tuottaja",
                     "cost": 5.0,
-                    "unit": ""
+                    "unit": "\u20ac/m2"
                 }
             ],
             "products": [

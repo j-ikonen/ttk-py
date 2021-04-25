@@ -2,7 +2,7 @@
 
 
 from bson.objectid import ObjectId
-from pymongo import MongoClient, ASCENDING
+from pymongo import MongoClient, ASCENDING, errors
 
 
 HOST = 'localhost'
@@ -26,8 +26,13 @@ class Database:
         if isinstance(data, dict):
             return Database.collection.insert_one(data).inserted_id
         elif isinstance(data, list):
-            return Database.collection.insert_many(data).inserted_ids
-    
+            try:
+                return Database.collection.insert_many(data).inserted_ids
+            except errors.BulkWriteError as e:
+                print(f"{e}\n\tVirhe syöttäessä tietokantaan." +
+                       " Mahdollisesti uniikki indexi on jo tietokannassa.")
+                return []
+
     def find(self, filter, many=False):
         if not many:
             return Database.collection.find_one(filter)
@@ -42,3 +47,6 @@ class Database:
     
     def index(self, key, unique):
         Database.collection.create_index([(key, ASCENDING)], unique=unique)
+
+    def get_indexes(self):
+        return Database.collection.index_information()

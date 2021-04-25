@@ -1,13 +1,31 @@
 import wx
 import wx.grid
+import wx.dataview as dv
 
 from data import GridData
+from database import Database
 
 
 GRIDMENU_EDIT_OBJECT = "Muokkaa"
 GOD_TITLE = "Muokkaa"
 GOD_LABEL = "Muokkaa valitun esineen ominaisuuksia."
 GOD_EDIT_SIZE = (250, -1)
+GRIDMENU_ITDB = "Syötä tietokantaan"
+GRIDMENU_ITDB_HELP = "Syötä tietokantaan"
+GRIDMENU_EDIT_OBJECT_HELP = "Muokkaa koodeja."
+GRID_ITDB_NO_SELECTION = "Ei valintaa, jota syöttää tietokantaan."
+GRIDMENU_FFDB = "Etsi tietokannasta"
+GRIDMENU_FFDB_HELP = "Etsi tietokannasta"
+GIRD_ITDB_INS_IDS = "\tInserted ids: {}"
+
+ITDD_TITLE = "Syötä Tietokantaan"
+BORDER = 5
+CH_CLL_SIZE = (80, -1)
+CLL_DICT = {'Materiaalit': 'materials', 'Tuotteet': 'products'}
+
+LABELS = {'materials': 'Materiaalit', 'products': 'Tuotteet'}
+FFDB_TITLE = "Etsi tietokannasta: '{}'"
+FFDB_TE_SIZE = (120, -1)
 
 
 class CustomDataTable(wx.grid.GridTableBase):
@@ -220,12 +238,20 @@ class CustomGrid(wx.grid.Grid):
 
         # Do Event Binding only once.
         if not hasattr(self, 'edit_object_id'):
-            self.edit_object_id = wx.NewIdRef()
+            self.edit_object_id = wx.NewIdRef() 
+            self.itdb_id = wx.NewIdRef()        # Insert To DataBase
+            self.ffdb_id = wx.NewIdRef()        # Find from DataBase
+
             self.Bind(wx.EVT_MENU, self.on_edit_object, id=self.edit_object_id)
+            self.Bind(wx.EVT_MENU, self.on_insert_to_db, id=self.itdb_id)
+            self.Bind(wx.EVT_MENU, self.on_find_from_db, id=self.ffdb_id)
 
         menu = wx.Menu()
-        menu.Append(self.edit_object_id, GRIDMENU_EDIT_OBJECT)
+        menu.Append(self.edit_object_id, GRIDMENU_EDIT_OBJECT, GRIDMENU_EDIT_OBJECT_HELP)
 
+        if self.data.name == 'materials' or self.data.name == 'products':
+            menu.Append(self.itdb_id, GRIDMENU_ITDB, GRIDMENU_ITDB_HELP)
+            menu.Append(self.ffdb_id, GRIDMENU_FFDB, GRIDMENU_FFDB_HELP)
         # Alternate item initialization for editing MenuItem properties.
         # item = wx.MenuItem(menu, self.edit_object_id, GRIDMENU_EDIT_OBJECT")
         # menu.Append(item)
@@ -253,6 +279,42 @@ class CustomGrid(wx.grid.Grid):
 
         dlg.Destroy()
         self.Refresh()
+
+    def on_insert_to_db(self, evt):
+        print("CustomGrid.on_insert_to_db")
+        selected = self.GetSelectedRows()
+        data = self.data.to_dict()
+        to_db = []
+        for row in selected:
+            to_db.append(data[row])
+        
+        if len(to_db) > 0:
+            ids = Database(self.data.name).insert(to_db)
+            print(GIRD_ITDB_INS_IDS.format(ids))
+        else:
+            print(GRID_ITDB_NO_SELECTION)
+
+    def on_find_from_db(self, evt):
+        print("CustomGrid.on_find_from_db")
+        
+        with FindFromDbDialog(self, self.data.name) as dlg:
+            if dlg.ShowModal() == wx.ID_OK:
+                print(f"\tFound items: {len(dlg.selected_items)}")
+                if len(dlg.selected_items) > 0:
+                    obj = dlg.selected_items[0]
+                    # obj = {
+                    #     k: v if not isinstance(v, dict) else {key: value for key, value in v.items()}
+                    #         for k, v in dlg.selected_items[0].items()
+                    # }
+                    try:
+                        del obj['_id']
+                    except KeyError:
+                        pass
+                    grid_data = GridData.from_dict(self.data.name, [obj])
+                    for item in grid_data.data:
+                        self.data.append(item)
+                        self.AppendRows()
+
 
     def update_data(self, data: list, reset_selection=False):
         """Update GridData with given data.
@@ -326,3 +388,131 @@ class GridObjectDialog(wx.Dialog):
         sizer.Add(btnsizer, 0, wx.ALL, 5)
         self.SetSizer(sizer)
         sizer.Fit(self)
+
+
+class FindFromDbDialog(wx.Dialog):
+    def __init__(self, parent, collection):
+        super().__init__()
+
+        self.Create(parent, title=FFDB_TITLE.format(LABELS[collection]))
+        self.CenterOnParent()
+
+        self.collection = collection
+        if collection == 'materials':
+            data = GridData.materials()
+        elif collection == 'products':
+            data = GridData.products()
+
+        self.col_labels = {}
+        for col in data.get_keys():
+            self.col_labels[data.get_label(col)] = col
+
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer_first = wx.BoxSizer(wx.HORIZONTAL)
+
+        self.choice_key = None
+        self.selected_items = []
+        self.choice = wx.Choice(
+            self,
+            size=CH_CLL_SIZE,
+            choices=list(self.col_labels.keys())
+        )
+        self.textedit = wx.TextCtrl(self, size=FFDB_TE_SIZE)
+        self.listctrl = dv.DataViewListCtrl(self)
+
+        self.listctrl.AppendTextColumn("ObjectID")
+        for label, key in self.col_labels.items():
+            self.listctrl.AppendTextColumn(label)
+
+        sizer_first.Add(self.choice, 0, wx.EXPAND|wx.ALL, BORDER)
+        sizer_first.Add(self.textedit, 0, wx.EXPAND|wx.ALL, BORDER)
+
+        self.Bind(wx.EVT_CHOICE, self.on_col_choice, self.choice)
+        self.Bind(wx.EVT_TEXT, self.on_text_edit, self.textedit)
+
+        sizer.Add(sizer_first, 0, wx.EXPAND)
+        sizer.Add(self.listctrl, 1, wx.EXPAND)
+
+        # Ok / Cancel buttons to bottom of dialog.
+        line = wx.StaticLine(self)
+        sizer.Add(line, 0, wx.EXPAND|wx.RIGHT|wx.TOP, BORDER)
+        
+        btnsizer = wx.StdDialogButtonSizer()
+        btn = wx.Button(self, wx.ID_OK)
+        btn.SetDefault()
+        btnsizer.AddButton(btn)
+
+        btn = wx.Button(self, wx.ID_CANCEL)
+        btnsizer.AddButton(btn)
+
+        btnsizer.Realize()
+        sizer.Add(btnsizer, 0, wx.ALL, BORDER)
+        self.SetSizer(sizer)
+        # sizer.Fit(self)
+
+    def on_col_choice(self, evt):
+        self.choice_key = self.col_labels[evt.GetString()]
+
+    def on_text_edit(self, evt):
+        value = self.textedit.GetValue()
+        self.listctrl.DeleteAllItems()
+        self.selected_items = []
+
+        if self.choice_key is not None:
+            filter = {self.choice_key: value}
+            objects = list(Database(self.collection).find(filter, True))
+            for obj in objects:
+                strlist = []
+                for val in obj.values():
+                    strlist.append(str(val))
+                self.listctrl.AppendItem(strlist)
+            
+            if len(objects) > 0:
+                self.selected_items.append(objects[0])
+
+
+class InsertToDbDialog(wx.Dialog):
+    def __init__(self, parent):
+        super().__init__()
+
+        self.Create(parent, title=ITDD_TITLE)
+        self.CenterOnParent()
+
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer_choice = wx.BoxSizer(wx.HORIZONTAL)
+
+        cll_labels = list(CLL_DICT.keys())
+        materials = GridData.materials()
+        products = GridData.products()
+
+        self.grid_materials = CustomGrid(self, materials)
+        self.grid_products = CustomGrid(self, products)
+        self.choice = wx.Choice(self, size=CH_CLL_SIZE, choices=cll_labels)
+
+        self.Bind(wx.EVT_CHOICE, self.on_coll_choice, self.choice)
+
+        sizer_choice.Add(self.choice, 0, wx.EXPAND|wx.ALL, BORDER)
+
+
+        sizer.Add(sizer_choice, 0, wx.EXPAND)
+
+        # Ok / Cancel buttons to bottom of dialog.
+        line = wx.StaticLine(self)
+        sizer.Add(line, 0, wx.EXPAND|wx.RIGHT|wx.TOP, BORDER)
+        
+        btnsizer = wx.StdDialogButtonSizer()
+        btn = wx.Button(self, wx.ID_OK)
+        btn.SetDefault()
+        btnsizer.AddButton(btn)
+
+        btn = wx.Button(self, wx.ID_CANCEL)
+        btnsizer.AddButton(btn)
+
+        btnsizer.Realize()
+        sizer.Add(btnsizer, 0, wx.ALL, BORDER)
+        self.SetSizer(sizer)
+        sizer.Fit(self)
+    
+    def on_coll_choice(self, evt):
+        collection = CLL_DICT[evt.GetString()]
+        print(f"InsertToDbDialog.on_coll_choice collection: {collection}")
