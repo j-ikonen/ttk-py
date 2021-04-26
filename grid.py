@@ -103,7 +103,7 @@ class CustomDataTable(wx.grid.GridTableBase):
 
     def DeleteRows(self, pos=0, numRows=1):
         n_del = self.obj.delete(pos, numRows)
-        
+
         if n_del > 0:
             msg = wx.grid.GridTableMessage(
                 self,
@@ -136,12 +136,21 @@ class CustomDataTable(wx.grid.GridTableBase):
             return
 
         self.GetView().ProcessTableMessage(msg)
+    
+    def set_data(self, data: GridData):
+        if isinstance(data, GridData):
+            self.obj = data
+        else:
+            raise TypeError(f"CustomDataTable.obj must be <GridData> not '{type(data)}'")
+
 
 class CustomGrid(wx.grid.Grid):
     def __init__(self, parent, data: GridData):
         super().__init__(parent)
 
         self.data = data
+        self.empty_data = GridData(data.name)
+        self.name = data.name
         self.selected_row = None
         self.rclick_row = None
 
@@ -292,7 +301,7 @@ class CustomGrid(wx.grid.Grid):
             to_db.append(data[row])
         
         if len(to_db) > 0:
-            ids = Database(self.data.name).insert(to_db)
+            ids = Database(self.name).insert(to_db)
             print(GIRD_ITDB_INS_IDS.format(ids))
         else:
             print(GRID_ITDB_NO_SELECTION)
@@ -319,16 +328,25 @@ class CustomGrid(wx.grid.Grid):
                         pass
 
                     for item in [obj]:
-                        row = len(self.data.data)
-                        self.GetTable().SetValue(row, 0, "")
-                        self.data.set_row(row, item)
-                        # self.AppendRows()
+                        oldrow = len(self.data)
+                        self.data.append(item)
+                        newrow = len(self.data)
+                        self.GetTable().NotifyRowChange(oldrow, newrow)
 
         print("\nAFTER")
         pprint(self.data.data)
         print("\n")
 
-    def update_data(self, data: list, reset_selection=False):
+    def set_data(self, data: GridData):
+        if isinstance(data, GridData):
+            self.data = data
+            self.GetTable().set_data(data)
+        else:
+            self.data = self.empty_data
+            self.GetTable().set_data(self.empty_data)
+            raise TypeError(f"CustomGrid.data must be <GridData> not {type(data)}")
+
+    def update_data(self, data: GridData, reset_selection=False):
         """Update GridData with given data.
 
         Args:
@@ -336,18 +354,20 @@ class CustomGrid(wx.grid.Grid):
             reset_selection (bool): Will the selection be reset with update.
         """
         try:
-            oldlen = len(self.data.data)
+            oldlen = len(self.data)
         except TypeError:
             oldlen = -1
 
-        self.data.data = data
-        self.GetTable().obj.data = data
+        if data is None:
+            self.set_data(self.empty_data)
+        else:
+            self.set_data(data)
 
         # Updated grid is empty.
-        if data is None or data is []:
+        if data is None:
             self.GetTable().NotifyRowChange(oldlen, -1)
         else:
-            new = len(data)
+            new = len(data.data)
             self.GetTable().NotifyRowChange(oldlen, new)
         
         # Reset selection when data is changed from one object to another.
@@ -410,10 +430,7 @@ class FindFromDbDialog(wx.Dialog):
         self.CenterOnParent()
 
         self.collection = collection
-        if collection == 'materials':
-            data = GridData.materials()
-        elif collection == 'products':
-            data = GridData.products()
+        data = GridData(collection)
 
         self.col_labels = {}
         for col in data.get_keys():

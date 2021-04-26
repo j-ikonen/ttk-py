@@ -416,10 +416,10 @@ class Panel(wx.Panel):
         if isinstance(obj, Group):
             print(f"Panel.on_treeitem_activate: Change page content to {obj}")
             self.gp_namectrl.ChangeValue(obj.name)
-            self.grid_predefs.update_data(obj.predefs.data, True)
-            self.grid_materials.update_data(obj.materials.data, True)
-            self.grid_products.update_data(obj.products.data, True)
-            self.grid_parts.update_data([], True)
+            self.grid_predefs.update_data(obj.predefs, True)
+            self.grid_materials.update_data(obj.materials, True)
+            self.grid_products.update_data(obj.products, True)
+            self.grid_parts.update_data(None, True)
             self.gp_parts_label.SetLabel(GP_NO_PRODUCT_SELECTED)
 
         else:
@@ -459,9 +459,9 @@ class Panel(wx.Panel):
                 'parent': self.grid_products.data.get(row)
             }
             parts.process_codes(outside_data)
-            self.grid_parts.update_data(parts.data, True)
+            self.grid_parts.update_data(parts, True)
         else:
-            self.grid_parts.update_data([], True)
+            self.grid_parts.update_data(None, True)
 
     def on_cell_changed(self, evt):
         print(f"Panel.on_cell_changed")
