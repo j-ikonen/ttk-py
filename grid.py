@@ -1,3 +1,5 @@
+from pprint import pprint
+
 import wx
 import wx.grid
 import wx.dataview as dv
@@ -222,7 +224,8 @@ class CustomGrid(wx.grid.Grid):
         evt.Skip()
 
     def on_select_cell(self, evt):
-        print(f"Grid - Selected cell (row, col): ({evt.GetRow()}, {evt.GetCol()})")
+        print(f"Grid '{self.data.name}' - Selected cell (row, col):" +
+              f" ({evt.GetRow()}, {evt.GetCol()})")
         self.selected_row = evt.GetRow()
         evt.Skip()
 
@@ -296,7 +299,11 @@ class CustomGrid(wx.grid.Grid):
 
     def on_find_from_db(self, evt):
         print("CustomGrid.on_find_from_db")
-        
+
+        print("\nBEFORE")
+        pprint(self.data.data)
+        print("\n")
+
         with FindFromDbDialog(self, self.data.name) as dlg:
             if dlg.ShowModal() == wx.ID_OK:
                 print(f"\tFound items: {len(dlg.selected_items)}")
@@ -310,15 +317,20 @@ class CustomGrid(wx.grid.Grid):
                         del obj['_id']
                     except KeyError:
                         pass
-                    grid_data = GridData.from_dict(self.data.name, [obj])
-                    for item in grid_data.data:
-                        self.data.append(item)
-                        self.AppendRows()
 
+                    for item in [obj]:
+                        row = len(self.data.data)
+                        self.GetTable().SetValue(row, 0, "")
+                        self.data.set_row(row, item)
+                        # self.AppendRows()
+
+        print("\nAFTER")
+        pprint(self.data.data)
+        print("\n")
 
     def update_data(self, data: list, reset_selection=False):
         """Update GridData with given data.
-        
+
         Args:
             data (list): New data to replace GridData.data with.
             reset_selection (bool): Will the selection be reset with update.
@@ -419,7 +431,6 @@ class FindFromDbDialog(wx.Dialog):
         )
         self.textedit = wx.TextCtrl(self, size=FFDB_TE_SIZE)
         self.listctrl = dv.DataViewListCtrl(self)
-
         self.listctrl.AppendTextColumn("ObjectID")
         for label, key in self.col_labels.items():
             self.listctrl.AppendTextColumn(label)
@@ -432,6 +443,9 @@ class FindFromDbDialog(wx.Dialog):
 
         sizer.Add(sizer_first, 0, wx.EXPAND)
         sizer.Add(self.listctrl, 1, wx.EXPAND)
+
+        self.choice.SetSelection(0)
+        self.choice_key = self.col_labels['Koodi']
 
         # Ok / Cancel buttons to bottom of dialog.
         line = wx.StaticLine(self)

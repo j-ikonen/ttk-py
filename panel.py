@@ -1,3 +1,4 @@
+from pprint import pprint
 import wx
 import wx.adv
 import wx.dataview as dv
@@ -427,7 +428,7 @@ class Panel(wx.Panel):
     def on_select_product(self, evt):
         """Update parts grid and it's label."""
         row = evt.GetRow()
-        # print(f"Panel.on_select_grid_cell row: {row}")
+        print(f"Panel.on_select_grid_cell row: {row}")
         self.grid_products.selected_row = row
         product_code = self.grid_products.data.get(row, 'code')
 
@@ -441,6 +442,13 @@ class Panel(wx.Panel):
 
         # Update part codes
         parts = self.grid_products.data.get(row, 'parts')
+        print(f"\n\tPARTS - {parts}")
+        try:
+            printparts = [{k: v for k, v in part.items() if k == 'code'} for part in parts.data]
+            pprint(printparts)
+        except:
+            pass
+        print("\n\tPARTS END")
         if parts:
             print(f"Panel.on_select_product - parts type: {type(parts)}")
             outside_data = {

@@ -1,4 +1,7 @@
 import collections
+from pprint import pprint
+
+from wx.core import DragNone
 
 
 NEW_OFFER_NAME = "Uusi tarjous"
@@ -138,6 +141,23 @@ class GridData:
                       f" len(self.col_keys): {len(self.columns)}")
                 return False
 
+    def set_row(self, row, value):
+        """Set a dictionary to row."""
+        for key, val in value.items():
+            if key == self.child:
+                # child = GridData.new(key)
+                child = self.get(row, key)
+                child.data = []
+                for child_obj in val:
+                    child.append(child_obj)
+                # self.set(row, key, child)
+            elif isinstance(val, dict):
+                self.set(row, key, {k: v for k, v in val.items()})
+            elif isinstance(val, list):
+                self.set(row, key, [n for n in val])
+            else:
+                self.set(row, key, val)
+
     def process_codes(self, osd):
         # print(f"GridData.process_codes - type(self.data): {type(self.data)}")
         for obj in self.data:
@@ -175,19 +195,34 @@ class GridData:
 
     def append(self, dic=None) -> int:
         """Return the index of the appended item.
+
+        Field in dictionary that is list or dict that is not specified in self.child
+        must not have subcontainers.
         
         Args:
-            dic (dict): Must match with self.data.keys().
+            dic (dict): Append copy of this data.
         """
-        if dic is None:
-            self.data.append({k: v[self.DEFAULT] for k, v in self.fields.items()})
-        else:
-            if self.fields.keys() == dic.keys():
-                self.data.append(dic)
-            else:
-                return None
-        return len(self.data) - 1
-    
+        row = len(self.data)
+        print(f"GridData.append - row: {row}")
+        default=None
+        try:
+            default = {k: v[self.DEFAULT] for k, v in self.fields.items() if k != self.child}
+            pprint(default)
+            print("\n")
+        except:
+            pass
+
+        # Replace default with a new instance of child class.
+        if self.child is not None:
+            default[self.child] = GridData.new(self.child)
+
+        self.data.append(default)
+
+        # Fill the appended row with data.
+        if dic is not None:
+            self.set_row(row, dic)
+        return row
+
     def delete(self, pos=0, num_rows=1) -> int:
         """Return number of deleted rows."""
         deleted = 0

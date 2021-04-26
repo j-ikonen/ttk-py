@@ -1,8 +1,6 @@
 """
 TODO:
-    Move Frame to frame.py
-    Add Dialog or page for creating new objects to database.
-    Add Dialog to handle loading objects from a database.
+    Add delete selected rows to grid LCLICK menu.
     Add FoldPanelBar to fold grids hidden.
 
 Part:
