@@ -1,5 +1,3 @@
-from pprint import pprint
-
 import wx
 import wx.grid
 import wx.dataview as dv
@@ -29,6 +27,13 @@ LABELS = {'materials': 'Materiaalit', 'products': 'Tuotteet'}
 FFDB_TITLE = "Etsi tietokannasta: '{}'"
 FFDB_TE_SIZE = (120, -1)
 
+GRIDMENU_DELSEL = "Poista"
+GRIDMENU_DELSEL_HELP = "Poista valitut rivit."
+GRIDMENU_COPY = "Kopioi"
+GRIDMENU_COPY_HELP = "Kopioi valitut solut."
+GRIDMENU_PASTE = "Liitä"
+GRIDMENU_PASTE_HELP = "Liitä kopioidut valittuihin soluihin."
+
 
 class CustomDataTable(wx.grid.GridTableBase):
     def __init__(self, data):
@@ -44,12 +49,12 @@ class CustomDataTable(wx.grid.GridTableBase):
         self.obj: GridData = data
 
     def GetNumberRows(self):
-        if self.obj is None or self.obj.data is None:
+        if self.obj is None:
             return 0
-        return len(self.obj.data) + 1
+        return len(self.obj) + 1
 
     def GetNumberCols(self):
-        return len(self.obj.columns)
+        return self.obj.get_n_columns()
 
     def IsEmptyCell(self, row, col):
         try:
@@ -105,9 +110,11 @@ class CustomDataTable(wx.grid.GridTableBase):
         n_del = self.obj.delete(pos, numRows)
 
         if n_del > 0:
+            newlen = len(self.obj)
             msg = wx.grid.GridTableMessage(
                 self,
                 wx.grid.GRIDTABLE_NOTIFY_ROWS_DELETED,
+                newlen,
                 n_del
             )
             self.GetView().ProcessTableMessage(msg)
@@ -132,7 +139,8 @@ class CustomDataTable(wx.grid.GridTableBase):
                 newlen,
                 rows_deleted
             )
-        else: 
+        else:
+            self.GetView().Refresh()
             return
 
         self.GetView().ProcessTableMessage(msg)
@@ -153,6 +161,7 @@ class CustomGrid(wx.grid.Grid):
         self.name = data.name
         self.selected_row = None
         self.rclick_row = None
+        self.copied = []
 
         table = CustomDataTable(self.data)
         self.SetTable(table, True)
@@ -196,7 +205,7 @@ class CustomGrid(wx.grid.Grid):
             else:
                 try:
                     # Move to next Column
-                    self.SetGridCursor(row, self.data.tab_to[col])
+                    self.SetGridCursor(row, GridData.tab_to[self.name][col])
                 except IndexError:
                     # Move to first cell of next row until at the end of grid.
                     if row < self.GetNumberRows() - 1:
@@ -205,8 +214,9 @@ class CustomGrid(wx.grid.Grid):
 
 
     def on_cell_changing(self, evt):
-        # print("On Cell Changing")
-        pass
+        if self.data == self.empty_data:
+            print("CustomGrid.on_cell_changing - Veto change for grid using empty_data.")
+            evt.Veto()
 
     def on_cell_changed(self, evt):
         # row = evt.GetRow()
@@ -247,30 +257,83 @@ class CustomGrid(wx.grid.Grid):
 
     def on_cell_rclick(self, evt):
         self.rclick_row = evt.GetRow()
+        selected = self.GetSelectedRows()
 
-        # Do Event Binding only once.
-        if not hasattr(self, 'edit_object_id'):
-            self.edit_object_id = wx.NewIdRef() 
+        # Do id assignment and event binding only once.
+        if not hasattr(self, 'copy_id'):
+            self.copy_id = wx.NewIdRef()
+            self.paste_id = wx.NewIdRef()
+            self.edit_object_id = wx.NewIdRef()
+            self.del_sel_id = wx.NewIdRef()
             self.itdb_id = wx.NewIdRef()        # Insert To DataBase
             self.ffdb_id = wx.NewIdRef()        # Find from DataBase
 
+            self.Bind(wx.EVT_MENU, self.on_copy, id=self.copy_id)
+            self.Bind(wx.EVT_MENU, self.on_paste, id=self.paste_id)
             self.Bind(wx.EVT_MENU, self.on_edit_object, id=self.edit_object_id)
+            self.Bind(wx.EVT_MENU, self.on_delete_selected, id=self.del_sel_id)
             self.Bind(wx.EVT_MENU, self.on_insert_to_db, id=self.itdb_id)
             self.Bind(wx.EVT_MENU, self.on_find_from_db, id=self.ffdb_id)
 
         menu = wx.Menu()
+        menu.Append(self.copy_id, GRIDMENU_COPY, GRIDMENU_COPY_HELP)
+        menu.Append(self.paste_id, GRIDMENU_PASTE, GRIDMENU_PASTE_HELP)
+        menu.AppendSeparator()
         menu.Append(self.edit_object_id, GRIDMENU_EDIT_OBJECT, GRIDMENU_EDIT_OBJECT_HELP)
+        menu.Append(self.del_sel_id, GRIDMENU_DELSEL, GRIDMENU_DELSEL_HELP)
 
+        # Append database menuitems if grid has database items.
         if self.data.name == 'materials' or self.data.name == 'products':
+            menu.AppendSeparator()
             menu.Append(self.itdb_id, GRIDMENU_ITDB, GRIDMENU_ITDB_HELP)
             menu.Append(self.ffdb_id, GRIDMENU_FFDB, GRIDMENU_FFDB_HELP)
+
+            if not selected:
+                menu.Enable(self.itdb_id, False)
+
         # Alternate item initialization for editing MenuItem properties.
         # item = wx.MenuItem(menu, self.edit_object_id, GRIDMENU_EDIT_OBJECT")
         # menu.Append(item)
 
+        # Gray out menuitems that require row selections.
+        if not selected:
+            menu.Enable(self.copy_id, False)
+            menu.Enable(self.del_sel_id, False)
+
+        # Gray out paste if nothing is copied or cut.
+        if not self.copied:
+            menu.Enable(self.paste_id, False)
+
         self.PopupMenu(menu)
         menu.Destroy()
         self.rclick_row = None
+
+    def on_copy(self, evt):
+        """Copy the selected cells."""
+        print("\nCustomGrid.on_copy")
+        selection = self.GetSelectedRows()
+        selection.sort(reverse=True)
+        objs = self.data.to_dict()
+        self.copied = []
+
+        for n in selection:
+            self.copied.append(objs[n])
+
+        # if not selection:
+        #     selection = self.GetSelectedBlocks()
+
+    def on_paste(self, evt):
+        """Paste the copied selection to new selection."""
+        print("\nCustomGrid.on_paste")
+        oldlen = len(self.data)
+
+        for obj in self.copied:
+            self.data.append(obj)
+
+        newlen = len(self.data)
+        self.GetTable().NotifyRowChange(oldlen, newlen)
+        # if not selection:
+        #     selection = self.GetSelectedBlocks()
 
     def on_edit_object(self, evt):
         """Handle event for editing code values."""
@@ -292,8 +355,21 @@ class CustomGrid(wx.grid.Grid):
         dlg.Destroy()
         self.Refresh()
 
+    def on_delete_selected(self, evt):
+        print("\nCustomGrid.on_delete_selected")
+        selected = self.GetSelectedRows()
+        selected.sort(reverse=True)
+        print(f"\tDelete rows: {selected}")
+        for index in selected:
+            self.DeleteRows(index)
+            # if self.data.delete(index) != 1:
+            #     raise IndexError(
+            #         f"\tCustomGrid.on_delete_selected Failed to delete at index {index}"
+            #     )
+        # self.Refresh()
+
     def on_insert_to_db(self, evt):
-        print("CustomGrid.on_insert_to_db")
+        print("\nCustomGrid.on_insert_to_db")
         selected = self.GetSelectedRows()
         data = self.data.to_dict()
         to_db = []
@@ -309,19 +385,16 @@ class CustomGrid(wx.grid.Grid):
     def on_find_from_db(self, evt):
         print("CustomGrid.on_find_from_db")
 
-        print("\nBEFORE")
-        pprint(self.data.data)
-        print("\n")
+        # print("\nBEFORE")
+        # pprint(self.data.data)
+        # print("\n")
 
         with FindFromDbDialog(self, self.data.name) as dlg:
             if dlg.ShowModal() == wx.ID_OK:
                 print(f"\tFound items: {len(dlg.selected_items)}")
                 if len(dlg.selected_items) > 0:
                     obj = dlg.selected_items[0]
-                    # obj = {
-                    #     k: v if not isinstance(v, dict) else {key: value for key, value in v.items()}
-                    #         for k, v in dlg.selected_items[0].items()
-                    # }
+
                     try:
                         del obj['_id']
                     except KeyError:
@@ -333,15 +406,16 @@ class CustomGrid(wx.grid.Grid):
                         newrow = len(self.data)
                         self.GetTable().NotifyRowChange(oldrow, newrow)
 
-        print("\nAFTER")
-        pprint(self.data.data)
-        print("\n")
+        # print("\nAFTER")
+        # pprint(self.data.data)
+        # print("\n")
 
     def set_data(self, data: GridData):
         if isinstance(data, GridData):
             self.data = data
             self.GetTable().set_data(data)
         else:
+            self.empty_data.data = []
             self.data = self.empty_data
             self.GetTable().set_data(self.empty_data)
             raise TypeError(f"CustomGrid.data must be <GridData> not {type(data)}")
@@ -359,17 +433,18 @@ class CustomGrid(wx.grid.Grid):
             oldlen = -1
 
         if data is None:
+            self.empty_data.data = []
             self.set_data(self.empty_data)
         else:
             self.set_data(data)
 
         # Updated grid is empty.
-        if data is None:
-            self.GetTable().NotifyRowChange(oldlen, -1)
-        else:
-            new = len(data.data)
-            self.GetTable().NotifyRowChange(oldlen, new)
-        
+        # if data is None:
+        #     self.GetTable().NotifyRowChange(oldlen, -1)
+        # else:
+        new = len(self.data)
+        self.GetTable().NotifyRowChange(oldlen, new)
+
         # Reset selection when data is changed from one object to another.
         if reset_selection:
             self.selected_row = None
@@ -426,7 +501,11 @@ class FindFromDbDialog(wx.Dialog):
     def __init__(self, parent, collection):
         super().__init__()
 
-        self.Create(parent, title=FFDB_TITLE.format(LABELS[collection]))
+        self.Create(
+            parent,
+            size=(600, 400),
+            title=FFDB_TITLE.format(LABELS[collection]),
+            style=wx.DEFAULT_DIALOG_STYLE|wx.RESIZE_BORDER)
         self.CenterOnParent()
 
         self.collection = collection
@@ -485,19 +564,21 @@ class FindFromDbDialog(wx.Dialog):
         self.choice_key = self.col_labels[evt.GetString()]
 
     def on_text_edit(self, evt):
+        """Search database for anything matching given text with key from choice."""
         value = self.textedit.GetValue()
+        pattern = ("\w*" + value + "\w*")
         self.listctrl.DeleteAllItems()
         self.selected_items = []
 
         if self.choice_key is not None:
-            filter = {self.choice_key: value}
+            filter = {self.choice_key: {'$regex': pattern, '$options': 'i'}}
             objects = list(Database(self.collection).find(filter, True))
             for obj in objects:
                 strlist = []
                 for val in obj.values():
                     strlist.append(str(val))
                 self.listctrl.AppendItem(strlist)
-            
+
             if len(objects) > 0:
                 self.selected_items.append(objects[0])
 

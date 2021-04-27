@@ -162,36 +162,49 @@ class GridData:
         """
         if name in self.fields:
             self.name = name
-            self.data = data
+            self.data = []
+            if isinstance(data, list):
+                for obj in data:
+                    self.append(obj)
+            else:
+                raise TypeError(f"GridData.__init__ data type '{type(data)}' is not a list.")
         else:
             raise ValueError(f"GridData.__init__ name '{name}' is not defined.")
 
     def __len__(self):
         return len(self.data)
 
-    def append(self, data=None) -> int:
+    def append(self, data={}) -> int:
         """Return the index of the appended item.
 
         Field in dictionary that is list or dict that is not specified in self.child
-        must not have subcontainers.
+        must not have subcontainers. Leaving 'data' to default results in an appended
+        empty default row.
 
         Args:
             data (dict): Append copy of this data.
         """
         row = len(self.data)
         default = self.get_default()
-        print(f"GridData.append - row: {row}")
+        # print(f"GridData.append - name: {self.name} row: {row}, len(data): {len(data)}, " +
+        #       f"len(default): {len(default)}")
 
         # Add data to default dictionary.
         for k, v in data.items():
             if k in GridData.child[self.name]:
-                for child_obj in v:
+                child_list = []
+                if isinstance(v, GridData):
+                    child_list = v.data
+                elif isinstance(v, list):
+                    child_list = v
+
+                for child_obj in child_list:
                     default[k].append(child_obj)
 
-            elif k in default and isinstance(k, dict):
+            elif k in default and isinstance(v, dict):
                 default[k] = {key: value for key, value in v.items()}
 
-            elif k in default and isinstance(k, list):
+            elif k in default and isinstance(v, list):
                 default[k] = [value for value in v]
 
             elif k in default:
@@ -253,7 +266,7 @@ class GridData:
             name (str): Name for GridData.name.
             data (list): List of dictionaries for GridData.data
         """
-        griddata = cls.new(name)
+        griddata = GridData(name)
         for obj in data:
             griddata.append(obj)
 
@@ -306,8 +319,11 @@ class GridData:
             k: v[self.DEFAULT]
             for k, v in self.fields[self.name].items()
         }
+
         for child_key in self.child[self.name]:
-            default[child_key] = GridData.new(child_key)
+            default[child_key] = GridData(child_key)
+
+        return default
 
     def get_keys(self):
         """Return a list of keys defined in GridData.fields."""
@@ -320,12 +336,16 @@ class GridData:
             col (int|str): Column index or key.
         """
         if isinstance(col, int):
-            return GridData.fields[self.name][self.columns[col]][self.LABEL]
+            return GridData.fields[self.name][GridData.columns[self.name][col]][self.LABEL]
         elif isinstance(col, str):
             return GridData.fields[self.name][col][self.LABEL]
         else:
             raise IndexError(
                 f"GridData.get_label - Label is not defined for col: {col}")
+
+    def get_n_columns(self) -> int:
+        """Return the number of columns to display."""
+        return len(GridData.columns[self.name])
 
     def get_type(self, col) -> str:
         """Return type string for column at index 'col'.
@@ -334,7 +354,14 @@ class GridData:
             col (int|str): Column index or key.
         """
         if isinstance(col, int):
-            return GridData.fields[self.name][self.columns[col]][self.TYPE]
+            try:
+                return GridData.fields[self.name][GridData.columns[self.name][col]][self.TYPE]
+            except IndexError as e:
+                print(f"Error: {e}\n\tself.name: {self.name}\n\tcol: {col}\n\t" +
+                      f"self.TYPE: {self.TYPE}\n\tGridData.columns[self.name]: " +
+                      f"{GridData.columns[self.name]}\n\tGridData.fields[self.name]: " +
+                      f"{GridData.fields[self.name]}")
+
         elif isinstance(col, str):
             return GridData.fields[self.name][col][self.TYPE]
         else:
@@ -347,7 +374,7 @@ class GridData:
         Args:
             col (int): Column index.
         """
-        return GridData.fields[self.name][self.columns[col]][GridData.READONLY]
+        return GridData.fields[self.name][GridData.columns[self.name][col]][GridData.READONLY]
 
     def is_true(self, value: str) -> bool:
         """Return True if value string is not one of:

@@ -1,6 +1,11 @@
 """
 TODO:
-    Add delete selected rows to grid LCLICK menu.
+    Fix DbDialog
+    Materiaaleille hukka, hintayksikkö enum €/m2, €/kpl Reunanauha, Lisähinta, Alennus
+    Add Tuoteryhmä Työaika Työhinta Osahinta Kokohinta Asennusyksikkö to products.
+    Price to two decimals.
+    IsEdited as a colored cell
+
     Add FoldPanelBar to fold grids hidden.
 
 Part:

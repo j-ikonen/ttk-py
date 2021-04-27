@@ -1,11 +1,11 @@
+from dialog import DbDialog
 from pprint import pprint
 import wx
 import wx.adv
 import wx.dataview as dv
 
-from data import Link, GridData, Group, Info
+from data import Link, GridData, Group, Info, Data
 from grid import CustomGrid
-from database import Database
 
 
 FRAME_SIZE = (1200, 750)
@@ -33,6 +33,7 @@ DLG_CLOSE_OFFERS_CAP = "Sulje tarjouksia"
 DLG_DEL_GROUPS_MSG = "Valitse poistettavat ryhmät tarjouksesta '{}'."
 DLG_DEL_GROUPS_CAP = "Poista ryhmiä"
 REFRESH_TIMES = 3
+GP_BTN_DB = "Tietokanta"
 
 
 class Panel(wx.Panel):
@@ -91,9 +92,9 @@ class Panel(wx.Panel):
         gridpage = wx.Panel(self.book)
         infopage = wx.Panel(self.book)
         rootpage = wx.Panel(self.book)
-        gridpage.SetBackgroundColour((255, 200, 200))   # For testing
-        infopage.SetBackgroundColour((200, 255, 200))   # For testing
-        rootpage.SetBackgroundColour((200, 200, 255))   # For testing
+        gridpage.SetBackgroundColour((250, 220, 220))   # For testing
+        infopage.SetBackgroundColour((200, 240, 230))   # For testing
+        rootpage.SetBackgroundColour((220, 210, 240))   # For testing
 
         self.book.AddPage(gridpage, "gridpage")
         self.book.AddPage(infopage, "infopage")
@@ -122,19 +123,22 @@ class Panel(wx.Panel):
         self.gp_parts_label = wx.StaticText(gridpage,label=GP_PARTS_LABEL.format(part_label))
         self.gp_namectrl = wx.TextCtrl(gridpage, size=GP_NAMECTRL_SIZE)
         self.gp_btn_refresh = wx.Button(gridpage, label=GP_BTN_REFRESH)
-        
+        self.gb_btn_db = wx.Button(gridpage, label=GP_BTN_DB)
+
         self.Bind(wx.EVT_TEXT, self.on_gp_namectrl_text, self.gp_namectrl)
         self.Bind(wx.EVT_BUTTON, self.on_gp_btn_refresh, self.gp_btn_refresh)
+        self.Bind(wx.EVT_BUTTON, self.on_gp_btn_db, self.gb_btn_db)
 
         gp_label_sizer = wx.BoxSizer(wx.HORIZONTAL)
         gp_label_sizer.Add(self.gp_namelabel, 0, wx.ALL, BORDER)
         gp_label_sizer.Add(self.gp_namectrl, 0, wx.ALL, BORDER)
         gp_label_sizer.Add(self.gp_btn_refresh, 0, wx.ALL, BORDER)
+        gp_label_sizer.Add(self.gb_btn_db, 0, wx.ALL, BORDER)
 
-        self.grid_predefs = CustomGrid(gridpage, GridData.predefs())
-        self.grid_materials = CustomGrid(gridpage, GridData.materials())
-        self.grid_products = CustomGrid(gridpage, GridData.products())
-        self.grid_parts = CustomGrid(gridpage, GridData.parts())
+        self.grid_predefs = CustomGrid(gridpage, GridData("predefs"))
+        self.grid_materials = CustomGrid(gridpage, GridData("materials"))
+        self.grid_products = CustomGrid(gridpage, GridData("products"))
+        self.grid_parts = CustomGrid(gridpage, GridData("parts"))
 
         self.Bind(wx.grid.EVT_GRID_SELECT_CELL, self.on_select_product, self.grid_products)
         self.Bind(wx.grid.EVT_GRID_CELL_CHANGED, self.on_cell_changed, self.grid_parts)
@@ -428,29 +432,28 @@ class Panel(wx.Panel):
     def on_select_product(self, evt):
         """Update parts grid and it's label."""
         row = evt.GetRow()
-        print(f"Panel.on_select_grid_cell row: {row}")
+        print(f"\nPanel.on_select_product row: {row}")
         self.grid_products.selected_row = row
         product_code = self.grid_products.data.get(row, 'code')
 
         # Update parts grid label.
         if product_code is None:
-            print("Product selection in a row without any initialized data." +
-                  " Using previous row for part grid.")
+            print("\tProduct selection in a row without any initialized data.")
             self.gp_parts_label.SetLabel(GP_NO_PRODUCT_SELECTED)
         else:   
             self.gp_parts_label.SetLabel(GP_PARTS_LABEL.format(product_code))
 
         # Update part codes
         parts = self.grid_products.data.get(row, 'parts')
-        print(f"\n\tPARTS - {parts}")
-        try:
-            printparts = [{k: v for k, v in part.items() if k == 'code'} for part in parts.data]
-            pprint(printparts)
-        except:
-            pass
-        print("\n\tPARTS END")
-        if parts:
-            print(f"Panel.on_select_product - parts type: {type(parts)}")
+        # print(f"\n\tPARTS - {parts}")
+        # try:
+        #     printparts = [{k: v for k, v in part.items() if k == 'code'} for part in parts.data]
+        #     pprint(printparts)
+        # except:
+        #     pass
+        # print("\n\tPARTS END")
+        if parts is not None:
+            print(f"\tPanel.on_select_product - parts type: {type(parts)}")
             outside_data = {
                 self.grid_predefs.data.name: self.grid_predefs.data,
                 self.grid_materials.data.name: self.grid_materials.data,
@@ -490,6 +493,12 @@ class Panel(wx.Panel):
             self.grid_parts.Refresh()
         for n in range(REFRESH_TIMES):
             inner_refresh()
+
+    def on_gp_btn_db(self, evt):
+        """Handle event for db dialog button."""
+        with DbDialog(self, 'materials') as dlg:
+            if dlg.ShowModal() == wx.ID_OK:
+                pass
 
     # def on_btn_materials_insert(self, evt):
     #     self.insert_to_db('materials')
