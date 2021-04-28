@@ -1,12 +1,19 @@
 """
 TODO:
-    Fix DbDialog
-    Materiaaleille hukka, hintayksikkö enum €/m2, €/kpl Reunanauha, Lisähinta, Alennus
-    Add Tuoteryhmä Työaika Työhinta Osahinta Kokohinta Asennusyksikkö to products.
-    Price to two decimals.
-    IsEdited as a colored cell
+    Meneekö Asennusyksikkö osiin vai tuotteeseen?
+    Onko Asennusyksikkö choice vai string?
 
+    Make refresh on gridpage check for edited status.
+    Format edited columns as a colored cell.
+    Test Database dialogs with new column additions.
+    Add Installunit count with multiplier and a total costs on offer page.
+    Add predefined column widths.
+    Add remove from database functionality.
+    Test part adding and editing in database dialogs.
+    Add code editor.
+    Add ctrl arrow key scrolling to choice cells.
     Add FoldPanelBar to fold grids hidden.
+    Change use_predef column in parts to bool.
 
 Part:
     In coded value calculations of Part material used is Part.use_material. 

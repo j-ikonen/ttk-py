@@ -22,6 +22,24 @@ class Database:
             Database.db = Database.client.test_database
             Database.collection = Database.db[collection_name]
 
+    def count(self, filter=None):
+        if filter is None:
+            return Database.collection.count_documents()
+        else:
+            return Database.collection.count_documents(filter)
+    
+    def find(self, filter, many=False):
+        if not many:
+            return Database.collection.find_one(filter)
+        else:
+            return Database.collection.find(filter)
+
+    def get_indexes(self):
+        return Database.collection.index_information()
+
+    def index(self, key, unique):
+        Database.collection.create_index([(key, ASCENDING)], unique=unique)
+
     def insert(self, data) -> ObjectId:
         if isinstance(data, dict):
             return Database.collection.insert_one(data).inserted_id
@@ -33,20 +51,11 @@ class Database:
                        " Mahdollisesti uniikki indexi on jo tietokannassa.")
                 return []
 
-    def find(self, filter, many=False):
-        if not many:
-            return Database.collection.find_one(filter)
-        else:
-            return Database.collection.find(filter)
-
-    def count(self, filter=None):
-        if filter is None:
-            return Database.collection.count_documents()
-        else:
-            return Database.collection.count_documents(filter)
-    
-    def index(self, key, unique):
-        Database.collection.create_index([(key, ASCENDING)], unique=unique)
-
-    def get_indexes(self):
-        return Database.collection.index_information()
+    def replace(self, filter, replacement, upsert=False) -> int:
+        """Replace a document matching filter with replacement.
+        
+        If upsert is True insert the replacement if filter finds nothing.
+        Return the count of modified documents.
+        """
+        result = Database.collection.replace_one(filter, replacement, upsert)
+        return result.modified_count

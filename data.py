@@ -1,7 +1,5 @@
-import collections
-from pprint import pprint
-
-from wx.core import DragNone
+"""Data classes for TTK."""
+from bson import ObjectId
 
 
 NEW_OFFER_NAME = "Uusi tarjous"
@@ -9,8 +7,18 @@ NEW_GROUP_NAME = "Uusi ryhmä"
 NO_PREDEF_FOUND = "Esimääritystä ei löytynyt osalle: '{}'"
 GD_TO_DICT = "Muodosta (dict) kopio '{}' sisällötä, jonka pituus on: {}"
 
+GD_NAMES = {
+    "predefs": "Esimääritykset",
+    "materials": "Materiaalit",
+    "products": "Tuotteet",
+    "parts": "Osat",
+}
+
+GD_DATABASE = ["materials", "products"]
+
 FIELDS_PARTS = {
     'code': ['', 'string', 'Koodi', False],
+    'edited': [True, 'bool', 'Muokattu', True],
     'desc': ['', 'string', 'Kuvaus', False],
     'use_predef': ['', 'string', 'Esimääritys', False],
     'mat': ['', 'string', 'Materiaali', False],
@@ -18,7 +26,7 @@ FIELDS_PARTS = {
     'x': [0, 'long', 'Leveys', True],
     'y': [0, 'long', 'Korkeus', True],
     'z': [0, 'long', 'Syvyys', True],
-    'cost': [0.0, 'double', 'Hinta', True],
+    'cost': [0.0, 'double:6,2', 'Hinta', True],
     'code_use_mat': 
     [
         "osd['predefs'].find('part', obj['code'], 'mat') "+
@@ -38,23 +46,46 @@ FIELDS_PARTS = {
 
 FIELDS_PRODUCTS = {
     'code': ['', 'string', 'Koodi', False],
+    'edited': [True, 'bool', 'Muokattu', True],
+    'count': [1, 'long', 'Määrä', False],
+    'group': ['', 'string', 'Tuoteryhmä', False],
     'desc': ['', 'string', 'Kuvaus', False],
     'prod': ['', 'string', 'Valmistaja', False],
     'x': [0, 'long', 'Leveys', False],
     'y': [0, 'long', 'Korkeus', False],
     'z': [0, 'long', 'Syvyys', False],
-    'cost': [0.0, 'double', 'Hinta', True],
-    'code_cost': ["obj['parts'].sum('cost')", 'string', 'Hinta koodi', False],
+    'work_time': [0.0, 'double:6,2', 'Työaika', False],
+    'work_cost': [0.0, 'double:6,2', 'Työhinta', False],
+    'part_cost': [0.0, 'double:6,2', 'Osahinta', True],
+    'tot_cost': [0.0, 'double:6,2', 'Kok. Hinta', True],
+    'inst_unit': ['', 'string', 'Asennusyksikkö', False],
+    'code_part_cost': ["obj['parts'].sum('cost')", 'string', 'Osahinnan koodi', False],
+    'code_tot_cost': 
+    [
+        "(obj['work_time'] * obj['work_cost']) + obj['part_cost'] + obj['tot_cost']",
+        'string', 'Kokonaishinnan koodi', False
+    ],
     'parts': [None, 'griddata', 'Osat', False]
 }
 
 FIELDS_MATERIALS = {
     'code': ['', 'string', 'Koodi', False],
+    'edited': [True, 'bool', 'Muokattu', True],
     'desc': ['', 'string', 'Kuvaus', False],
     'thck': [0, 'long', 'Paksuus (mm)', False],
     'prod': ['', 'string', 'Valmistaja', False],
-    'cost': [0.0, 'double', 'Hinta', False],
-    'unit': ['', 'string', 'Hintayksikkö', False]
+    'loss': [0.0, 'double:6,2', 'Hukka', False],
+    'unit': ['€/m2', 'choice:€/m2,€/kpl', 'Hintayksikkö', False],
+    'cost': [0.0, 'double:6,2', 'Hinta', False],
+    'edg_cost': [0.0, 'double:6,2', 'Reunanauhan hinta', False],
+    'add_cost': [0.0, 'double:6,2', 'Lisähinta', False],
+    'discount': [0.0, 'double:6,2', 'Alennus', False],
+    'tot_cost': [0.0, 'double:6,2', 'Kok. Hinta', True],
+    'code_tot_cost': 
+    [
+        "(obj['cost'] + obj['edg_cost'] + obj['add_cost']) * obj['discount'] * obj['loss']",
+        'string', 'Kokonaishinnan koodi', False
+    ]
 }
 
 FIELDS_PREDEFS = {
@@ -66,24 +97,49 @@ COL_PREDEFS = [
     'part', 'mat'
 ]
 COL_MATERIALS = [
-    'code', 'desc', 'thck', 'prod', 'cost', 'unit'
+    'code',
+    'edited',
+    'desc',
+    'thck',
+    'prod',
+    'loss',
+    'unit',
+    'cost',
+    'edg_cost',
+    'add_cost',
+    'discount',
+    'tot_cost'
 ]
 COL_PRODUCTS = [
-    'code', 'desc', 'prod', 'x', 'y', 'z', 'cost'
+    "code",
+    "edited",
+    "count",
+    "group",
+    "desc",
+    "prod",
+    "x",
+    "y",
+    "z",
+    "inst_unit",
+    "work_time",
+    "work_cost",
+    "part_cost",
+    "tot_cost",
 ]
 COL_PARTS = [
-    'code', 'desc', 'use_predef', 'mat',
+    'code', 'edited', 'desc', 'use_predef', 'mat',
     'use_mat', 'x', 'y', 'z', 'cost'
 ]
 TABTO_PREDEFS = [1]
-TABTO_MATERIALS = [1, 2, 3, 4, 5]
-TABTO_PRODUCTS = [1, 2, 3, 4, 5, 6]
-TABTO_PARTS = [1, 2, 3]
+TABTO_MATERIALS = [2, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+TABTO_PRODUCTS = [2, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+TABTO_PARTS = [2, 2, 3, 4]
 
 CODES_PREDEFS = {}
-CODES_MATERIALS = {}
+CODES_MATERIALS = {'tot_cost': 'code_tot_cost'}
 CODES_PRODUCTS = {
-    'cost': 'code_cost'
+    'part_cost': 'code_part_cost',
+    'tot_cost': 'code_tot_cost'
 }
 CODES_PARTS = {
     'use_mat': "code_use_mat",
@@ -105,10 +161,34 @@ PARENT_PARTS = ['products']
 
 
 class GridData:
+    """Class for data storage and it's various formatting information.
+
+    Class Constants:
+        - DEFAULT, TYPE, LABEL, READONLY (int): The index of each information in
+        fields Class Variable.
+
+    Class Variables:
+        - grid_names (dict): The defined names as key and their labels as values.
+        - db (list): The name keys that have a database collection with same name.
+        - fields (dict): Field information for each grid.
+        - child (dict): Child keys in a list for each grid.
+        - parent (dict): Parent keys in a list for each grid.
+        - columns (dict): Column keys visible in grid for each grid.
+        - tab_to (dict): Each index in list has the index of column to jump to on tab.
+        - codes (dict): {The key that receives value from code: The key for code}
+    
+    Instance Variables:
+        - data (list): List of dictionaries containing grid data.
+        - name (str): Name key for this GridData.
+    """
     DEFAULT = 0
     TYPE = 1
     LABEL = 2
     READONLY = 3
+
+    grid_names = GD_NAMES
+
+    db = GD_DATABASE
 
     fields = {
         "predefs": FIELDS_PREDEFS,
@@ -306,12 +386,25 @@ class GridData:
             except (KeyError, IndexError):
                 return None
 
+    def get_children(self) -> list:
+        """Return a list of children."""
+        return [child for child in GridData.child[self.name]]
+
     def get_codes(self, row) -> dict:
         """Return dictionary of codes at row. {label: code}."""
         codes = {}
         for label, code_key in GridData.codes[self.name].items():
             codes[label] = self.get(row, code_key)
         return codes
+
+    def get_columns(self) -> list:
+        """Return a copy of the list of column keys."""
+        return [key for key in GridData.columns[self.name]]
+
+    @classmethod
+    def get_db_keys(cls) -> list:
+        """Return a copy of grid keys that have a database collection."""
+        return [key for key in cls.db]
 
     def get_default(self) -> dict:
         """Return a new dictionary with default values."""
@@ -325,23 +418,44 @@ class GridData:
 
         return default
 
+    def get_default_dict(self) -> dict:
+        """Return a new dictionary with default values and any child as dictionary."""
+        default = {
+            k: v[self.DEFAULT]
+            for k, v in self.fields[self.name].items()
+        }
+
+        for child_key in self.child[self.name]:
+            default[child_key] = GridData(child_key).get_default_dict()
+
+        return default
+
     def get_keys(self):
         """Return a list of keys defined in GridData.fields."""
         return list(GridData.fields[self.name].keys())
 
-    def get_label(self, col) -> str:
-        """Return the label string for for column at index 'col'.
-        
+    def get_key(self, col):
+        """Return the key at col index."""
+        return GridData.columns[self.name][col]
+
+    def get_label(self, col, grid=False) -> str:
+        """Return the label for the column or grid at given index or key.
+
         Args:
-            col (int|str): Column index or key.
+            - col (int|str): Column index or key OR Grid key.
+            - grid (bool): True if return label is for the grid, Default False for column.
+            For grid label col can only be str key.
         """
-        if isinstance(col, int):
-            return GridData.fields[self.name][GridData.columns[self.name][col]][self.LABEL]
-        elif isinstance(col, str):
-            return GridData.fields[self.name][col][self.LABEL]
+        if grid:
+            return GridData.grid_names[col]
         else:
-            raise IndexError(
-                f"GridData.get_label - Label is not defined for col: {col}")
+            if isinstance(col, int):
+                return GridData.fields[self.name][GridData.columns[self.name][col]][self.LABEL]
+            elif isinstance(col, str):
+                return GridData.fields[self.name][col][self.LABEL]
+            else:
+                raise IndexError(
+                    f"GridData.get_label - Label is not defined for col: {col}")
 
     def get_n_columns(self) -> int:
         """Return the number of columns to display."""
@@ -893,3 +1007,22 @@ class Link:
     #         return Product()
     #     elif self.target == Link.PART:
     #         return Part()
+
+
+TYPE_STRINGS = {
+    "string": str,
+    "double": float,
+    "long": int,
+    "bool": bool,
+    "oid": ObjectId,
+    "griddata": GridData
+}
+
+def convert(typestring: str, valuestring: str):
+    st = typestring.split(':')[0]
+    if isinstance(valuestring, str):
+        if st == "double":
+            valuestring = valuestring.replace(',', '.')
+        return TYPE_STRINGS[st](valuestring)
+    else:
+        raise TypeError(f"convert() valuestring is not a string but a {type(valuestring)}")
