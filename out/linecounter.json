@@ -1,0 +1,171 @@
+{
+    "extension": "linecounter",
+    "version": "0.2.7",
+    "workspace": "c:\\Users\\Cosa Dove Ky\\Desktop\\Uusi kansio\\koodi\\ttk-py",
+    "linecount": [
+        {
+            "version": "0.2.7",
+            "counttime": "2021-04-28 17:36:11",
+            "filesum": 20,
+            "codesum": 2031,
+            "commentsum": 381,
+            "blanksum": 526,
+            "statistics": {
+                ".json": {
+                    "code": 140,
+                    "comment": 0,
+                    "blank": 1
+                },
+                ".py": {
+                    "code": 1882,
+                    "comment": 380,
+                    "blank": 524
+                },
+                "": {
+                    "code": 3,
+                    "comment": 0,
+                    "blank": 0
+                },
+                ".TAG": {
+                    "code": 4,
+                    "comment": 1,
+                    "blank": 0
+                },
+                ".md": {
+                    "code": 2,
+                    "comment": 0,
+                    "blank": 1
+                }
+            },
+            "filelist": [
+                {
+                    "blank": 0,
+                    "code": 2,
+                    "comment": 0,
+                    "filename": ".pytest_cache\\.gitignore"
+                },
+                {
+                    "blank": 0,
+                    "code": 4,
+                    "comment": 1,
+                    "filename": ".pytest_cache\\CACHEDIR.TAG"
+                },
+                {
+                    "blank": 1,
+                    "code": 2,
+                    "comment": 0,
+                    "filename": ".pytest_cache\\README.md"
+                },
+                {
+                    "blank": 0,
+                    "code": 1,
+                    "comment": 0,
+                    "filename": ".pytest_cache\\v\\cache\\stepwise"
+                },
+                {
+                    "filename": "__pycache__\\data.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\database.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\dialog.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\frame.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\grid.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\main.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\panel.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "blank": 136,
+                    "code": 609,
+                    "comment": 173,
+                    "filename": "data.py"
+                },
+                {
+                    "blank": 16,
+                    "code": 41,
+                    "comment": 0,
+                    "filename": "database.py"
+                },
+                {
+                    "blank": 75,
+                    "code": 252,
+                    "comment": 20,
+                    "filename": "dialog.py"
+                },
+                {
+                    "blank": 44,
+                    "code": 135,
+                    "comment": 27,
+                    "filename": "frame.py"
+                },
+                {
+                    "blank": 132,
+                    "code": 422,
+                    "comment": 61,
+                    "filename": "grid.py"
+                },
+                {
+                    "blank": 9,
+                    "code": 21,
+                    "comment": 0,
+                    "filename": "main.py"
+                },
+                {
+                    "blank": 112,
+                    "code": 402,
+                    "comment": 99,
+                    "filename": "panel.py"
+                },
+                {
+                    "blank": 0,
+                    "code": 136,
+                    "comment": 0,
+                    "filename": "Uusi tarjous.json"
+                },
+                {
+                    "blank": 1,
+                    "code": 4,
+                    "comment": 0,
+                    "filename": "workspace.json"
+                }
+            ]
+        }
+    ]
+}

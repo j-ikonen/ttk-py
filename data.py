@@ -1,5 +1,6 @@
 """Data classes for TTK."""
 from bson import ObjectId
+from database import Database
 
 
 NEW_OFFER_NAME = "Uusi tarjous"
@@ -16,9 +17,37 @@ GD_NAMES = {
 
 GD_DATABASE = ["materials", "products"]
 
+EQ_KEYS = {
+    "predefs": ['part', 'mat'],
+    "materials": [
+        'code',
+        'desc',
+        'thck',
+        'prod',
+        'loss',
+        'unit',
+        'cost'
+    ],
+    "products": [
+        'code',
+        'group',
+        'desc',
+        'prod',
+        'x',
+        'y',
+        'z'
+    ],
+    "parts": [
+        'code',
+        'desc',
+        'code_x',
+        'code_y',
+        'code_z'
+    ]
+}
+
 FIELDS_PARTS = {
     'code': ['', 'string', 'Koodi', False],
-    'edited': [True, 'bool', 'Muokattu', True],
     'desc': ['', 'string', 'Kuvaus', False],
     'use_predef': ['', 'string', 'Esimääritys', False],
     'mat': ['', 'string', 'Materiaali', False],
@@ -46,7 +75,7 @@ FIELDS_PARTS = {
 
 FIELDS_PRODUCTS = {
     'code': ['', 'string', 'Koodi', False],
-    'edited': [True, 'bool', 'Muokattu', True],
+    'edited': ['E', 'string', 'Muokattu', True],
     'count': [1, 'long', 'Määrä', False],
     'group': ['', 'string', 'Tuoteryhmä', False],
     'desc': ['', 'string', 'Kuvaus', False],
@@ -59,10 +88,11 @@ FIELDS_PRODUCTS = {
     'part_cost': [0.0, 'double:6,2', 'Osahinta', True],
     'tot_cost': [0.0, 'double:6,2', 'Kok. Hinta', True],
     'inst_unit': ['', 'string', 'Asennusyksikkö', False],
+    'code_edited': ["db.get_edited(self.get_edited_filter(obj))", 'string', 'Muokattu koodi', True],
     'code_part_cost': ["obj['parts'].sum('cost')", 'string', 'Osahinnan koodi', False],
     'code_tot_cost': 
     [
-        "(obj['work_time'] * obj['work_cost']) + obj['part_cost'] + obj['tot_cost']",
+        "(obj['work_time'] * obj['work_cost']) + obj['part_cost']",
         'string', 'Kokonaishinnan koodi', False
     ],
     'parts': [None, 'griddata', 'Osat', False]
@@ -70,7 +100,7 @@ FIELDS_PRODUCTS = {
 
 FIELDS_MATERIALS = {
     'code': ['', 'string', 'Koodi', False],
-    'edited': [True, 'bool', 'Muokattu', True],
+    'edited': ['E', 'string', 'Muokattu', True],
     'desc': ['', 'string', 'Kuvaus', False],
     'thck': [0, 'long', 'Paksuus (mm)', False],
     'prod': ['', 'string', 'Valmistaja', False],
@@ -81,11 +111,14 @@ FIELDS_MATERIALS = {
     'add_cost': [0.0, 'double:6,2', 'Lisähinta', False],
     'discount': [0.0, 'double:6,2', 'Alennus', False],
     'tot_cost': [0.0, 'double:6,2', 'Kok. Hinta', True],
-    'code_tot_cost': 
-    [
+    'code_tot_cost': [
         "(obj['cost'] + obj['edg_cost'] + obj['add_cost']) * obj['discount'] * obj['loss']",
         'string', 'Kokonaishinnan koodi', False
-    ]
+    ],
+    'code_edited': [
+        "db.get_edited(self.get_edited_filter(obj))",
+        'string', 'Muokattu koodi', False
+    ],
 }
 
 FIELDS_PREDEFS = {
@@ -127,19 +160,23 @@ COL_PRODUCTS = [
     "tot_cost",
 ]
 COL_PARTS = [
-    'code', 'edited', 'desc', 'use_predef', 'mat',
+    'code', 'desc', 'use_predef', 'mat',
     'use_mat', 'x', 'y', 'z', 'cost'
 ]
 TABTO_PREDEFS = [1]
 TABTO_MATERIALS = [2, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 TABTO_PRODUCTS = [2, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-TABTO_PARTS = [2, 2, 3, 4]
+TABTO_PARTS = [1, 2, 3]
 
 CODES_PREDEFS = {}
-CODES_MATERIALS = {'tot_cost': 'code_tot_cost'}
+CODES_MATERIALS = {
+    'tot_cost': 'code_tot_cost',
+    'edited': 'code_edited'
+}
 CODES_PRODUCTS = {
     'part_cost': 'code_part_cost',
-    'tot_cost': 'code_tot_cost'
+    'tot_cost': 'code_tot_cost',
+    'edited': 'code_edited'
 }
 CODES_PARTS = {
     'use_mat': "code_use_mat",
@@ -170,6 +207,7 @@ class GridData:
     Class Variables:
         - grid_names (dict): The defined names as key and their labels as values.
         - db (list): The name keys that have a database collection with same name.
+        - eq_keys (dict): A list of keys used to check equality for each grid.
         - fields (dict): Field information for each grid.
         - child (dict): Child keys in a list for each grid.
         - parent (dict): Parent keys in a list for each grid.
@@ -187,9 +225,8 @@ class GridData:
     READONLY = 3
 
     grid_names = GD_NAMES
-
     db = GD_DATABASE
-
+    eq_keys = EQ_KEYS
     fields = {
         "predefs": FIELDS_PREDEFS,
         "materials": FIELDS_MATERIALS,
@@ -277,6 +314,9 @@ class GridData:
                     child_list = v.data
                 elif isinstance(v, list):
                     child_list = v
+
+                print(f"GridData.append\n\tdefault[childkey]: {default[k]}" +
+                      f"\n\tlen: {len(default[k])}\n")
 
                 for child_obj in child_list:
                     default[k].append(child_obj)
@@ -430,6 +470,30 @@ class GridData:
 
         return default
 
+    def get_edited_filter(self, obj):
+        """Return the filter for checking if database has the same item."""
+        # print("GridData.get_edited_filter")
+        if self.name in GridData.get_db_keys():
+            flt = {}
+            children = self.get_children()
+            for key in GridData.eq_keys[self.name]:
+                if key in children:
+                    # List of child objects.
+                    for n, child_obj in enumerate(obj[key].data):
+                        # EqKeys in child object.
+                        for child_key in GridData.eq_keys[key]:
+                            # Dot notation for MongoDb query of embedded documents.
+                            dotkey = "{}.{}.{}".format(key, n, child_key)
+                            flt[dotkey] = child_obj[child_key]
+                else:
+                    flt[key] = obj[key]
+                    # print(f"\nAdd {flt[key]}: {obj[key]}")
+            return flt
+
+        print(f"\nGridData.get_edited_filter: self.name: {self.name} - " +
+              f"Tried to get filter for checking edited cell in a grid with no database.\n")
+        return None
+
     def get_keys(self):
         """Return a list of keys defined in GridData.fields."""
         return list(GridData.fields[self.name].keys())
@@ -468,13 +532,12 @@ class GridData:
             col (int|str): Column index or key.
         """
         if isinstance(col, int):
-            try:
-                return GridData.fields[self.name][GridData.columns[self.name][col]][self.TYPE]
-            except IndexError as e:
-                print(f"Error: {e}\n\tself.name: {self.name}\n\tcol: {col}\n\t" +
-                      f"self.TYPE: {self.TYPE}\n\tGridData.columns[self.name]: " +
-                      f"{GridData.columns[self.name]}\n\tGridData.fields[self.name]: " +
-                      f"{GridData.fields[self.name]}")
+            # try:
+            return GridData.fields[self.name][GridData.columns[self.name][col]][self.TYPE]
+            # except IndexError as e:
+            #     print(f"GridData.get_type - IndexError: {e}\n\tself.name: " +
+            #           f"{self.name}\n\tcol: {col}\n\t" +
+            #           f"self.TYPE: {self.TYPE}\n")
 
         elif isinstance(col, str):
             return GridData.fields[self.name][col][self.TYPE]
@@ -509,6 +572,11 @@ class GridData:
             osd (dict): Outside data. Data of other grids.
         """
         # print(f"GridData.process_codes - type(self.data): {type(self.data)}")
+        if self.name in GridData.get_db_keys():
+            db = Database(self.name)
+        else:
+            db = None
+
         for obj in self.data:
             for target_key, code_key in GridData.codes[self.name].items():
                 obj[target_key] = eval(obj[code_key])

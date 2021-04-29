@@ -1,0 +1,41 @@
+===============================================================================
+EXTENSION NAME : linecounter
+EXTENSION VERSION : 0.2.7
+-------------------------------------------------------------------------------
+count time : 2021-04-28 17:36:11
+count workspace : c:\Users\Cosa Dove Ky\Desktop\Uusi kansio\koodi\ttk-py
+total files : 20
+total code lines : 2031
+total comment lines : 381
+total blank lines : 526
+
+    statistics
+   |      extension|     total code|  total comment|    total blank|percent|
+   -------------------------------------------------------------------------
+   |          .json|            140|              0|              1|    6.9|
+   |            .py|           1882|            380|            524|     93|
+   |               |              3|              0|              0|   0.15|
+   |           .TAG|              4|              1|              0|   0.20|
+   |            .md|              2|              0|              1|  0.098|
+   -------------------------------------------------------------------------
+.pytest_cache\.gitignore, code is 2, comment is 0, blank is 0.
+.pytest_cache\CACHEDIR.TAG, code is 4, comment is 1, blank is 0.
+.pytest_cache\README.md, code is 2, comment is 0, blank is 1.
+.pytest_cache\v\cache\stepwise, code is 1, comment is 0, blank is 0.
+__pycache__\data.cpython-38.pyc, it is a binary file.
+__pycache__\database.cpython-38.pyc, it is a binary file.
+__pycache__\dialog.cpython-38.pyc, it is a binary file.
+__pycache__\frame.cpython-38.pyc, it is a binary file.
+__pycache__\grid.cpython-38.pyc, it is a binary file.
+__pycache__\main.cpython-38.pyc, it is a binary file.
+__pycache__\panel.cpython-38.pyc, it is a binary file.
+data.py, code is 609, comment is 173, blank is 136.
+database.py, code is 41, comment is 0, blank is 16.
+dialog.py, code is 252, comment is 20, blank is 75.
+frame.py, code is 135, comment is 27, blank is 44.
+grid.py, code is 422, comment is 61, blank is 132.
+main.py, code is 21, comment is 0, blank is 9.
+panel.py, code is 402, comment is 99, blank is 112.
+Uusi tarjous.json, code is 136, comment is 0, blank is 0.
+workspace.json, code is 4, comment is 0, blank is 1.
+===============================================================================

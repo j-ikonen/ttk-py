@@ -11,29 +11,38 @@ from grid import CustomGrid
 FRAME_SIZE = (1200, 750)
 LEFTWIN_SIZE = (270, FRAME_SIZE[1])
 BOTWIN_SIZE = (FRAME_SIZE[0], 100)
-TREE_ROOT_TITLE = "Tarjoukset"
-GP_NAMELABEL = "Ryhmän nimi: "
-GP_NAMECTRL_SIZE = (125, -1)
-IP_TEXTCTRL_SIZE = (400,-1)
+IP_TEXTCTRL_SIZE = (400,-1)     # InfoPage
 IP_LABEL_SIZE = (150, -1)
+GP_NAMECTRL_SIZE = (125, -1)
 BORDER = 5
+REFRESH_TIMES = 3
+
+TREE_ROOT_TITLE = "Tarjoukset"
+GP_NAMELABEL = "Ryhmän nimi: "  # GridPage
 GP_BTN_REFRESH = "Päivitä"
 GP_PREDEFS_LABEL = "Osien esimääritellyt materiaalit"
 GP_MATERIALS_LABEL = "Materiaalit"
 GP_PRODUCTS_LABEL = "Tuotteet"
 GP_PARTS_LABEL = "Tuotteen '{}' osat"
 GP_NO_PRODUCT_SELECTED = "Tuotetta ei ole valittu."
+GP_BTN_DB = "Tietokanta"
 NO_OFFER_SELECTED = "Tarjousta ei ole valittu."
 BTN_NEW_GROUP = "Lisää ryhmä"
 BTN_DEL_GROUP = "Poista ryhmiä"
 BTN_NEW_OFFER = "Uusi tarjous"
 BTN_CLOSE_OFFER = "Sulje tarjous"
-DLG_CLOSE_OFFERS_MSG = "Valitse suljettavat tarjoukset."
+DLG_CLOSE_OFFERS_MSG = "Valitse suljettavat tarjoukset."    # Dialog
 DLG_CLOSE_OFFERS_CAP = "Sulje tarjouksia"
 DLG_DEL_GROUPS_MSG = "Valitse poistettavat ryhmät tarjouksesta '{}'."
 DLG_DEL_GROUPS_CAP = "Poista ryhmiä"
-REFRESH_TIMES = 3
-GP_BTN_DB = "Tietokanta"
+FCL_LABEL_UNIT = "Asennusyksikkö"   # Field Count List
+FCL_LABEL_MULT = "Hintakerroin"
+FCL_LABEL_N = "Määrä"
+FCL_LABEL_COST = "Hinta"
+FC_KEY = "inst_unit"
+FC_COUNT_KEY = "count"
+FC_COUNT = 'count'
+FC_MULT = 'mult'
 
 
 class Panel(wx.Panel):
@@ -222,9 +231,24 @@ class Panel(wx.Panel):
 
             self.Bind(wx.EVT_TEXT, self.on_info_text, self.info_textctrls[key])
 
+        # InstallUnit counter.
+        self.inst_unit = {}
+        field_count_panel = wx.Panel(infopage)
+        self.field_count_list = dv.DataViewListCtrl(field_count_panel)
+        self.field_count_list.AppendTextColumn(FCL_LABEL_UNIT)
+        self.field_count_list.AppendTextColumn(FCL_LABEL_MULT)
+        self.field_count_list.AppendTextColumn(FCL_LABEL_N)
+        self.field_count_list.AppendTextColumn(FCL_LABEL_COST)
+
+        field_count_sizer = wx.BoxSizer(wx.VERTICAL)
+        field_count_sizer.Add(self.field_count_list, 0, wx.EXPAND)
+
+        field_count_panel.SetSizer(field_count_sizer)
         infopanel.SetSizer(info_sizer)
+
         infopage_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        infopage_sizer.Add(infopanel, 1, wx.EXPAND)
+        infopage_sizer.Add(infopanel, 3, wx.EXPAND)
+        infopage_sizer.Add(field_count_panel, 2, wx.EXPAND)
         infopage.SetSizer(infopage_sizer)
 
 
@@ -472,7 +496,7 @@ class Panel(wx.Panel):
     def on_gp_btn_refresh(self, evt):
         """Handle refresh button event for GridData.process_codes()."""
         print(f"Panel.on_gp_btn_refresh")
-        def inner_refresh():
+        def inner_refresh(n):
             outside_data = {
                 self.grid_predefs.data.name: self.grid_predefs.data,
                 self.grid_materials.data.name: self.grid_materials.data,
@@ -481,53 +505,51 @@ class Panel(wx.Panel):
             self.grid_predefs.data.process_codes(outside_data)
             self.grid_materials.data.process_codes(outside_data)
             self.grid_products.data.process_codes(outside_data)
-            self.grid_predefs.Refresh()
-            self.grid_materials.Refresh()
-            self.grid_products.Refresh()
+
             for row in range(self.grid_products.GetNumberRows() - 1):
                 parent = self.grid_products.data.get(row)
                 parts = self.grid_products.data.get(row, 'parts')
                 outside_data['parent'] = parent
                 parts.process_codes(outside_data)
 
-            self.grid_parts.Refresh()
+            # Do stuff that does not require repeats.
+            if n == REFRESH_TIMES - 1:
+                # Repaint the cells that require it.
+                for row in range(len(self.grid_materials.data)):
+                    self.grid_materials.set_edited_cell(row)
+
+                for row in range(len(self.grid_products.data)):
+                    self.grid_products.set_edited_cell(row)
+
+                self.grid_predefs.Refresh()
+                self.grid_materials.Refresh()
+                self.grid_products.Refresh()
+                self.grid_parts.Refresh()
+
+        # Repeat to make sure all dependend codes are updated.
         for n in range(REFRESH_TIMES):
-            inner_refresh()
+            inner_refresh(n)
 
     def on_gp_btn_db(self, evt):
         """Handle event for db dialog button."""
         with DbDialog(self, 'materials') as dlg:
             if dlg.ShowModal() == wx.ID_OK:
-                pass
+                self.add_items_to_offer(dlg.to_offer)
 
-    # def on_btn_materials_insert(self, evt):
-    #     self.insert_to_db('materials')
-
-    # def on_btn_products_insert(self, evt):
-    #     self.insert_to_db('products')
-
-    # def insert_to_db(self, collection):
-    #     """Insert selected data to database.
-
-    #     Args:
-    #         collection (str): Name of collection where insert happens.
-    #     """
-    #     print("Panel.insert_to_db")
-    #     # Find the grid from which we add to database.
-    #     if collection == 'materials':
-    #         grid = self.grid_materials
-    #     elif collection == 'products':
-    #         grid = self.grid_products
-
-    #     # Create list of objects for database insert.
-    #     data = grid.data.to_dict()
-    #     to_db = []
-    #     for row in grid.GetSelectedRows():
-    #         to_db.append(data[row])
-        
-    #     # Insert to database.
-    #     ids = Database(collection).insert(to_db)
-    #     print(f"\tInserted ids: {ids}")
+    def add_items_to_offer(self, to_offer):
+        """Add items received from dialog to the open offer."""
+        print("Panel.add_items_to_offer")
+        for collection, obj_list in to_offer.items():
+            if collection == 'materials':
+                grid = self.grid_materials
+            elif collection == 'products':
+                grid = self.grid_products
+            else:
+                print(f"\tP.AITO - Collection '{collection}' is not defined.")
+                continue
+            for obj in obj_list:
+                grid.append(obj)
+                print(f"\tP.AITO - parts type: {type(obj['parts'])} should be list")
 
     #------------------------------------------------------------------------------------------
     # Simplebook - infpage
@@ -594,6 +616,28 @@ class Panel(wx.Panel):
         info_dict = self.get_selected_offer().info.to_dict()
         for key, ctrl in self.info_textctrls.items():
             ctrl.ChangeValue(info_dict[key])
+
+        # groups = self.get_selected_offer().groups
+        # self.inst_units = {}
+        # for group in groups:
+        #     for product in group.products.data:
+        #     # Update the infopage unit counter.
+        #         try:
+        #             unit = self.inst_units[product[FC_KEY]]
+        #         except KeyError:
+        #             self.inst_units[product[FC_KEY]] = {FC_COUNT: 0, FC_MULT: 0}
+        #             unit = self.inst_units[product[FC_KEY]]
+        #         unit[FC_COUNT] = unit[FC_COUNT] + product[FC_COUNT_KEY]
+
+        # total = 0
+        # for key, value in self.inst_units.items():
+        #     self.field_count_list.AppendItem([
+        #         key, value[FC_MULT],
+        #         value[FC_COUNT],
+        #         value[FC_MULT] * value[FC_COUNT]
+        #     ])
+        #     total += value[FC_MULT] * value[FC_COUNT]
+        # print(f"Panel.update_infopage_content - FIELD_COUNT_TOTAL = {total}")
 
     #------------------------------------------------------------------------------------------
     # Simplebook - rootpage

@@ -3,7 +3,7 @@ import wx.grid
 import wx.dataview as dv
 
 from data import GridData
-from database import Database
+from database import Database, EDITED_CHAR, EDITED_DIFF_MATCH, EDITED_MATCH, EDITED_NO_MATCH
 
 
 GRIDMENU_EDIT_OBJECT = "Muokkaa"
@@ -33,6 +33,10 @@ GRIDMENU_COPY = "Kopioi"
 GRIDMENU_COPY_HELP = "Kopioi valitut solut."
 GRIDMENU_PASTE = "Liitä"
 GRIDMENU_PASTE_HELP = "Liitä kopioidut valittuihin soluihin."
+CLR_CELL_EDITED_NO_MATCH = (255, 210, 210)
+CLR_CELL_EDITED_DIFF_MATCH = (210, 210, 255)
+CLR_CELL_EDITED_MATCH = (210, 255, 210)
+CLR_WHITE = (255, 255, 255)
 
 
 class CustomDataTable(wx.grid.GridTableBase):
@@ -176,6 +180,12 @@ class CustomGrid(wx.grid.Grid):
         self.Bind(wx.grid.EVT_GRID_TABBING, self.on_tab)
         self.Bind(wx.grid.EVT_GRID_EDITOR_SHOWN, self.on_editor_shown)
         self.Bind(wx.grid.EVT_GRID_CELL_RIGHT_CLICK, self.on_cell_rclick)
+
+    def append(self, obj):
+        """Append a row with data from obj to grid."""
+        oldlen = len(self.data)
+        self.data.append(obj)
+        self.GetTable().NotifyRowChange(oldlen, len(self.data))
 
     def on_tab(self, evt):
         # print("On TAB")
@@ -419,6 +429,23 @@ class CustomGrid(wx.grid.Grid):
             self.data = self.empty_data
             self.GetTable().set_data(self.empty_data)
             raise TypeError(f"CustomGrid.data must be <GridData> not {type(data)}")
+
+    def set_edited_cell(self, row):
+        """Set the backgroundcolor of cell for key 'edited'."""
+        try:
+            col = self.data.get_columns().index('edited')
+        except ValueError as e:
+            print(f"ValueError - {e} - CustomGrid.set_edited_cell grid has no column 'edited'")
+            return
+        value = self.GetCellValue(row, col)
+        if value == EDITED_CHAR[EDITED_NO_MATCH]:
+            self.SetCellBackgroundColour(row, col, CLR_CELL_EDITED_NO_MATCH)
+        elif value == EDITED_CHAR[EDITED_DIFF_MATCH]:
+            self.SetCellBackgroundColour(row, col, CLR_CELL_EDITED_DIFF_MATCH)
+        elif value == EDITED_CHAR[EDITED_MATCH]:
+            self.SetCellBackgroundColour(row, col, CLR_CELL_EDITED_MATCH)
+        else:
+            self.SetCellBackgroundColour(row, col, CLR_WHITE)
 
     def update_data(self, data: GridData, reset_selection=False):
         """Update GridData with given data.
