@@ -1,5 +1,8 @@
 """Data classes for TTK."""
+from copy import deepcopy
 from bson import ObjectId
+from wx.core import WXK_RETURN
+
 from database import Database
 
 
@@ -801,6 +804,16 @@ class Group:
         self.materials = GridData('materials')
         self.products = GridData('products')
 
+    def get(self, key):
+        if key == 'products':
+            return self.products
+        elif key == 'materials':
+            return self.materials
+        elif key == 'predefs':
+            return self.predefs
+        else:
+            raise KeyError(f"Key '{key}' is not defined in Group.get.")
+
     def to_dict(self) -> dict:
         return {
             "name": self.name,
@@ -819,13 +832,43 @@ class Group:
         return obj
 
 
+FILE_KEY = 'filepath'
+CLIENT_KEY = 'client'
+ADDR_KEY = 'address'
+NAME_KEY = 'offer_name'
+FC_TEST_KEY = 'Kaappi'
+FC_TEST2_KEY = 'Testiyksikkö'
+FC_KEY = 'field_count'
+FC_MULT = 'mult'
+FC_COUNT = 'count'
+FC_TOTAL = 'total'
+
+
 class Info:
+    # Must be initialized with all possible keys.
+    fc_mult = {
+        FC_TEST_KEY: 6.5,
+        FC_TEST2_KEY: 12.2
+    }
+    # GridData.name: Field key in GridData
+    fc_keys = {'products': 'inst_unit'}
+    fc_count_key = 'count'
+
     def __init__(self, name=NEW_OFFER_NAME):
         self.offer_name = name
         self.filepath = ""
         self.first_name = ""
         self.last_name = ""
         self.address = ""
+        self.data = {
+            FC_KEY: {
+                k: {
+                    FC_MULT: mult,
+                    FC_COUNT: 0,
+                    FC_TOTAL: 0
+                } for k, mult in Info.fc_mult.items()
+            }
+        }
 
     def to_dict(self) -> dict:
         return {
@@ -833,7 +876,8 @@ class Info:
             "filepath": self.filepath,
             "first_name": self.first_name,
             "last_name": self.last_name,
-            "address": self.address
+            "address": self.address,
+            "data": deepcopy(self.data)
         }
 
     @classmethod
@@ -844,7 +888,55 @@ class Info:
         obj.first_name = dic["first_name"]
         obj.last_name = dic["last_name"]
         obj.address = dic["address"]
+        obj.data = deepcopy(dic["data"])
         return obj
+
+    def get_fieldcount_data(self, groups, use_globals=False, refresh=True) -> dict:
+        """Return the fieldcount data with global or local multiplier.
+        
+        Args:
+            group (dict): Group containing GridData objects with field count data.
+            use_globals (bool): Determines use of Class or Instance multipliers.
+        """
+        # Get multipliers and reset rest to zero.
+        fc_data = deepcopy(self.data[FC_KEY])
+        if refresh:
+            for fc_unit in fc_data.keys():
+                fc_data[fc_unit][FC_COUNT] = 0
+                fc_data[fc_unit][FC_TOTAL] = 0
+
+            # Iterate over all groups.
+            for group in groups:
+                # Iterate through relevant GridData objects from group.
+                for gd_key, field_key in Info.fc_keys.items():
+                    # Go through the dictionaries in a list.
+                    for object in group.get(gd_key).data:
+                        unit = object[field_key]
+                        # Test if object has key for multiples.
+                        try:
+                            n = object[Info.fc_count_key]
+                        except KeyError:
+                            n = 1
+                        # Update count if the unit is predefined.
+                        try:
+                            fc_data[unit][FC_COUNT] += 1 * n
+                        except KeyError:
+                            print(f"Info.get_fieldcount_data\n" +
+                                f"\t{unit} is not a predefined fc_unit.")
+
+            # Update the totals.
+            for fc_unit in fc_data.keys():
+                fc_data[fc_unit][FC_TOTAL] = (fc_data[fc_unit][FC_MULT] *
+                                              fc_data[fc_unit][FC_COUNT])
+
+        # Assign instance Field Count so Class does not overwrite Instance.
+        self.data[FC_KEY] = deepcopy(fc_data)
+
+        if use_globals:
+            for fc_unit in fc_data.keys():
+                fc_data[fc_unit][FC_COUNT] = Info.fc_mult[fc_unit]
+
+        return fc_data
 
     @classmethod
     def get_labels(cls) -> dict:
@@ -857,9 +949,9 @@ class Info:
         }
 
 class Offer:
-    def __init__(self, groups=[Group()]):
+    def __init__(self):
         self.info = Info()
-        self.groups = groups
+        self.groups = [Group()]
 
     def to_dict(self) -> dict:
         return {
@@ -875,10 +967,7 @@ class Offer:
         return obj
 
     def get_group_names(self):
-        lst = []
-        for group in self.groups:
-            lst.append(group.name)
-        return lst
+        return [group.name for group in self.groups]
 
     def del_groups(self, lst: list):
         lst.sort(reverse=True)
@@ -999,10 +1088,7 @@ class Data:
 
     def get_offer_names(self) -> list:
         """Return a list of names of the offers."""
-        lst = []
-        for offer in self.offers:
-            lst.append(offer.name)
-        return lst
+        return [offer.info.offer_name for offer in self.offers]
 
     def del_offers(self, lst):
         lst.sort(reverse=True)

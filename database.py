@@ -61,17 +61,17 @@ class Database:
         EDITED_DIFF_MATCH for edited document found with 'code'.
         EDITED_MATCH for same document found with 'code'
         """
-        print(f"Database.get_edited")
+        # print(f"Database.get_edited")
         if filter is None:
-            print(f"\tReturn {EDITED_CHAR[EDITED_NO_MATCH]}\n")
+            # print(f"\tReturn {EDITED_CHAR[EDITED_NO_MATCH]}\n")
             return EDITED_CHAR[EDITED_NO_MATCH]
         elif self.count(filter) > 0:
-            print(f"\tReturn {EDITED_CHAR[EDITED_MATCH]}\n")
+            # print(f"\tReturn {EDITED_CHAR[EDITED_MATCH]}\n")
             return EDITED_CHAR[EDITED_MATCH]
         elif self.count({'code': filter['code']}) > 0:
-            print(f"\tReturn {EDITED_CHAR[EDITED_DIFF_MATCH]}\n")
+            # print(f"\tReturn {EDITED_CHAR[EDITED_DIFF_MATCH]}\n")
             return EDITED_CHAR[EDITED_DIFF_MATCH]
-        print(f"\tReturn {EDITED_CHAR[EDITED_NO_MATCH]}\n")
+        # print(f"\tReturn {EDITED_CHAR[EDITED_NO_MATCH]}\n")
         return EDITED_CHAR[EDITED_NO_MATCH]
 
     def index(self, key, unique):

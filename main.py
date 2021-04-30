@@ -2,8 +2,9 @@
 TODO:
     Is Asennusyksikkö choice or string?
 
-    Add inst_unit variables and multipliers to offer.info.
-    Add Installunit count with multiplier and a total costs on offer page.
+    Add field count multiplier global and local editing.
+    Create dialog with Treebook for settings / global values.
+    Add field count list title and a check box for global/local multiplier
     Add predefined column widths.
     Add remove from database functionality.
     Add part editing in database dialogs.
@@ -11,8 +12,11 @@ TODO:
     Add ctrl arrow key scrolling to choice cells.
     Add FoldPanelBar to fold grids hidden.
     Change use_predef column in parts to bool.
+    Change Info into something closer to GridData.
 
     DONE:
+    Add inst_unit variables and multipliers to offer.info.
+    Add Installunit count with multiplier and a total costs on offer page.
     Make refresh on gridpage check for edited status.
     Format edited columns as a colored cell.
     Test Database dialogs with new column additions.
@@ -20,6 +24,8 @@ TODO:
     Fix adding parts to database.
 
 BUGS:
+    Possibly linking same groups list object across different offers on some unknown condition.
+        No way to reproduce found.
 
 Fields:
     edited:

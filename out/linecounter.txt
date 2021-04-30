@@ -39,3 +39,43 @@ panel.py, code is 402, comment is 99, blank is 112.
 Uusi tarjous.json, code is 136, comment is 0, blank is 0.
 workspace.json, code is 4, comment is 0, blank is 1.
 ===============================================================================
+===============================================================================
+EXTENSION NAME : linecounter
+EXTENSION VERSION : 0.2.7
+-------------------------------------------------------------------------------
+count time : 2021-04-29 17:52:55
+count workspace : c:\Users\Cosa Dove Ky\Desktop\Uusi kansio\koodi\ttk-py
+total files : 19
+total code lines : 2078
+total comment lines : 405
+total blank lines : 560
+
+    statistics
+   |      extension|     total code|  total comment|    total blank|percent|
+   -------------------------------------------------------------------------
+   |          .json|              3|              0|              0|   0.14|
+   |            .py|           2066|            404|            559|     99|
+   |               |              3|              0|              0|   0.14|
+   |           .TAG|              4|              1|              0|   0.19|
+   |            .md|              2|              0|              1|  0.096|
+   -------------------------------------------------------------------------
+.pytest_cache\.gitignore, code is 2, comment is 0, blank is 0.
+.pytest_cache\CACHEDIR.TAG, code is 4, comment is 1, blank is 0.
+.pytest_cache\README.md, code is 2, comment is 0, blank is 1.
+.pytest_cache\v\cache\stepwise, code is 1, comment is 0, blank is 0.
+__pycache__\data.cpython-38.pyc, it is a binary file.
+__pycache__\database.cpython-38.pyc, it is a binary file.
+__pycache__\dialog.cpython-38.pyc, it is a binary file.
+__pycache__\frame.cpython-38.pyc, it is a binary file.
+__pycache__\grid.cpython-38.pyc, it is a binary file.
+__pycache__\main.cpython-38.pyc, it is a binary file.
+__pycache__\panel.cpython-38.pyc, it is a binary file.
+data.py, code is 659, comment is 183, blank is 143.
+database.py, code is 62, comment is 0, blank is 20.
+dialog.py, code is 305, comment is 29, blank is 89.
+frame.py, code is 135, comment is 27, blank is 44.
+grid.py, code is 445, comment is 61, blank is 136.
+main.py, code is 21, comment is 0, blank is 9.
+panel.py, code is 439, comment is 104, blank is 118.
+workspace.json, code is 3, comment is 0, blank is 0.
+===============================================================================

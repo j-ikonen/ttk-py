@@ -4,9 +4,8 @@ import wx
 import wx.adv
 import wx.dataview as dv
 
-from data import Link, GridData, Group, Info, Data
+from data import FC_TOTAL, FC_MULT, FC_COUNT, Link, GridData, Group, Info, Data
 from grid import CustomGrid
-
 
 FRAME_SIZE = (1200, 750)
 LEFTWIN_SIZE = (270, FRAME_SIZE[1])
@@ -41,8 +40,6 @@ FCL_LABEL_N = "Määrä"
 FCL_LABEL_COST = "Hinta"
 FC_KEY = "inst_unit"
 FC_COUNT_KEY = "count"
-FC_COUNT = 'count'
-FC_MULT = 'mult'
 
 
 class Panel(wx.Panel):
@@ -193,7 +190,7 @@ class Panel(wx.Panel):
         btn_sizer.Add(btn_new_group, 0, wx.ALL, BORDER)
         btn_sizer.Add(btn_del_group, 0, wx.ALL, BORDER)
 
-        info_sizer.Add(btn_sizer, 0, wx.EXPAND)
+        info_sizer.Add(btn_sizer, 0)
         info_sizer.Add((400, 20))
 
         # Info() edits.
@@ -232,25 +229,25 @@ class Panel(wx.Panel):
             self.Bind(wx.EVT_TEXT, self.on_info_text, self.info_textctrls[key])
 
         # InstallUnit counter.
-        self.inst_unit = {}
-        field_count_panel = wx.Panel(infopage)
-        self.field_count_list = dv.DataViewListCtrl(field_count_panel)
+        self.list_data = []
+        # field_count_panel = wx.Panel(infopage)
+        self.field_count_list = dv.DataViewListCtrl(infopage)
         self.field_count_list.AppendTextColumn(FCL_LABEL_UNIT)
         self.field_count_list.AppendTextColumn(FCL_LABEL_MULT)
         self.field_count_list.AppendTextColumn(FCL_LABEL_N)
         self.field_count_list.AppendTextColumn(FCL_LABEL_COST)
 
-        field_count_sizer = wx.BoxSizer(wx.VERTICAL)
-        field_count_sizer.Add(self.field_count_list, 0, wx.EXPAND)
+        self.Bind(dv.EVT_DATAVIEW_SELECTION_CHANGED, self.on_fc_selection, self.field_count_list)
+        # field_count_sizer = wx.BoxSizer(wx.VERTICAL)
+        # field_count_sizer.Add(self.field_count_list, 1, wx.EXPAND)
 
-        field_count_panel.SetSizer(field_count_sizer)
-        infopanel.SetSizer(info_sizer)
+        # field_count_panel.SetSizer(field_count_sizer)
 
         infopage_sizer = wx.BoxSizer(wx.HORIZONTAL)
         infopage_sizer.Add(infopanel, 3, wx.EXPAND)
-        infopage_sizer.Add(field_count_panel, 2, wx.EXPAND)
+        infopage_sizer.Add(self.field_count_list, 2, wx.EXPAND)
+        infopanel.SetSizer(info_sizer)
         infopage.SetSizer(infopage_sizer)
-
 
         #------------------------------------------------------------------------------------------
         # Simplebook - rootpage
@@ -265,9 +262,9 @@ class Panel(wx.Panel):
         # btn_sizer.Add(btn_new_offer, 0, wx.ALL, BORDER)
         btn_sizer.Add(btn_close_offer, 0, wx.ALL, BORDER)
 
-        sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer.Add(btn_sizer)
-        rootpage.Sizer = sizer
+        root_sizer = wx.BoxSizer(wx.VERTICAL)
+        root_sizer.Add(btn_sizer)
+        rootpage.SetSizer(root_sizer)
 
     #----------------------------------------------------------------------------------------------
     # SashWindows functions
@@ -440,6 +437,8 @@ class Panel(wx.Panel):
             link (Link): Link to the new Group.
         """
         obj = self.data.get(link)
+        print(f"Panel.on_treeitem_activate: \n\t" +
+              f"link: {link.target}, {link.n}, {link}")
 
         if isinstance(obj, Group):
             print(f"Panel.on_treeitem_activate: Change page content to {obj}")
@@ -613,31 +612,33 @@ class Panel(wx.Panel):
     def update_infopage_content(self):
         """Get values from selected offer to TextCtrls."""
         print("Panel.update_infopage_content")
-        info_dict = self.get_selected_offer().info.to_dict()
+        offer = self.get_selected_offer()
+        info_dict = offer.info.to_dict()
         for key, ctrl in self.info_textctrls.items():
             ctrl.ChangeValue(info_dict[key])
 
-        # groups = self.get_selected_offer().groups
-        # self.inst_units = {}
-        # for group in groups:
-        #     for product in group.products.data:
-        #     # Update the infopage unit counter.
-        #         try:
-        #             unit = self.inst_units[product[FC_KEY]]
-        #         except KeyError:
-        #             self.inst_units[product[FC_KEY]] = {FC_COUNT: 0, FC_MULT: 0}
-        #             unit = self.inst_units[product[FC_KEY]]
-        #         unit[FC_COUNT] = unit[FC_COUNT] + product[FC_COUNT_KEY]
+        groups = offer.groups
+        inst_units = offer.info.get_fieldcount_data(groups, True)
 
-        # total = 0
-        # for key, value in self.inst_units.items():
-        #     self.field_count_list.AppendItem([
-        #         key, value[FC_MULT],
-        #         value[FC_COUNT],
-        #         value[FC_MULT] * value[FC_COUNT]
-        #     ])
-        #     total += value[FC_MULT] * value[FC_COUNT]
-        # print(f"Panel.update_infopage_content - FIELD_COUNT_TOTAL = {total}")
+        self.list_data.clear()
+        self.field_count_list.DeleteAllItems()
+        # print(f"\tupdate_infopage - len inst_units: {len(inst_units)}")
+        for key, value in inst_units.items():
+            # print(f"\tupdate_infopage - inst_units: {key}: {value}")
+            strlist = [
+                str(key),
+                str(value[FC_MULT]),
+                str(value[FC_COUNT]),
+                str(value[FC_TOTAL])
+            ]
+            self.list_data.append(strlist)
+            self.field_count_list.AppendItem(self.list_data[-1])
+        # print(f"\tupdate_infopage - n list items: {self.field_count_list.GetItemCount()}")
+
+    def on_fc_selection(self, evt):
+        item = evt.GetItem()
+        row = self.field_count_list.ItemToRow(item)
+        print(f"Panel.on_fc_selection - row: {row}")
 
     #------------------------------------------------------------------------------------------
     # Simplebook - rootpage
