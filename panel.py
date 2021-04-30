@@ -1,11 +1,11 @@
-from dialog import DbDialog
-from pprint import pprint
 import wx
 import wx.adv
 import wx.dataview as dv
 
-from data import FC_TOTAL, FC_MULT, FC_COUNT, Link, GridData, Group, Info, Data
+from data import FC_GLOBAL, Link, GridData, Group, Info, Data
 from grid import CustomGrid
+from dialog import DbDialog
+
 
 FRAME_SIZE = (1200, 750)
 LEFTWIN_SIZE = (270, FRAME_SIZE[1])
@@ -38,8 +38,12 @@ FCL_LABEL_UNIT = "Asennusyksikkö"   # Field Count List
 FCL_LABEL_MULT = "Hintakerroin"
 FCL_LABEL_N = "Määrä"
 FCL_LABEL_COST = "Hinta"
-FC_KEY = "inst_unit"
 FC_COUNT_KEY = "count"
+FC_DLG_MSG = "Yksikön '{}' hintakerroin"
+FC_UNIT_COL = 0
+FC_MULT_COL = 1
+FC_COUNT_COL = 2
+FC_TOT_COL = 3
 
 
 class Panel(wx.Panel):
@@ -180,8 +184,8 @@ class Panel(wx.Panel):
         infopanel = wx.Panel(infopage)
 
         # Buttons
-        btn_new_group = wx.Button(infopanel, label=BTN_NEW_GROUP)
-        btn_del_group = wx.Button(infopanel, label=BTN_DEL_GROUP)
+        btn_new_group = wx.Button(infopage, label=BTN_NEW_GROUP)
+        btn_del_group = wx.Button(infopage, label=BTN_DEL_GROUP)
 
         self.Bind(wx.EVT_BUTTON, self.on_btn_new_group, btn_new_group)
         self.Bind(wx.EVT_BUTTON, self.on_btn_del_group, btn_del_group)
@@ -190,7 +194,7 @@ class Panel(wx.Panel):
         btn_sizer.Add(btn_new_group, 0, wx.ALL, BORDER)
         btn_sizer.Add(btn_del_group, 0, wx.ALL, BORDER)
 
-        info_sizer.Add(btn_sizer, 0)
+        # info_sizer.Add(btn_sizer, 0)
         info_sizer.Add((400, 20))
 
         # Info() edits.
@@ -229,25 +233,46 @@ class Panel(wx.Panel):
             self.Bind(wx.EVT_TEXT, self.on_info_text, self.info_textctrls[key])
 
         # InstallUnit counter.
-        self.list_data = []
+        # self.list_data = []
         # field_count_panel = wx.Panel(infopage)
+        # TXT_FC_LABEL = "Asennusyksiköt"
+        # TXT_FC_MULT = "{} kerroin:"
+        # TXT_FC_MULT_NOSEL = "Yksikköä ei ole valittu"
+        # self.txt_fc = wx.StaticText(infopage, label=TXT_FC_LABEL)
+        # self.txt_fc_mult = wx.StaticText(infopage, label=TXT_FC_MULT_NOSEL)
+        # self.txtc_fc = wx.TextCtrl(infopage)
+        FC_CHK_LABEL = "Käytä yleisiä kertoimia"
+        self.chk_fc_globals = wx.CheckBox(infopage, label=FC_CHK_LABEL)
+
         self.field_count_list = dv.DataViewListCtrl(infopage)
         self.field_count_list.AppendTextColumn(FCL_LABEL_UNIT)
-        self.field_count_list.AppendTextColumn(FCL_LABEL_MULT)
+        self.field_count_list.AppendTextColumn(FCL_LABEL_MULT, dv.DATAVIEW_CELL_EDITABLE)
         self.field_count_list.AppendTextColumn(FCL_LABEL_N)
         self.field_count_list.AppendTextColumn(FCL_LABEL_COST)
 
         self.Bind(dv.EVT_DATAVIEW_SELECTION_CHANGED, self.on_fc_selection, self.field_count_list)
-        # field_count_sizer = wx.BoxSizer(wx.VERTICAL)
-        # field_count_sizer.Add(self.field_count_list, 1, wx.EXPAND)
+        self.Bind(dv.EVT_DATAVIEW_ITEM_ACTIVATED, self.on_fc_activate, self.field_count_list)
+        self.Bind(wx.EVT_CHECKBOX, self.on_fc_use_global, self.chk_fc_globals)
+        # sizer_fc_label = wx.BoxSizer(wx.HORIZONTAL)
+        # sizer_fc_label.Add(self.txt_fc_mult, 0, wx.EXPAND|wx.LEFT, BORDER)
+        # sizer_fc_label.Add(self.txtc_fc, 0, wx.EXPAND|wx.LEFT, BORDER)
 
-        # field_count_panel.SetSizer(field_count_sizer)
+        sizer_fc = wx.BoxSizer(wx.VERTICAL)
+        # sizer_fc.Add(self.txt_fc, 0, wx.EXPAND|wx.ALL, BORDER)
+        sizer_fc.Add(self.chk_fc_globals, 0, wx.ALL, BORDER)
+        sizer_fc.Add(self.field_count_list, 1, wx.EXPAND)
 
         infopage_sizer = wx.BoxSizer(wx.HORIZONTAL)
         infopage_sizer.Add(infopanel, 3, wx.EXPAND)
-        infopage_sizer.Add(self.field_count_list, 2, wx.EXPAND)
+        infopage_sizer.Add(sizer_fc, 2, wx.EXPAND)
+
+        sizer_page = wx.BoxSizer(wx.VERTICAL)
+        sizer_page.Add(btn_sizer, 0)
+        sizer_page.Add(infopage_sizer, 1, wx.EXPAND)
+
+        # infopage_sizer.Add(self.field_count_list, 2, wx.EXPAND)
         infopanel.SetSizer(info_sizer)
-        infopage.SetSizer(infopage_sizer)
+        infopage.SetSizer(sizer_page)
 
         #------------------------------------------------------------------------------------------
         # Simplebook - rootpage
@@ -613,32 +638,68 @@ class Panel(wx.Panel):
         """Get values from selected offer to TextCtrls."""
         print("Panel.update_infopage_content")
         offer = self.get_selected_offer()
-        info_dict = offer.info.to_dict()
+        info: Info = offer.info
+        info_dict = info.to_dict()
         for key, ctrl in self.info_textctrls.items():
             ctrl.ChangeValue(info_dict[key])
 
-        groups = offer.groups
-        inst_units = offer.info.get_fieldcount_data(groups, True)
+        use_globals = info.get(FC_GLOBAL)
+        self.chk_fc_globals.SetValue(use_globals)
+        info.update_fieldcount_data(offer.groups)
+        self.update_fcl(info.get_fc_liststrings())
 
-        self.list_data.clear()
+    def update_fcl(self, data: list):
+        """Update the Field Count List with new data."""
         self.field_count_list.DeleteAllItems()
-        # print(f"\tupdate_infopage - len inst_units: {len(inst_units)}")
-        for key, value in inst_units.items():
-            # print(f"\tupdate_infopage - inst_units: {key}: {value}")
-            strlist = [
-                str(key),
-                str(value[FC_MULT]),
-                str(value[FC_COUNT]),
-                str(value[FC_TOTAL])
-            ]
-            self.list_data.append(strlist)
-            self.field_count_list.AppendItem(self.list_data[-1])
-        # print(f"\tupdate_infopage - n list items: {self.field_count_list.GetItemCount()}")
+        for list_row in data:
+            self.field_count_list.AppendItem(list_row)
 
     def on_fc_selection(self, evt):
+        """Handle event for selecting a row. 
+        
+        Implementing this stopped a crash from happening when left clicking a row.
+        """
+        pass
+        # item = evt.GetItem()
+        # row = self.field_count_list.ItemToRow(item)
+        # print(f"Panel.on_fc_selection - row: {row}")
+
+    def on_fc_activate(self, evt):
+        """Handle field count list activation event. Opens dialog to edit multiplier."""
         item = evt.GetItem()
         row = self.field_count_list.ItemToRow(item)
-        print(f"Panel.on_fc_selection - row: {row}")
+        unit = self.field_count_list.GetValue(row, FC_UNIT_COL)
+        mult = self.field_count_list.GetValue(row, FC_MULT_COL)
+        print(f"Panel.on_fc_activate - row: {row}, unit: {unit}")
+        with wx.TextEntryDialog(self, FC_DLG_MSG.format(unit), value=mult) as dlg:
+            if dlg.ShowModal() == wx.ID_OK:
+                value: str = dlg.GetValue()
+                try:
+                    new_mult = float(value.replace(',', '.'))
+                except:
+                    new_mult = mult
+                    print(f"Panel.on_fc_activate - Value '{value}' " +
+                           "could not be converted to decimal number. ")
+                info: Info = self.get_selected_offer().info
+                total = info.set_fc_mult(new_mult, unit)
+                if info.get(FC_GLOBAL):
+                    self.field_count_list.SetValue(str(Info.fc_mult[unit]), row, FC_MULT_COL)
+                else:
+                    self.field_count_list.SetValue(str(new_mult), row, FC_MULT_COL)
+                self.field_count_list.SetValue(str(total), row, FC_TOT_COL)
+
+        evt.Skip()
+
+    def on_fc_use_global(self, evt):
+        """Handle event for fc use global check box."""
+        info: Info = self.get_selected_offer().info
+        if evt.IsChecked():
+            info.set_fc_global(True)
+        else:
+            info.set_fc_global(False)
+
+        list_data = info.get_fc_liststrings()
+        self.update_fcl(list_data)
 
     #------------------------------------------------------------------------------------------
     # Simplebook - rootpage

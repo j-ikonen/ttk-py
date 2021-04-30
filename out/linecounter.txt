@@ -79,3 +79,84 @@ main.py, code is 21, comment is 0, blank is 9.
 panel.py, code is 439, comment is 104, blank is 118.
 workspace.json, code is 3, comment is 0, blank is 0.
 ===============================================================================
+===============================================================================
+EXTENSION NAME : linecounter
+EXTENSION VERSION : 0.2.7
+-------------------------------------------------------------------------------
+count time : 2021-04-30 14:01:10
+count workspace : c:\Users\Cosa Dove Ky\Desktop\Uusi kansio\koodi\ttk-py
+total files : 19
+total code lines : 2147
+total comment lines : 407
+total blank lines : 572
+
+    statistics
+   |      extension|     total code|  total comment|    total blank|percent|
+   -------------------------------------------------------------------------
+   |            .py|           2135|            406|            571|     99|
+   |          .json|              3|              0|              0|   0.14|
+   |            .md|              2|              0|              1|  0.093|
+   |               |              3|              0|              0|   0.14|
+   |           .TAG|              4|              1|              0|   0.19|
+   -------------------------------------------------------------------------
+.pytest_cache\.gitignore, code is 2, comment is 0, blank is 0.
+.pytest_cache\CACHEDIR.TAG, code is 4, comment is 1, blank is 0.
+.pytest_cache\README.md, code is 2, comment is 0, blank is 1.
+.pytest_cache\v\cache\stepwise, code is 1, comment is 0, blank is 0.
+__pycache__\data.cpython-38.pyc, it is a binary file.
+__pycache__\database.cpython-38.pyc, it is a binary file.
+__pycache__\dialog.cpython-38.pyc, it is a binary file.
+__pycache__\frame.cpython-38.pyc, it is a binary file.
+__pycache__\grid.cpython-38.pyc, it is a binary file.
+__pycache__\main.cpython-38.pyc, it is a binary file.
+__pycache__\panel.cpython-38.pyc, it is a binary file.
+data.py, code is 718, comment is 193, blank is 155.
+database.py, code is 57, comment is 5, blank is 20.
+dialog.py, code is 305, comment is 29, blank is 89.
+frame.py, code is 135, comment is 27, blank is 44.
+grid.py, code is 445, comment is 61, blank is 136.
+main.py, code is 21, comment is 0, blank is 10.
+panel.py, code is 454, comment is 91, blank is 117.
+workspace.json, code is 3, comment is 0, blank is 0.
+===============================================================================
+===============================================================================
+EXTENSION NAME : linecounter
+EXTENSION VERSION : 0.2.7
+-------------------------------------------------------------------------------
+count time : 2021-04-30 16:47:08
+count workspace : c:\Users\Cosa Dove Ky\Desktop\Uusi kansio\koodi\ttk-py
+total files : 20
+total code lines : 2454
+total comment lines : 417
+total blank lines : 594
+
+    statistics
+   |      extension|     total code|  total comment|    total blank|percent|
+   -------------------------------------------------------------------------
+   |          .json|            244|              0|              1|    9.9|
+   |            .py|           2201|            416|            592|     90|
+   |            .md|              2|              0|              1|  0.081|
+   |           .TAG|              4|              1|              0|   0.16|
+   |               |              3|              0|              0|   0.12|
+   -------------------------------------------------------------------------
+.pytest_cache\.gitignore, code is 2, comment is 0, blank is 0.
+.pytest_cache\CACHEDIR.TAG, code is 4, comment is 1, blank is 0.
+.pytest_cache\README.md, code is 2, comment is 0, blank is 1.
+.pytest_cache\v\cache\stepwise, code is 1, comment is 0, blank is 0.
+__pycache__\data.cpython-38.pyc, it is a binary file.
+__pycache__\database.cpython-38.pyc, it is a binary file.
+__pycache__\dialog.cpython-38.pyc, it is a binary file.
+__pycache__\frame.cpython-38.pyc, it is a binary file.
+__pycache__\grid.cpython-38.pyc, it is a binary file.
+__pycache__\main.cpython-38.pyc, it is a binary file.
+__pycache__\panel.cpython-38.pyc, it is a binary file.
+data.py, code is 748, comment is 193, blank is 164.
+database.py, code is 57, comment is 5, blank is 20.
+dialog.py, code is 305, comment is 29, blank is 89.
+frame.py, code is 135, comment is 27, blank is 44.
+grid.py, code is 445, comment is 61, blank is 136.
+main.py, code is 21, comment is 0, blank is 10.
+panel.py, code is 490, comment is 101, blank is 129.
+Uusi tarjous.json, code is 240, comment is 0, blank is 0.
+workspace.json, code is 4, comment is 0, blank is 1.
+===============================================================================

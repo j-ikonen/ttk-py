@@ -324,6 +324,328 @@
                     "filename": "workspace.json"
                 }
             ]
+        },
+        {
+            "version": "0.2.7",
+            "counttime": "2021-04-30 14:01:10",
+            "filesum": 19,
+            "codesum": 2147,
+            "commentsum": 407,
+            "blanksum": 572,
+            "statistics": {
+                ".py": {
+                    "code": 2135,
+                    "comment": 406,
+                    "blank": 571
+                },
+                ".json": {
+                    "code": 3,
+                    "comment": 0,
+                    "blank": 0
+                },
+                ".md": {
+                    "code": 2,
+                    "comment": 0,
+                    "blank": 1
+                },
+                "": {
+                    "code": 3,
+                    "comment": 0,
+                    "blank": 0
+                },
+                ".TAG": {
+                    "code": 4,
+                    "comment": 1,
+                    "blank": 0
+                }
+            },
+            "filelist": [
+                {
+                    "blank": 0,
+                    "code": 2,
+                    "comment": 0,
+                    "filename": ".pytest_cache\\.gitignore"
+                },
+                {
+                    "blank": 0,
+                    "code": 4,
+                    "comment": 1,
+                    "filename": ".pytest_cache\\CACHEDIR.TAG"
+                },
+                {
+                    "blank": 1,
+                    "code": 2,
+                    "comment": 0,
+                    "filename": ".pytest_cache\\README.md"
+                },
+                {
+                    "blank": 0,
+                    "code": 1,
+                    "comment": 0,
+                    "filename": ".pytest_cache\\v\\cache\\stepwise"
+                },
+                {
+                    "filename": "__pycache__\\data.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\database.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\dialog.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\frame.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\grid.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\main.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\panel.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "blank": 155,
+                    "code": 718,
+                    "comment": 193,
+                    "filename": "data.py"
+                },
+                {
+                    "blank": 20,
+                    "code": 57,
+                    "comment": 5,
+                    "filename": "database.py"
+                },
+                {
+                    "blank": 89,
+                    "code": 305,
+                    "comment": 29,
+                    "filename": "dialog.py"
+                },
+                {
+                    "blank": 44,
+                    "code": 135,
+                    "comment": 27,
+                    "filename": "frame.py"
+                },
+                {
+                    "blank": 136,
+                    "code": 445,
+                    "comment": 61,
+                    "filename": "grid.py"
+                },
+                {
+                    "blank": 10,
+                    "code": 21,
+                    "comment": 0,
+                    "filename": "main.py"
+                },
+                {
+                    "blank": 117,
+                    "code": 454,
+                    "comment": 91,
+                    "filename": "panel.py"
+                },
+                {
+                    "blank": 0,
+                    "code": 3,
+                    "comment": 0,
+                    "filename": "workspace.json"
+                }
+            ]
+        },
+        {
+            "version": "0.2.7",
+            "counttime": "2021-04-30 16:47:08",
+            "filesum": 20,
+            "codesum": 2454,
+            "commentsum": 417,
+            "blanksum": 594,
+            "statistics": {
+                ".json": {
+                    "code": 244,
+                    "comment": 0,
+                    "blank": 1
+                },
+                ".py": {
+                    "code": 2201,
+                    "comment": 416,
+                    "blank": 592
+                },
+                ".md": {
+                    "code": 2,
+                    "comment": 0,
+                    "blank": 1
+                },
+                ".TAG": {
+                    "code": 4,
+                    "comment": 1,
+                    "blank": 0
+                },
+                "": {
+                    "code": 3,
+                    "comment": 0,
+                    "blank": 0
+                }
+            },
+            "filelist": [
+                {
+                    "blank": 0,
+                    "code": 2,
+                    "comment": 0,
+                    "filename": ".pytest_cache\\.gitignore"
+                },
+                {
+                    "blank": 0,
+                    "code": 4,
+                    "comment": 1,
+                    "filename": ".pytest_cache\\CACHEDIR.TAG"
+                },
+                {
+                    "blank": 1,
+                    "code": 2,
+                    "comment": 0,
+                    "filename": ".pytest_cache\\README.md"
+                },
+                {
+                    "blank": 0,
+                    "code": 1,
+                    "comment": 0,
+                    "filename": ".pytest_cache\\v\\cache\\stepwise"
+                },
+                {
+                    "filename": "__pycache__\\data.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\database.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\dialog.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\frame.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\grid.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\main.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\panel.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "blank": 164,
+                    "code": 748,
+                    "comment": 193,
+                    "filename": "data.py"
+                },
+                {
+                    "blank": 20,
+                    "code": 57,
+                    "comment": 5,
+                    "filename": "database.py"
+                },
+                {
+                    "blank": 89,
+                    "code": 305,
+                    "comment": 29,
+                    "filename": "dialog.py"
+                },
+                {
+                    "blank": 44,
+                    "code": 135,
+                    "comment": 27,
+                    "filename": "frame.py"
+                },
+                {
+                    "blank": 136,
+                    "code": 445,
+                    "comment": 61,
+                    "filename": "grid.py"
+                },
+                {
+                    "blank": 10,
+                    "code": 21,
+                    "comment": 0,
+                    "filename": "main.py"
+                },
+                {
+                    "blank": 129,
+                    "code": 490,
+                    "comment": 101,
+                    "filename": "panel.py"
+                },
+                {
+                    "blank": 0,
+                    "code": 240,
+                    "comment": 0,
+                    "filename": "Uusi tarjous.json"
+                },
+                {
+                    "blank": 1,
+                    "code": 4,
+                    "comment": 0,
+                    "filename": "workspace.json"
+                }
+            ]
         }
     ]
 }

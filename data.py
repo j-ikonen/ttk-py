@@ -1,7 +1,7 @@
 """Data classes for TTK."""
 from copy import deepcopy
+
 from bson import ObjectId
-from wx.core import WXK_RETURN
 
 from database import Database
 
@@ -842,6 +842,7 @@ FC_KEY = 'field_count'
 FC_MULT = 'mult'
 FC_COUNT = 'count'
 FC_TOTAL = 'total'
+FC_GLOBAL = 'use_global'
 
 
 class Info:
@@ -867,7 +868,8 @@ class Info:
                     FC_COUNT: 0,
                     FC_TOTAL: 0
                 } for k, mult in Info.fc_mult.items()
-            }
+            },
+            FC_GLOBAL: True
         }
 
     def to_dict(self) -> dict:
@@ -890,53 +892,53 @@ class Info:
         obj.address = dic["address"]
         obj.data = deepcopy(dic["data"])
         return obj
+    
+    def get(self, key):
+        return self.data[key]
 
-    def get_fieldcount_data(self, groups, use_globals=False, refresh=True) -> dict:
-        """Return the fieldcount data with global or local multiplier.
-        
+    def update_fieldcount_data(self, groups) -> dict:
+        """Update the fieldcount data.
+
         Args:
             group (dict): Group containing GridData objects with field count data.
-            use_globals (bool): Determines use of Class or Instance multipliers.
         """
         # Get multipliers and reset rest to zero.
-        fc_data = deepcopy(self.data[FC_KEY])
-        if refresh:
-            for fc_unit in fc_data.keys():
-                fc_data[fc_unit][FC_COUNT] = 0
-                fc_data[fc_unit][FC_TOTAL] = 0
+        fc_data = self.data[FC_KEY]
+        for fc_unit in fc_data.keys():
+            fc_data[fc_unit][FC_COUNT] = 0
+            fc_data[fc_unit][FC_TOTAL] = 0
 
-            # Iterate over all groups.
-            for group in groups:
-                # Iterate through relevant GridData objects from group.
-                for gd_key, field_key in Info.fc_keys.items():
-                    # Go through the dictionaries in a list.
-                    for object in group.get(gd_key).data:
-                        unit = object[field_key]
-                        # Test if object has key for multiples.
-                        try:
-                            n = object[Info.fc_count_key]
-                        except KeyError:
-                            n = 1
-                        # Update count if the unit is predefined.
-                        try:
-                            fc_data[unit][FC_COUNT] += 1 * n
-                        except KeyError:
-                            print(f"Info.get_fieldcount_data\n" +
-                                f"\t{unit} is not a predefined fc_unit.")
+        # Iterate over all groups.
+        for group in groups:
+            # Iterate through relevant GridData objects from group.
+            for gd_key, field_key in Info.fc_keys.items():
+                # Go through the dictionaries in a list.
+                for object in group.get(gd_key).data:
+                    unit = object[field_key]
+                    # Test if object has key for multiples.
+                    try:
+                        n = object[Info.fc_count_key]
+                    except KeyError:
+                        n = 1
+                    # Update count if the unit is predefined.
+                    try:
+                        fc_data[unit][FC_COUNT] += 1 * n
+                    except KeyError:
+                        print(f"Info.get_fieldcount_data\n" +
+                            f"\t{unit} is not a predefined fc_unit.")
 
-            # Update the totals.
-            for fc_unit in fc_data.keys():
+        # Update the totals.
+        for fc_unit in fc_data.keys():
+            if self.data[FC_GLOBAL]:
+                fc_data[fc_unit][FC_TOTAL] = (Info.fc_mult[fc_unit] *
+                                                fc_data[fc_unit][FC_COUNT])
+            else:
                 fc_data[fc_unit][FC_TOTAL] = (fc_data[fc_unit][FC_MULT] *
-                                              fc_data[fc_unit][FC_COUNT])
+                                                fc_data[fc_unit][FC_COUNT])
 
         # Assign instance Field Count so Class does not overwrite Instance.
-        self.data[FC_KEY] = deepcopy(fc_data)
+        self.data[FC_KEY] = fc_data
 
-        if use_globals:
-            for fc_unit in fc_data.keys():
-                fc_data[fc_unit][FC_COUNT] = Info.fc_mult[fc_unit]
-
-        return fc_data
 
     @classmethod
     def get_labels(cls) -> dict:
@@ -947,6 +949,45 @@ class Info:
             "last_name": "Sukunimi",
             "address": "Osoite"
         }
+
+    def get_fc_liststrings(self) -> list:
+        """Return field count data in listctrl ready format."""
+        list_data = []
+        for unit in self.data[FC_KEY]:
+            unit_data = self.data[FC_KEY][unit]
+            mult = Info.fc_mult[unit] if self.data[FC_GLOBAL] else unit_data[FC_MULT]
+            list_data.append([
+                str(unit),
+                str(mult),
+                str(unit_data[FC_COUNT]),
+                str(unit_data[FC_TOTAL])
+            ])
+        return list_data
+
+    def set_fc_mult(self, mult, unit):
+        """Set the field count multiplier for 'unit'.
+
+        Return the new total using new mult if Info fc use global is set to True.
+        """
+        if isinstance(mult, float):
+            self.data[FC_KEY][unit][FC_MULT] = mult
+            return self.update_fc_total(unit)
+        return None
+
+    def set_fc_global(self, use_global):
+        """Set a new value for fc global and calculate new totals."""
+        self.data[FC_GLOBAL] = use_global
+        for unit in self.data[FC_KEY].keys():
+            self.update_fc_total(unit)
+
+    def update_fc_total(self, unit) -> float:
+        """Updated a new total value to a single FC unit. Return the total."""
+        if self.data[FC_GLOBAL]:
+            total = Info.fc_mult[unit] * self.data[FC_KEY][unit][FC_COUNT]
+        else:
+            total = self.data[FC_KEY][unit][FC_MULT] * self.data[FC_KEY][unit][FC_COUNT]
+        self.data[FC_KEY][unit][FC_TOTAL] = total
+        return total
 
 class Offer:
     def __init__(self):

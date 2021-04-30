@@ -2,9 +2,7 @@
 TODO:
     Is Asennusyksikkö choice or string?
 
-    Add field count multiplier global and local editing.
     Create dialog with Treebook for settings / global values.
-    Add field count list title and a check box for global/local multiplier
     Add predefined column widths.
     Add remove from database functionality.
     Add part editing in database dialogs.
@@ -15,6 +13,8 @@ TODO:
     Change Info into something closer to GridData.
 
     DONE:
+    Add field count multiplier global and local editing.
+    Add field count list title and a check box for global/local multiplier
     Add inst_unit variables and multipliers to offer.info.
     Add Installunit count with multiplier and a total costs on offer page.
     Make refresh on gridpage check for edited status.
@@ -25,7 +25,7 @@ TODO:
 
 BUGS:
     Possibly linking same groups list object across different offers on some unknown condition.
-        No way to reproduce found.
+        No way to reproduce found. Only happened once. Possibly fixed.
 
 Fields:
     edited:
@@ -70,6 +70,7 @@ import wx.grid
 from data import Data
 from frame import AppFrame
 from database import Database
+
 
 def main():
     app = wx.App(useBestVisual=True)
