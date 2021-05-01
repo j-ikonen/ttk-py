@@ -9,13 +9,78 @@ FK_MATERIALS = 'materials'
 FK_PRODUCTS = 'products'
 FK_PARTS = 'parts'
 
-
 class SetupData:
-    pass
+    def __init__(self, name, setup):
+        self.name = name
+        self.data = {}
+        self.setup = setup
 
+    def values(self) -> list:
+        return list(self.data.values())
+    
+    def set(self, key, value):
+        try:
+            self.data[key] = value
+        except KeyError:
+            for n, k in enumerate(self.data.keys()):
+                if n == key:
+                    self.data[k] = value
+                    break
 
 class GridData:
-    pass
+    def __init__(self, name, setup):
+        self.name = name
+        self.data = []
+        self.setup = setup
+
+
+GD_CHILD_SETUP = {
+    'parts': {
+        'fields': {
+            'code': ['', 'string', 'Koodi', False]
+        },
+        'columns': [
+            'code',
+            'count'
+        ],
+        'db': True,
+        'tab_to': [1],
+        'codes': {},
+        'children': []
+    }
+}
+
+GD_SETUP = {
+    'predefs': {},
+    'materials': {},
+    'products': {
+        'fields': {
+            'code': ['', 'string', 'Koodi', False],
+            'count': [0, 'long', 'Määrä', False],
+            'parts': [None, 'griddata', 'Osat', False]
+        },
+        'columns': [
+            'code',
+            'count'
+        ],
+        'db': True,
+        'tab_to': [1],
+        'codes': {},
+        'children': ['parts']
+    },
+    FK_FCG_MULT: {},
+    FK_OFFER_INFO: {
+        'fields': {
+            'file': ['', 'string', 'Tiedosto'],
+            'client.firstname': ['', 'string', 'Etunimi'],
+            'client.lastname': ['', 'string', 'Sukunimi'],
+            'client.email': ['', 'string', 'Sähköposti'],
+            'client.phone': ['', 'string', 'Puh.'],
+            'client.address': ['', 'string', 'Osoite'],
+            'client.add_info': ['', 'string', 'Lisätiedot']
+        }
+    },
+}
 
 
 class TreeData:
@@ -37,41 +102,13 @@ class TreeData:
         self.selected = None
         self.children = []
         try:
-            self.data = {k: v[IDX_TYPE]() for k, v in self.fields.items()}
+            self.data = {k: v[IDX_TYPE](k, GD_SETUP[k]) for k, v in self.fields.items()}
 
             if data:
                 for key in self.data.keys():
                     self.data[key] = data[key]
         except AttributeError:
             self.data = {}
-
-    def get(self, link: list):
-        """Get the TreeRoot or it's child TreeData item matching the link."""
-        if len(link) == 0:
-            return self
-        index = link.pop()
-        return self.children[index].get(link)
-
-    def get_name(self):
-        return self.name
-
-    def get_selected(self):
-        return self.selected
-
-    def set_name(self, value):
-        self.name = value
-
-    def set_selected(self, link):
-        self.selected = self.get(link)
-
-    def get_data(self, key):
-        try:
-            return self.data[key]
-        except AttributeError as e:
-            print(f"\nError in TreeData with name '{self.name}'\n\t-" +
-                   " Necessary Class Attribute for " +
-                   "inherited method get_data() has not been initiated.")
-            raise e
 
     def append_child(self, data=None):
         try:
@@ -84,13 +121,46 @@ class TreeData:
         self.children.append(child)
         return idx
 
+    def get(self, link: list):
+        """Get the TreeRoot or it's child TreeData item matching the link."""
+        if len(link) == 0:
+            return self
+        index = link.pop()
+        return self.children[index].get(link)
+
+    def get_data(self, key):
+        try:
+            return self.data[key]
+        except AttributeError as e:
+            print(f"\nError in TreeData with name '{self.name}'\n\t-" +
+                   " Necessary Class Attribute for " +
+                   "inherited method get_data() has not been initiated.")
+            raise e
+
+    def get_name(self):
+        return self.name
+
+    def get_selected(self):
+        return self.selected
+
+    def set(self, key, subkey, value):
+        self.data[key][subkey] = value
+
+    def set_name(self, value):
+        self.name = value
+
+    def set_selected(self, link):
+        self.selected = self.get(link)
+
+
+
 
 class TreeChild(TreeData):
     fields = {
         FK_PREDEFS: [GridData],
         FK_MATERIALS: [GridData],
-        FK_PRODUCTS: [GridData],
-        FK_PARTS: [GridData]
+        FK_PRODUCTS: [GridData]
+        # FK_PARTS: [GridData]
     }
 
     def __init__(self, data=None):

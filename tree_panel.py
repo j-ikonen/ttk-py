@@ -1,30 +1,63 @@
+from setupgrid import SetupGrid
 import wx
 import wx.adv
 import wx.dataview as dv
 
 
-from tree_data import TreeRoot
+from tree_data import TreeRoot, GD_SETUP
 
 
 FRAME_SIZE = (1200, 700)
 BOTWIN_SIZE = (150, 150)
 LEFTWIN_SIZE = (230, 230)
+BORDER_BTN = 5
+BTN_ADD_ITEM = "Uusi Tarjous"
+BTN_ADD_CHILD = "Uusi ryhmä"
 
 
 class RootPage(wx.Panel):
-    def __init__(self, parent):
+    def __init__(self, parent, treedata):
         super().__init__(parent)
-    
+
+        self.treedata: TreeRoot = treedata
+        self.btn_add_item = wx.Button(self, label=BTN_ADD_ITEM)
+
+        sizer_btn = wx.BoxSizer(wx.HORIZONTAL)
+        sizer = wx.BoxSizer(wx.VERTICAL)
+
+        sizer_btn.Add(self.btn_add_item, 0, wx.RIGHT, BORDER_BTN)
+
+        sizer.Add(sizer_btn, 0, wx.EXPAND|wx.ALL, BORDER_BTN)
+
+        self.SetSizer(sizer)
+
     def update(self, treedata):
         print(f"RootPage.update")
+
 
 
 class ItemPage(wx.Panel):
     def __init__(self, parent):
         super().__init__(parent)
-    
+
+        setup = GD_SETUP['offer_info']
+        self.btn_add_child = wx.Button(self, label=BTN_ADD_CHILD)
+        self.infogrid = SetupGrid(self, setup)
+
+        sizer_btn = wx.BoxSizer(wx.HORIZONTAL)
+        sizer = wx.BoxSizer(wx.VERTICAL)
+
+        sizer_btn.Add(self.btn_add_child, 0, wx.RIGHT, BORDER_BTN)
+
+        sizer.Add(sizer_btn, 0, wx.EXPAND|wx.ALL, BORDER_BTN)
+        sizer.Add(self.infogrid, 1, wx.EXPAND)
+
+        self.SetSizer(sizer)
+
+
     def update(self, treedata):
         print(f"ItemPage.update")
+        self.infogrid.update(treedata.get_data('offer_info').values())
 
 
 class ChildPage(wx.Panel):
@@ -150,20 +183,24 @@ class BasePanel(wx.Panel):
         # Simplebook
         #------------------------------------------------------------------------------------------
         self.book = wx.Simplebook(self.main_win)
-        page_troot = RootPage(self.book)
-        page_titem = ItemPage(self.book)
-        page_tchild = ChildPage(self.book)
+        page_root = RootPage(self.book, self.treedata)
+        page_item = ItemPage(self.book)
+        page_child = ChildPage(self.book)
 
-        page_troot.SetBackgroundColour((250, 220, 220))   # For testing
-        page_titem.SetBackgroundColour((200, 240, 230))   # For testing
-        page_tchild.SetBackgroundColour((220, 210, 240))   # For testing
+        page_root.SetBackgroundColour((250, 220, 220))   # For testing
+        page_item.SetBackgroundColour((200, 240, 230))   # For testing
+        page_child.SetBackgroundColour((220, 210, 240))   # For testing
 
-        self.book.AddPage(page_troot, "rootpage")
-        self.book.AddPage(page_titem, "itempage")
-        self.book.AddPage(page_tchild, "childpage")
+        self.book.AddPage(page_root, "rootpage")
+        self.book.AddPage(page_item, "itempage")
+        self.book.AddPage(page_child, "childpage")
 
         self.book.SetSelection(0)   # BookPageIndex == len(TreeData.selection)
 
+        import wx.grid as wxg
+        self.Bind(wx.EVT_BUTTON, self.on_add_item, page_root.btn_add_item)
+        self.Bind(wx.EVT_BUTTON, self.on_add_child, page_item.btn_add_child)
+        self.Bind(wxg.EVT_GRID_CELL_CHANGED, self.on_edit_item_data, page_item.infogrid)
         #------------------------------------------------------------------------------------------
         # Sizers
         #------------------------------------------------------------------------------------------
@@ -175,9 +212,10 @@ class BasePanel(wx.Panel):
     # TreePanel functions
     #----------------------------------------------------------------------------------------------
     def on_tree_select(self, evt):
-        link = self.treepanel.tree.GetItemData(evt.GetItem())
+        link: list = self.treepanel.tree.GetItemData(evt.GetItem())
         page_selection = self.book.GetSelection()
         new_selection = len(link)
+        self.treedata.set_selected([i for i in link])
         print("BasePanel.on_tree_select: {}".format(str(link)))
 
         # Change page
@@ -186,8 +224,27 @@ class BasePanel(wx.Panel):
 
         # Refresh page
         page = self.book.GetPage(new_selection)
-        page.update(self.treedata.get(link))
+        page.update(self.treedata.get_selected())
 
+    #----------------------------------------------------------------------------------------------
+    # Page functions
+    #----------------------------------------------------------------------------------------------
+    def on_add_item(self, evt):
+        print("BasePanel.on_add_item")
+        self.treedata.append_child()
+        self.treepanel.fill(self.treedata.get_treelist())
+
+    def on_add_child(self, evt):
+        print("BasePanel.on_add_child")
+        self.treedata.get_selected().append_child()
+        self.treepanel.fill(self.treedata.get_treelist())
+
+    def on_edit_item_data(self, evt):
+        print("BasePanel.on_edit_item_data")
+        item = self.treedata.get_selected()
+        # for n, key in item.data['offer_info']:
+        #     if n == evt.GetRow():
+        #         item.set('offer_info', key, self.book.GetPage())
 
     #----------------------------------------------------------------------------------------------
     # SashWindows functions
@@ -241,11 +298,6 @@ if __name__ == '__main__':
 
     frame = wx.Frame(None, size=FRAME_SIZE)
     treedata = TreeRoot(None)
-    index = treedata.append_child()
-    child = treedata.get([index])
-    child.append_child()
-    child.append_child()
-    treedata.append_child()
     panel = BasePanel(frame, treedata)
 
     frame.Show()
