@@ -355,7 +355,7 @@ class Panel(wx.Panel):
                     list[n][1],
                     data=list[n][0]
                 )
-                
+
                 # Set expanded status from saved.
                 is_expanded = self.is_treeitem_expanded.get(list[n][1])
                 if is_expanded:
