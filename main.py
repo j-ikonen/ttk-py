@@ -2,6 +2,11 @@
 TODO:
     Is Asennusyksikkö choice or string?
 
+    Create ItemPage instead of current infopage implementation.
+    Create RootPage instead of current rootpage implementation.
+    Add the new data and setup initializations with defaults.
+    Test test test test test.
+
     Create dialog with Treebook for settings / global values.
     Add predefined column widths.
     Add remove from database functionality.

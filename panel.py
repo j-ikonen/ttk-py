@@ -2,6 +2,9 @@ import wx
 import wx.adv
 import wx.dataview as dv
 
+import ttk_data as ttk
+from tree_panel import TreePanel
+from pages import Page, RootPage, ItemPage, ChildPage
 from data import FC_GLOBAL, Link, GridData, Group, Info, Data
 from grid import CustomGrid
 from dialog import DbDialog
@@ -47,7 +50,7 @@ FC_TOT_COL = 3
 
 
 class Panel(wx.Panel):
-    def __init__(self, parent, data):
+    def __init__(self, parent, data, setup):
         """Handle MainPanel windows.
         
         Args:
@@ -56,7 +59,9 @@ class Panel(wx.Panel):
         """
         super().__init__(parent)
 
-        self.data: Data = data
+        # self.data: Data = data
+        self.treedata: ttk.Data = data
+        self.setup: dict = setup
 
         #------------------------------------------------------------------------------------------
         # SashWindows
@@ -73,109 +78,110 @@ class Panel(wx.Panel):
         # DVC_TreeCtrl
         #------------------------------------------------------------------------------------------
         
-        tree_panel = wx.Panel(self.left_win)
-        self.tree_ctrl = dv.DataViewTreeCtrl(tree_panel)
-        self.tree_root = self.tree_ctrl.AppendContainer(
-            dv.NullDataViewItem,
-            TREE_ROOT_TITLE,
-            data=Link(Link.DATA, [])
-        )
-        # Save expanded status for refreshing the tree.
-        self.is_treeitem_expanded = {TREE_ROOT_TITLE: True}
-        self.create_tree()
+        self.treepanel = TreePanel(self.left_win)
+        self.Bind(dv.EVT_DATAVIEW_SELECTION_CHANGED, self.on_tree_select)
+        # tree_panel = wx.Panel(self.left_win)
+        # self.tree_ctrl = dv.DataViewTreeCtrl(tree_panel)
+        # self.tree_root = self.tree_ctrl.AppendContainer(
+        #     dv.NullDataViewItem,
+        #     TREE_ROOT_TITLE,
+        #     data=Link(Link.DATA, [])
+        # )
+        # # Save expanded status for refreshing the tree.
+        # self.is_treeitem_expanded = {TREE_ROOT_TITLE: True}
+        # self.create_tree()
 
-        # Fill the left window with tree_ctrl
-        lwin_sizer = wx.BoxSizer(wx.VERTICAL)
-        lwin_sizer.Add(self.tree_ctrl, 1, wx.EXPAND)
+        # # Fill the left window with tree_ctrl
+        # lwin_sizer = wx.BoxSizer(wx.VERTICAL)
+        # lwin_sizer.Add(self.tree_ctrl, 1, wx.EXPAND)
 
-        tree_panel.SetSizer(lwin_sizer)
+        # tree_panel.SetSizer(lwin_sizer)
 
-        self.Bind(dv.EVT_DATAVIEW_SELECTION_CHANGED, self.on_treeitem_activate)
-        self.Bind(dv.EVT_DATAVIEW_ITEM_START_EDITING, self.on_treeitem_edit)
-        self.Bind(dv.EVT_DATAVIEW_ITEM_COLLAPSING, self.on_treeitem_collapsing)
-        self.Bind(dv.EVT_DATAVIEW_ITEM_EXPANDING, self.on_treeitem_expanding)
+        # self.Bind(dv.EVT_DATAVIEW_SELECTION_CHANGED, self.on_treeitem_activate)
+        # self.Bind(dv.EVT_DATAVIEW_ITEM_START_EDITING, self.on_treeitem_edit)
+        # self.Bind(dv.EVT_DATAVIEW_ITEM_COLLAPSING, self.on_treeitem_collapsing)
+        # self.Bind(dv.EVT_DATAVIEW_ITEM_EXPANDING, self.on_treeitem_expanding)
 
         #------------------------------------------------------------------------------------------
         # Simplebook
         #------------------------------------------------------------------------------------------
-        self.book = wx.Simplebook(self.main_win)
-        gridpage = wx.Panel(self.book)
-        infopage = wx.Panel(self.book)
-        rootpage = wx.Panel(self.book)
-        gridpage.SetBackgroundColour((250, 220, 220))   # For testing
-        infopage.SetBackgroundColour((200, 240, 230))   # For testing
-        rootpage.SetBackgroundColour((220, 210, 240))   # For testing
+        page = Page(self.book, self.setup[str(ttk.Data)])
+        rootpage = RootPage(self.book, self.setup[str(ttk.DataRoot)])
+        itempage = ItemPage(self.book, self.setup[str(ttk.DataItem)])
+        childpage = ChildPage(self.book, self.setup[str(ttk.DataChild)])
 
-        self.book.AddPage(gridpage, "gridpage")
-        self.book.AddPage(infopage, "infopage")
+        self.Bind(wx.EVT_TEXT, self.on_child_name, childpage.txtc_name)
+
+        self.book = wx.Simplebook(self.main_win)
+        self.book.AddPage(page, "page", True)
         self.book.AddPage(rootpage, "rootpage")
-        self.pageidx = {Link.GROUP: 0, Link.OFFER: 1, Link.DATA: 2}
-        self.pagesel_link = Link(Link.DATA, [])
-        self.book.SetSelection(2)
+        self.book.AddPage(itempage, "itempage")
+        self.book.AddPage(childpage, "childpage")
 
         # self.Bind(wx.EVT_BOOKCTRL_PAGE_CHANGING, self.on_book_pagechanged, self.book)
-        self.main_win.Sizer = wx.BoxSizer()
-        self.main_win.Sizer.Add(self.book, 1, wx.EXPAND)
+        sizer_book = wx.BoxSizer(wx.HORIZONTAL)
+        sizer_book.Add(self.book, 1, wx.EXPAND)
+        self.main_win.SetSizer(sizer_book)
 
         #------------------------------------------------------------------------------------------
         # Simplebook - gridpage
         #------------------------------------------------------------------------------------------
-        self.selected_product = None
-        self.gp_namelabel = wx.StaticText(gridpage, label=GP_NAMELABEL)
-        self.gp_predefs_label = wx.StaticText(gridpage, label=GP_PREDEFS_LABEL)
-        self.gp_materials_label = wx.StaticText(gridpage, label=GP_MATERIALS_LABEL)
-        self.gp_products_label = wx.StaticText(gridpage, label=GP_PRODUCTS_LABEL)
-        try:
-            part_label = self.data.get(self.selected_product).code
-        except (IndexError, AttributeError):
-            part_label = ""
+        # self.selected_product = None
+        # self.gp_namelabel = wx.StaticText(gridpage, label=GP_NAMELABEL)
+        # self.gp_predefs_label = wx.StaticText(gridpage, label=GP_PREDEFS_LABEL)
+        # self.gp_materials_label = wx.StaticText(gridpage, label=GP_MATERIALS_LABEL)
+        # self.gp_products_label = wx.StaticText(gridpage, label=GP_PRODUCTS_LABEL)
+        # try:
+        #     part_label = self.data.get(self.selected_product).code
+        # except (IndexError, AttributeError):
+        #     part_label = ""
 
-        self.gp_parts_label = wx.StaticText(gridpage,label=GP_PARTS_LABEL.format(part_label))
-        self.gp_namectrl = wx.TextCtrl(gridpage, size=GP_NAMECTRL_SIZE)
-        self.gp_btn_refresh = wx.Button(gridpage, label=GP_BTN_REFRESH)
-        self.gb_btn_db = wx.Button(gridpage, label=GP_BTN_DB)
+        # self.gp_parts_label = wx.StaticText(gridpage, label=GP_PARTS_LABEL.format(part_label))
+        # self.gp_namectrl = wx.TextCtrl(gridpage, size=GP_NAMECTRL_SIZE)
+        # self.gp_btn_refresh = wx.Button(gridpage, label=GP_BTN_REFRESH)
+        # self.gb_btn_db = wx.Button(gridpage, label=GP_BTN_DB)
 
-        self.Bind(wx.EVT_TEXT, self.on_gp_namectrl_text, self.gp_namectrl)
-        self.Bind(wx.EVT_BUTTON, self.on_gp_btn_refresh, self.gp_btn_refresh)
-        self.Bind(wx.EVT_BUTTON, self.on_gp_btn_db, self.gb_btn_db)
+        # self.Bind(wx.EVT_TEXT, self.on_gp_namectrl_text, self.gp_namectrl)
+        # self.Bind(wx.EVT_BUTTON, self.on_gp_btn_refresh, self.gp_btn_refresh)
+        # self.Bind(wx.EVT_BUTTON, self.on_gp_btn_db, self.gb_btn_db)
 
-        gp_label_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        gp_label_sizer.Add(self.gp_namelabel, 0, wx.ALL, BORDER)
-        gp_label_sizer.Add(self.gp_namectrl, 0, wx.ALL, BORDER)
-        gp_label_sizer.Add(self.gp_btn_refresh, 0, wx.ALL, BORDER)
-        gp_label_sizer.Add(self.gb_btn_db, 0, wx.ALL, BORDER)
+        # gp_label_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        # gp_label_sizer.Add(self.gp_namelabel, 0, wx.ALL, BORDER)
+        # gp_label_sizer.Add(self.gp_namectrl, 0, wx.ALL, BORDER)
+        # gp_label_sizer.Add(self.gp_btn_refresh, 0, wx.ALL, BORDER)
+        # gp_label_sizer.Add(self.gb_btn_db, 0, wx.ALL, BORDER)
 
-        self.grid_predefs = CustomGrid(gridpage, GridData("predefs"))
-        self.grid_materials = CustomGrid(gridpage, GridData("materials"))
-        self.grid_products = CustomGrid(gridpage, GridData("products"))
-        self.grid_parts = CustomGrid(gridpage, GridData("parts"))
+        # self.grid_predefs = CustomGrid(gridpage, GridData("predefs"))
+        # self.grid_materials = CustomGrid(gridpage, GridData("materials"))
+        # self.grid_products = CustomGrid(gridpage, GridData("products"))
+        # self.grid_parts = CustomGrid(gridpage, GridData("parts"))
 
-        self.Bind(wx.grid.EVT_GRID_SELECT_CELL, self.on_select_product, self.grid_products)
-        self.Bind(wx.grid.EVT_GRID_CELL_CHANGED, self.on_cell_changed, self.grid_parts)
-        self.Bind(wx.grid.EVT_GRID_CELL_CHANGED, self.on_cell_changed, self.grid_materials)
-        self.Bind(wx.grid.EVT_GRID_CELL_CHANGED, self.on_cell_changed, self.grid_products)
+        # self.Bind(wx.grid.EVT_GRID_SELECT_CELL, self.on_select_product, self.grid_products)
+        # self.Bind(wx.grid.EVT_GRID_CELL_CHANGED, self.on_cell_changed, self.grid_parts)
+        # self.Bind(wx.grid.EVT_GRID_CELL_CHANGED, self.on_cell_changed, self.grid_materials)
+        # self.Bind(wx.grid.EVT_GRID_CELL_CHANGED, self.on_cell_changed, self.grid_products)
 
-        gp_sizer = wx.BoxSizer(wx.VERTICAL)
-        horgrids_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        predef_sizer = wx.BoxSizer(wx.VERTICAL)
-        mat_sizer = wx.BoxSizer(wx.VERTICAL)
+        # gp_sizer = wx.BoxSizer(wx.VERTICAL)
+        # horgrids_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        # predef_sizer = wx.BoxSizer(wx.VERTICAL)
+        # mat_sizer = wx.BoxSizer(wx.VERTICAL)
 
-        gp_sizer.Add(gp_label_sizer)
-        predef_sizer.Add(self.gp_predefs_label, 0, wx.EXPAND|wx.LEFT|wx.TOP, BORDER)
-        predef_sizer.Add(self.grid_predefs, 1, wx.EXPAND|wx.ALL, BORDER)
-        horgrids_sizer.Add(predef_sizer, 0, wx.EXPAND)
+        # gp_sizer.Add(gp_label_sizer)
+        # predef_sizer.Add(self.gp_predefs_label, 0, wx.EXPAND|wx.LEFT|wx.TOP, BORDER)
+        # predef_sizer.Add(self.grid_predefs, 1, wx.EXPAND|wx.ALL, BORDER)
+        # horgrids_sizer.Add(predef_sizer, 0, wx.EXPAND)
 
-        mat_sizer.Add(self.gp_materials_label, 0, wx.EXPAND|wx.LEFT|wx.TOP, BORDER)
-        mat_sizer.Add(self.grid_materials, 1, wx.EXPAND|wx.ALL, BORDER)
-        horgrids_sizer.Add(mat_sizer, 1, wx.EXPAND)
+        # mat_sizer.Add(self.gp_materials_label, 0, wx.EXPAND|wx.LEFT|wx.TOP, BORDER)
+        # mat_sizer.Add(self.grid_materials, 1, wx.EXPAND|wx.ALL, BORDER)
+        # horgrids_sizer.Add(mat_sizer, 1, wx.EXPAND)
 
-        gp_sizer.Add(horgrids_sizer, 1, wx.EXPAND)
-        gp_sizer.Add(self.gp_products_label, 0, wx.EXPAND|wx.LEFT|wx.TOP, BORDER)
-        gp_sizer.Add(self.grid_products, 1, wx.EXPAND|wx.ALL, BORDER)
+        # gp_sizer.Add(horgrids_sizer, 1, wx.EXPAND)
+        # gp_sizer.Add(self.gp_products_label, 0, wx.EXPAND|wx.LEFT|wx.TOP, BORDER)
+        # gp_sizer.Add(self.grid_products, 1, wx.EXPAND|wx.ALL, BORDER)
 
-        gp_sizer.Add(self.gp_parts_label, 0, wx.EXPAND|wx.LEFT|wx.TOP, BORDER)
-        gp_sizer.Add(self.grid_parts, 1, wx.EXPAND|wx.ALL, BORDER)
-        gridpage.Sizer = gp_sizer
+        # gp_sizer.Add(self.gp_parts_label, 0, wx.EXPAND|wx.LEFT|wx.TOP, BORDER)
+        # gp_sizer.Add(self.grid_parts, 1, wx.EXPAND|wx.ALL, BORDER)
+        # gridpage.Sizer = gp_sizer
 
         #------------------------------------------------------------------------------------------
         # Simplebook - infopage
@@ -339,101 +345,108 @@ class Panel(wx.Panel):
     #----------------------------------------------------------------------------------------------
     # DVC_TreeCtrl functions
     #----------------------------------------------------------------------------------------------
-    def create_tree(self):
-        """Add items from data to dv_treectrl."""
+    def on_tree_select(self, evt):
+        """Change and update page on tree selection."""
+        item = evt.GetItem()
+        tree = evt.GetEventObject()
+        link = tree.GetItemData(item)
+        print(f"Panel.on_tree_select - Selected link: {link}")
 
-        # Clear the tree.
-        self.tree_ctrl.DeleteChildren(self.tree_root)
-        list = self.data.get_treelist()
+    # def create_tree(self):
+    #     """Add items from data to dv_treectrl."""
 
-        last = None
-        for n in range(len(list)):
-            # Attach offers to rootitem
-            if list[n][0].target == Link.OFFER:
-                last = self.tree_ctrl.AppendContainer(
-                    self.tree_root,
-                    list[n][1],
-                    data=list[n][0]
-                )
+    #     # Clear the tree.
+    #     self.tree_ctrl.DeleteChildren(self.tree_root)
+    #     list = self.data.get_treelist()
 
-                # Set expanded status from saved.
-                is_expanded = self.is_treeitem_expanded.get(list[n][1])
-                if is_expanded:
-                    self.tree_ctrl.Expand(last)
-                elif is_expanded is None:
-                    self.is_treeitem_expanded[list[n][1]] = True
-                    self.tree_ctrl.Expand(last)
+    #     last = None
+    #     for n in range(len(list)):
+    #         # Attach offers to rootitem
+    #         if list[n][0].target == Link.OFFER:
+    #             last = self.tree_ctrl.AppendContainer(
+    #                 self.tree_root,
+    #                 list[n][1],
+    #                 data=list[n][0]
+    #             )
 
-            # Attach Groups to previous offer.
-            elif list[n][0].target == Link.GROUP:
-                if last:
-                    self.tree_ctrl.AppendItem(last, list[n][1], data=list[n][0])
+    #             # Set expanded status from saved.
+    #             is_expanded = self.is_treeitem_expanded.get(list[n][1])
+    #             if is_expanded:
+    #                 self.tree_ctrl.Expand(last)
+    #             elif is_expanded is None:
+    #                 self.is_treeitem_expanded[list[n][1]] = True
+    #                 self.tree_ctrl.Expand(last)
 
-    def on_treeitem_activate(self, evt):
-        """Change the page or it's content based on treeitem activation event."""
+    #         # Attach Groups to previous offer.
+    #         elif list[n][0].target == Link.GROUP:
+    #             if last:
+    #                 self.tree_ctrl.AppendItem(last, list[n][1], data=list[n][0])
 
-        link = self.tree_ctrl.GetItemData(evt.GetItem())
-        obj = self.data.get(link)
+    # def on_treeitem_activate(self, evt):
+    #     """Change the page or it's content based on treeitem activation event."""
 
-        if link.target in self.pageidx: # if link is a valid page
+    #     link = self.tree_ctrl.GetItemData(evt.GetItem())
+    #     obj = self.data.get(link)
 
-            if self.pagesel_link.target != link.target:
-                # Change page.
-                self.book.ChangeSelection(self.pageidx[link.target])
-                self.pagesel_link = link
-                print(f"Panel.on_treeitem_activate: Change page to {obj}")
+    #     if link.target in self.pageidx: # if link is a valid page
 
-                if link.target == Link.GROUP:
-                    self.update_gridpage_content(link)
-                elif link.target == Link.OFFER:
-                    self.update_infopage_content()
-                    # print("Panel.on_treeitem_activate CHANGE TO INFOPAGE")
+    #         if self.pagesel_link.target != link.target:
+    #             # Change page.
+    #             self.book.ChangeSelection(self.pageidx[link.target])
+    #             self.pagesel_link = link
+    #             print(f"Panel.on_treeitem_activate: Change page to {obj}")
 
-            elif self.pagesel_link.n != link.n:
-                # Change content of the page to obj.
-                self.pagesel_link = link
-                if link.target == Link.GROUP:
-                    self.update_gridpage_content(link)
-                elif link.target == Link.OFFER:
-                    self.update_infopage_content()
-                    # print("Panel.on_treeitem_activate CHANGE CONTENT OF INFOPAGE")
+    #             if link.target == Link.GROUP:
+    #                 self.update_gridpage_content(link)
+    #             elif link.target == Link.OFFER:
+    #                 self.update_infopage_content()
+    #                 # print("Panel.on_treeitem_activate CHANGE TO INFOPAGE")
 
-            else:
-                print(f"Panel.on_treeitem_activate: Page already activated {obj}")
+    #         elif self.pagesel_link.n != link.n:
+    #             # Change content of the page to obj.
+    #             self.pagesel_link = link
+    #             if link.target == Link.GROUP:
+    #                 self.update_gridpage_content(link)
+    #             elif link.target == Link.OFFER:
+    #                 self.update_infopage_content()
+    #                 # print("Panel.on_treeitem_activate CHANGE CONTENT OF INFOPAGE")
 
-        else:
-            print(f"Panel.on_treeitem_activate: Page not changed - obj: {obj}")
+    #         else:
+    #             print(f"Panel.on_treeitem_activate: Page already activated {obj}")
 
-    def on_treeitem_edit(self, evt):
-        """Prevent editing."""
-        evt.Veto()
+    #     else:
+    #         print(f"Panel.on_treeitem_activate: Page not changed - obj: {obj}")
 
-    def on_treeitem_expanding(self, evt):
-        text = self.tree_ctrl.GetItemText(evt.GetItem())
-        self.is_treeitem_expanded[text] = True
-        # print(f"Panel.on_treeitem_expanded: Set {text} to True")
+    # def on_treeitem_edit(self, evt):
+    #     """Prevent editing."""
+    #     evt.Veto()
 
-    def on_treeitem_collapsing(self, evt):
-        text = self.tree_ctrl.GetItemText(evt.GetItem())
-        self.is_treeitem_expanded[text] = False
-        # print(f"Panel.on_treeitem_collapsed: Set {text} to False")
+    # def on_treeitem_expanding(self, evt):
+    #     text = self.tree_ctrl.GetItemText(evt.GetItem())
+    #     self.is_treeitem_expanded[text] = True
+    #     # print(f"Panel.on_treeitem_expanded: Set {text} to True")
 
-    def get_selected_offer(self):
-        """Return the offer selected or whose child is selected in treelist."""
-        offer_link = Link(Link.OFFER, n=[0])
-        link = self.pagesel_link
+    # def on_treeitem_collapsing(self, evt):
+    #     text = self.tree_ctrl.GetItemText(evt.GetItem())
+    #     self.is_treeitem_expanded[text] = False
+    #     # print(f"Panel.on_treeitem_collapsed: Set {text} to False")
 
-        # Check if offer or it's child is selected.
-        if link.target == Link.DATA:
-            print(NO_OFFER_SELECTED)
-            return
-        elif link.target == Link.GROUP:
-            offer_link.n = [i for i in link.n[:-1]]
-        elif link.target == Link.OFFER:
-            offer_link.n = [i for i in link.n]
+    # def get_selected_offer(self):
+    #     """Return the offer selected or whose child is selected in treelist."""
+    #     offer_link = Link(Link.OFFER, n=[0])
+    #     link = self.pagesel_link
 
-        # Return the selected offer.
-        return self.data.get(offer_link)
+    #     # Check if offer or it's child is selected.
+    #     if link.target == Link.DATA:
+    #         print(NO_OFFER_SELECTED)
+    #         return
+    #     elif link.target == Link.GROUP:
+    #         offer_link.n = [i for i in link.n[:-1]]
+    #     elif link.target == Link.OFFER:
+    #         offer_link.n = [i for i in link.n]
+
+    #     # Return the selected offer.
+    #     return self.data.get(offer_link)
 
     #------------------------------------------------------------------------------------------
     # Simplebook
@@ -445,135 +458,141 @@ class Panel(wx.Panel):
     #------------------------------------------------------------------------------------------
     # Simplebook - gridpage
     #------------------------------------------------------------------------------------------
-    def on_gp_namectrl_text(self, evt):
-        """Update the group name with content of textctrl."""
-        group = self.data.get(self.pagesel_link)
-        if self.pagesel_link.target == Link.GROUP:
-            group.name = evt.GetString()
-            self.create_tree()
-            print(f"Panel.on_gp_namectrl_text: {evt.GetString()}")
-        else:
-            print(f"Panel.on_gp_namectrl_text: Selected page '{self.pagesel_link}' is not a grouppage")
+    def on_child_name(self, evt):
+        """Refresh the tree with new name."""
+        self.treepanel.fill(self.treedata.get_tree())
+        print("Panel.on_child_name - Tree refreshed.")
 
-    def update_gridpage_content(self, link):
-        """Update the content of the gridpage.
 
-        Args:
-            link (Link): Link to the new Group.
-        """
-        obj = self.data.get(link)
-        print(f"Panel.on_treeitem_activate: \n\t" +
-              f"link: {link.target}, {link.n}, {link}")
+    # def on_gp_namectrl_text(self, evt):
+    #     """Update the group name with content of textctrl."""
+    #     group = self.data.get(self.pagesel_link)
+    #     if self.pagesel_link.target == Link.GROUP:
+    #         group.name = evt.GetString()
+    #         self.create_tree()
+    #         print(f"Panel.on_gp_namectrl_text: {evt.GetString()}")
+    #     else:
+    #         print(f"Panel.on_gp_namectrl_text: Selected page '{self.pagesel_link}' is not a grouppage")
 
-        if isinstance(obj, Group):
-            print(f"Panel.on_treeitem_activate: Change page content to {obj}")
-            self.gp_namectrl.ChangeValue(obj.name)
-            self.grid_predefs.update_data(obj.predefs, True)
-            self.grid_materials.update_data(obj.materials, True)
-            self.grid_products.update_data(obj.products, True)
-            self.grid_parts.update_data(None, True)
-            self.gp_parts_label.SetLabel(GP_NO_PRODUCT_SELECTED)
+    # def update_gridpage_content(self, link):
+    #     """Update the content of the gridpage.
 
-        else:
-            print(f"Panel.update_gridpage_content given object '{obj}' is not a Group class.")
+    #     Args:
+    #         link (Link): Link to the new Group.
+    #     """
+    #     obj = self.data.get(link)
+    #     print(f"Panel.on_treeitem_activate: \n\t" +
+    #           f"link: {link.target}, {link.n}, {link}")
 
-    def on_select_product(self, evt):
-        """Update parts grid and it's label."""
-        row = evt.GetRow()
-        print(f"\nPanel.on_select_product row: {row}")
-        self.grid_products.selected_row = row
-        product_code = self.grid_products.data.get(row, 'code')
+    #     if isinstance(obj, Group):
+    #         print(f"Panel.on_treeitem_activate: Change page content to {obj}")
+    #         self.gp_namectrl.ChangeValue(obj.name)
+    #         self.grid_predefs.update_data(obj.predefs, True)
+    #         self.grid_materials.update_data(obj.materials, True)
+    #         self.grid_products.update_data(obj.products, True)
+    #         self.grid_parts.update_data(None, True)
+    #         self.gp_parts_label.SetLabel(GP_NO_PRODUCT_SELECTED)
 
-        # Update parts grid label.
-        if product_code is None:
-            print("\tProduct selection in a row without any initialized data.")
-            self.gp_parts_label.SetLabel(GP_NO_PRODUCT_SELECTED)
-        else:   
-            self.gp_parts_label.SetLabel(GP_PARTS_LABEL.format(product_code))
+    #     else:
+    #         print(f"Panel.update_gridpage_content given object '{obj}' is not a Group class.")
 
-        # Update part codes
-        parts = self.grid_products.data.get(row, 'parts')
-        # print(f"\n\tPARTS - {parts}")
-        # try:
-        #     printparts = [{k: v for k, v in part.items() if k == 'code'} for part in parts.data]
-        #     pprint(printparts)
-        # except:
-        #     pass
-        # print("\n\tPARTS END")
-        if parts is not None:
-            print(f"\tPanel.on_select_product - parts type: {type(parts)}")
-            outside_data = {
-                self.grid_predefs.data.name: self.grid_predefs.data,
-                self.grid_materials.data.name: self.grid_materials.data,
-                self.grid_parts.data.name: self.grid_products.data.get(
-                    row, self.grid_parts.data.name),
-                'parent': self.grid_products.data.get(row)
-            }
-            parts.process_codes(outside_data)
-            self.grid_parts.update_data(parts, True)
-        else:
-            self.grid_parts.update_data(None, True)
+    # def on_select_product(self, evt):
+    #     """Update parts grid and it's label."""
+    #     row = evt.GetRow()
+    #     print(f"\nPanel.on_select_product row: {row}")
+    #     self.grid_products.selected_row = row
+    #     product_code = self.grid_products.data.get(row, 'code')
 
-    def on_cell_changed(self, evt):
-        print(f"Panel.on_cell_changed")
+    #     # Update parts grid label.
+    #     if product_code is None:
+    #         print("\tProduct selection in a row without any initialized data.")
+    #         self.gp_parts_label.SetLabel(GP_NO_PRODUCT_SELECTED)
+    #     else:   
+    #         self.gp_parts_label.SetLabel(GP_PARTS_LABEL.format(product_code))
 
-    def on_gp_btn_refresh(self, evt):
-        """Handle refresh button event for GridData.process_codes()."""
-        print(f"Panel.on_gp_btn_refresh")
-        def inner_refresh(n):
-            outside_data = {
-                self.grid_predefs.data.name: self.grid_predefs.data,
-                self.grid_materials.data.name: self.grid_materials.data,
-                self.grid_products.data.name: self.grid_products.data
-            }
-            self.grid_predefs.data.process_codes(outside_data)
-            self.grid_materials.data.process_codes(outside_data)
-            self.grid_products.data.process_codes(outside_data)
+    #     # Update part codes
+    #     parts = self.grid_products.data.get(row, 'parts')
+    #     # print(f"\n\tPARTS - {parts}")
+    #     # try:
+    #     #     printparts = [{k: v for k, v in part.items() if k == 'code'} for part in parts.data]
+    #     #     pprint(printparts)
+    #     # except:
+    #     #     pass
+    #     # print("\n\tPARTS END")
+    #     if parts is not None:
+    #         print(f"\tPanel.on_select_product - parts type: {type(parts)}")
+    #         outside_data = {
+    #             self.grid_predefs.data.name: self.grid_predefs.data,
+    #             self.grid_materials.data.name: self.grid_materials.data,
+    #             self.grid_parts.data.name: self.grid_products.data.get(
+    #                 row, self.grid_parts.data.name),
+    #             'parent': self.grid_products.data.get(row)
+    #         }
+    #         parts.process_codes(outside_data)
+    #         self.grid_parts.update_data(parts, True)
+    #     else:
+    #         self.grid_parts.update_data(None, True)
 
-            for row in range(self.grid_products.GetNumberRows() - 1):
-                parent = self.grid_products.data.get(row)
-                parts = self.grid_products.data.get(row, 'parts')
-                outside_data['parent'] = parent
-                parts.process_codes(outside_data)
+    # def on_cell_changed(self, evt):
+    #     print(f"Panel.on_cell_changed")
 
-            # Do stuff that does not require repeats.
-            if n == REFRESH_TIMES - 1:
-                # Repaint the cells that require it.
-                for row in range(len(self.grid_materials.data)):
-                    self.grid_materials.set_edited_cell(row)
+    # def on_gp_btn_refresh(self, evt):
+    #     """Handle refresh button event for GridData.process_codes()."""
+    #     print(f"Panel.on_gp_btn_refresh")
+    #     def inner_refresh(n):
+    #         outside_data = {
+    #             self.grid_predefs.data.name: self.grid_predefs.data,
+    #             self.grid_materials.data.name: self.grid_materials.data,
+    #             self.grid_products.data.name: self.grid_products.data
+    #         }
+    #         self.grid_predefs.data.process_codes(outside_data)
+    #         self.grid_materials.data.process_codes(outside_data)
+    #         self.grid_products.data.process_codes(outside_data)
 
-                for row in range(len(self.grid_products.data)):
-                    self.grid_products.set_edited_cell(row)
+    #         for row in range(self.grid_products.GetNumberRows() - 1):
+    #             parent = self.grid_products.data.get(row)
+    #             parts = self.grid_products.data.get(row, 'parts')
+    #             outside_data['parent'] = parent
+    #             parts.process_codes(outside_data)
 
-                self.grid_predefs.Refresh()
-                self.grid_materials.Refresh()
-                self.grid_products.Refresh()
-                self.grid_parts.Refresh()
+    #         # Do stuff that does not require repeats.
+    #         if n == REFRESH_TIMES - 1:
+    #             # Repaint the cells that require it.
+    #             for row in range(len(self.grid_materials.data)):
+    #                 self.grid_materials.set_edited_cell(row)
 
-        # Repeat to make sure all dependend codes are updated.
-        for n in range(REFRESH_TIMES):
-            inner_refresh(n)
+    #             for row in range(len(self.grid_products.data)):
+    #                 self.grid_products.set_edited_cell(row)
 
-    def on_gp_btn_db(self, evt):
-        """Handle event for db dialog button."""
-        with DbDialog(self, 'materials') as dlg:
-            if dlg.ShowModal() == wx.ID_OK:
-                self.add_items_to_offer(dlg.to_offer)
+    #             self.grid_predefs.Refresh()
+    #             self.grid_materials.Refresh()
+    #             self.grid_products.Refresh()
+    #             self.grid_parts.Refresh()
 
-    def add_items_to_offer(self, to_offer):
-        """Add items received from dialog to the open offer."""
-        print("Panel.add_items_to_offer")
-        for collection, obj_list in to_offer.items():
-            if collection == 'materials':
-                grid = self.grid_materials
-            elif collection == 'products':
-                grid = self.grid_products
-            else:
-                print(f"\tP.AITO - Collection '{collection}' is not defined.")
-                continue
-            for obj in obj_list:
-                grid.append(obj)
-                print(f"\tP.AITO - parts type: {type(obj['parts'])} should be list")
+    #     # Repeat to make sure all dependend codes are updated.
+    #     for n in range(REFRESH_TIMES):
+    #         inner_refresh(n)
+
+    # def on_gp_btn_db(self, evt):
+    #     """Handle event for db dialog button."""
+    #     with DbDialog(self, 'materials') as dlg:
+    #         if dlg.ShowModal() == wx.ID_OK:
+    #             self.add_items_to_offer(dlg.to_offer)
+
+    # def add_items_to_offer(self, to_offer):
+    #     """Add items received from dialog to the open offer."""
+    #     print("Panel.add_items_to_offer")
+    #     for collection, obj_list in to_offer.items():
+    #         if collection == 'materials':
+    #             grid = self.grid_materials
+    #         elif collection == 'products':
+    #             grid = self.grid_products
+    #         else:
+    #             print(f"\tP.AITO - Collection '{collection}' is not defined.")
+    #             continue
+    #         for obj in obj_list:
+    #             grid.append(obj)
+    #             print(f"\tP.AITO - parts type: {type(obj['parts'])} should be list")
 
     #------------------------------------------------------------------------------------------
     # Simplebook - infpage

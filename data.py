@@ -1019,36 +1019,13 @@ class Offer:
 class Data:
     def __init__(self):
         self.offers = []
-    
-    def get(self, link):
-        if link is None:
-            return []
-        elif link.target == Link.OFFER:
-            return self.offers[link.n[0]]
-        elif link.target == Link.GROUP:
-            return self.offers[link.n[0]].groups[link.n[1]]
-        elif link.target == Link.PREDEFS:
-            return self.offers[link.n[0]].groups[link.n[1]].predefs
-        elif link.target == Link.MATERIALS:
-            return self.offers[link.n[0]].groups[link.n[1]].materials
-        elif link.target == Link.PRODUCTS:
-            return self.offers[link.n[0]].groups[link.n[1]].products
-        elif link.target == Link.PRODUCT:
-            return self.offers[link.n[0]].groups[link.n[1]].products.get(link.n[2])
-        elif link.target == Link.PARTS:
-            return self.offers[link.n[0]].groups[link.n[1]].products.get(link.n[2], 'parts')
-        elif link.target == Link.PREDEF:
-            return self.offers[link.n[0]].groups[link.n[1]].predefs.get(link.n[2])
-        elif link.target == Link.MATERIAL:
-            return self.offers[link.n[0]].groups[link.n[1]].materials.get(link.n[2])
-        elif link.target == Link.PRODUCT:
-            return self.offers[link.n[0]].groups[link.n[1]].products.get(link.n[2])
-        elif link.target == Link.PART:
-            return self.offers[link.n[0]].groups[link.n[1]].products.get(link.n[2], 'parts').get(link.n[3])
-        elif link.target == Link.DATA:
+
+    def get(self, link: list):
+        """Return Data, Offer or Group pointed by the link index list."""
+        if len(link) == 0:
             return self
-        else:
-            print(f"Data.get: Link.target '{link.target}' is not defined.")
+        offer = self.offers[link.pop()]
+        return offer.get(link)
 
     def get_treelist(self) -> list:
         treelist = []
@@ -1063,43 +1040,6 @@ class Data:
                 treelist.append((link, name))
 
         return treelist
-
-    # def set(self, link, col, value):
-    #     """Set a value to a member at col to a object at link.
-
-    #     Args:
-    #         link (Link): Link to the object.
-    #         col (int): Column idx to the member which value is to be changed.
-    #         value (Any): Value to be changed.
-    #     """
-
-    #     obj = self.get(link)
-
-    #     if (link.target == Link.PREDEF or 
-    #         link.target == Link.MATERIAL or 
-    #         link.target == Link.PRODUCT or 
-    #         link.target == Link.PART):
-    #         obj.set(col, value)
-
-    #     self.to_print()
-
-    # def build_test(self):
-    #     self.offers.append(Offer("Tarjous 1", [
-    #         Group("TestGroup"),
-    #         Group("Group2")
-    #     ]))
-    #     self.offers.append(Offer("Testi tarjous", [
-    #         Group("DefName"),
-    #         Group("One"),
-    #         Group("Two"),
-    #         Group("Three")
-    #     ]))
-    #     self.offers.append(Offer("Matinkatu 15", [
-    #         Group("Kitchen")
-    #     ]))
-
-    #     self.offers[0].groups[0].predefs.data.append({'part': "ovi", 'mat': "MELVA16"})
-    #     self.offers[0].groups[0].predefs.data.append({'part': "hylly", 'mat': "MELVA16"})
 
     def to_print(self):
         print("")
