@@ -42,7 +42,7 @@ class Panel(wx.Panel):
 
         fcmult = self.treedata.get([0]).get_data('fc_mult')
         page = Page(self.book, self.setup)
-        rootpage = RootPage(self.book, self.setup)
+        rootpage = RootPage(self.book, self.setup, self.refresh_tree)
         itempage = ItemPage(self.book, self.setup, fcmult, self.refresh_tree)
         childpage = ChildPage(self.book, self.setup, self.refresh_tree)
 
@@ -113,12 +113,12 @@ class Panel(wx.Panel):
 
         # Refresh page
         page = self.book.GetPage(selection_new)
-        page.change_data(self.treedata.get_active())
+        active_data = self.treedata.get_active()
+        page.change_data(active_data)
+        evt.Skip()
 
     def refresh_tree(self):
         """Handle refreshing the tree."""
         print("Panel.refresh_tree")
         datatree = self.treedata.get_tree()
-        for item in datatree:
-            print(f"\t{item}")
         self.treepanel.fill(datatree)

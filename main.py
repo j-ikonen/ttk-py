@@ -2,9 +2,8 @@
 TODO:
     Is Asennusyksikkö choice or string?
 
-    Create RootPage instead of current rootpage implementation.
-    Add the new data and setup initializations with defaults.
-    Test test test test test.
+    Implement SetupGrid and DataGrid
+    testtestestesttestesttesttesttest
 
     Create dialog with Treebook for settings / global values.
     Add predefined column widths.
@@ -91,10 +90,16 @@ DEFAULT_SETUP = {
     },
     str(DataItem): {
         "__name": "Tarjous",
-        "info": {
+        "file": {
             "type": "SetupGrid",
             "fields": [
                 ["Tiedosto", "string"],
+                ["Polku", "string"]
+            ]
+        },
+        "info": {
+            "type": "SetupGrid",
+            "fields": [
                 ["Etunimi", "string"],
                 ["Sukunimi", "string"],
                 ["Puh.", "string"],

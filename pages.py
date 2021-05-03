@@ -28,12 +28,13 @@ class Page(wx.Panel):
         self.SetSizer(sizer)
 
 class RootPage(wx.Panel):
-    def __init__(self, parent, setup):
+    def __init__(self, parent, setup, refresh_tree):
         super().__init__(parent)
         self.SetBackgroundColour((200, 255, 255))
 
         self.setup = setup[str(DataRoot)]
         self.data = None
+        self.refresh_tree = refresh_tree
 
         txt_name = wx.StaticText(self, label=self.setup['__name'])
         self.txtc_name = wx.TextCtrl(self, value="", size=TXTC_NAME_SIZE)
@@ -54,15 +55,17 @@ class RootPage(wx.Panel):
     def change_data(self, data: DataRoot):
         """Change the data to a new DataItem."""
         self.data = data
+        print(f"RootPage.change_data - name: {self.data.get_name()}")
         self.txtc_name.SetValue(data.get_name())
         # self.grid_info.change_data(data.get_data('info'))
 
     def on_text(self, evt):
         """Update the DataItem name."""
-        print("ItemPage.on_text - Implement changing DataItem name here.")
-        if self.data:
+        print("RootPage.on_text")
+        if self.data is not None:
             txtc: wx.TextCtrl = evt.GetEventObject()
             self.data.set_name(txtc.GetValue())
+            print(f"\t{txtc.GetValue()}")
             self.refresh_tree()
 
 
@@ -88,7 +91,10 @@ class ItemPage(wx.Panel):
         chk_fc = wx.CheckBox(self, label=CHK_FC_LABEL)
 
         self.grid_info = SetupGrid(self, self.setup['info'])
+        self.grid_file = SetupGrid(self, self.setup['file'])
         self.grid_fc = TtkGrid(self, self.setup['fieldcount'])
+        grid_file_size = len(self.setup['file']['fields'])
+        grid_info_size = len(self.setup['info']['fields'])
 
         self.Bind(wx.EVT_TEXT, self.on_text, self.txtc_name)
         self.Bind(wx.EVT_BUTTON, self.on_add_child, self.btn_add_child)
@@ -107,7 +113,8 @@ class ItemPage(wx.Panel):
         sizer_name.Add(self.btn_add_child, 0, wx.EXPAND|wx.RIGHT, BORDER)
         sizer_name.Add(btn_del_child, 0, wx.EXPAND|wx.RIGHT, BORDER)
 
-        sizer_info.Add(self.grid_info, 0, wx.EXPAND)
+        sizer_info.Add(self.grid_file, grid_file_size, wx.EXPAND)
+        sizer_info.Add(self.grid_info, grid_info_size, wx.EXPAND)
 
         sizer_fc.Add(chk_fc, 0, wx.EXPAND|wx.ALL, BORDER)
         sizer_fc.Add(self.grid_fc, 0, wx.EXPAND)
@@ -120,7 +127,6 @@ class ItemPage(wx.Panel):
 
         self.SetSizer(sizer)
 
-
     def change_data(self, data: DataItem):
         """Change the data to a new DataItem."""
         # self.fc = self.data.get_data('fieldcount')
@@ -128,10 +134,11 @@ class ItemPage(wx.Panel):
         self.txtc_name.SetValue(data.get_name())
         self.update_fieldcount()
         self.grid_info.change_data(data.get_data('info'))
+        print(f"ItemPage.change_data - name: {self.data.get_name()}")
 
     def on_add_child(self, evt):
         """Add a child data object to current DataItem."""
-        if self.data:
+        if self.data is not None:
             with wx.TextEntryDialog(self, TEDLG_MSG) as dlg:
                 if dlg.ShowModal() == wx.ID_OK:
                     name = dlg.GetValue()
@@ -148,7 +155,7 @@ class ItemPage(wx.Panel):
 
     def on_del_child(self, evt):
         """Delete a child from DataItem."""
-        if self.data:
+        if self.data is not None:
             child_list = [child.get_name() for child in self.data.get_children()]
             with wx.MultiChoiceDialog(
                 self, MCDLG_MSG, MCDLG_CAP,
@@ -165,14 +172,17 @@ class ItemPage(wx.Panel):
     def on_text(self, evt):
         """Update the DataItem name."""
         print("ItemPage.on_text - Implement changing DataItem name here.")
-        if self.data:
+        if self.data is not None:
             txtc: wx.TextCtrl = evt.GetEventObject()
             self.data.set_name(txtc.GetValue())
             self.refresh_tree()
 
     def update_fieldcount(self):
+        """Update the fieldcount data and display."""
         self.fc.clear()
-        for item in self.data.get_data('fieldcount'):
+        fcdata = self.data.get_data('fieldcount')
+        print(f"ItemPage.update_fieldcount - {fcdata}")
+        for item in fcdata:
             mult = self.gfc_mult[item['unit']] if self.use_global else item['mult']
             self.fc.append({
                 'unit': item['unit'],
@@ -263,7 +273,8 @@ class ChildPage(wx.Panel):
 
     def change_data(self, data: DataChild):
         """Change page contents to a new DataChild object."""
-        print("ChildPage.change_data - Implement chaning contents here.")
+        print("ChildPage.change_data")
+        print(f"\tname: {data.get_name()}")
         self.data = data
 
         self.txtc_name.SetValue(data.get_name())
@@ -289,7 +300,7 @@ class ChildPage(wx.Panel):
                 self.grid_products.refresh_attr()
                 self.grid_parts.refresh_attr()
 
-        if self.data:
+        if self.data is not None:
             for n in range(self.setup['__refresh_n']):
                 inner_refresh(n)
 
@@ -321,8 +332,7 @@ class ChildPage(wx.Panel):
 
     def on_text(self, evt):
         """Update the ChildData name."""
-        print("ChildPage.on_text - Implement changing DataChild name here.")
-        if self.data:
+        if self.data is not None:
             txtc: wx.TextCtrl = evt.GetEventObject()
             self.data.set_name(txtc.GetValue())
             self.refresh_tree()

@@ -15,7 +15,7 @@ FIELD_READONLY = 2
 FIELD_DEF = 3
 
 def type_default(type_string: str):
-    return TYPES[type_string.split(':')[0]]
+    return TYPES[type_string.split(':')[0]]()
 
 
 class TtkData:
@@ -30,7 +30,11 @@ class TtkData:
         """
         self.name = name
         self.page = page
-        self.setup = setup
+        if str(type(self)) not in setup:
+            self.setup = setup
+        else:
+            self.setup = setup[str(type(self))]
+
         self.child = child
         self.children = None if child is None else []
         self.data = {}
@@ -44,9 +48,13 @@ class TtkData:
         """Delete a child at idx."""
         del self.children[idx]
 
+    def delete_all_children(self):
+        """Delete all the children."""
+        self.children = None if self.child is None else []
+
     @classmethod
     def from_dict(cls, data: dict, setup: dict):
-        obj = cls(data['name'], setup[str(type(cls))])
+        obj = cls(data['name'], setup)
         obj.data = deepcopy(data['data'])
         if obj.child is not None:
             for child in data['ttkdata_children']:
@@ -105,7 +113,8 @@ class TtkData:
 
     def init_data(self):
         """Initialize the data."""
-        st = self.setup[str(type(self))]
+        print(f"\n{type(self)}.init_data\n\t{self.setup.keys()}")
+        st = self.setup#[str(type(self))]
         for k, v in st.items():
             # print(f"{type(self)}.init_data - {v}")
             if isinstance(v, dict):
@@ -171,6 +180,13 @@ class Data(TtkData):
 class DataRoot(TtkData):
     def __init__(self, name, setup):
         super().__init__(name, 1, setup, DataItem)
+
+    def file_open(self, path):
+        """Return True if the child is already opened."""
+        for child in self.children:
+            if path == child.get_data('file')['Polku']:
+                return True
+        return False
 
 class DataItem(TtkData):
     def __init__(self, name, setup):

@@ -3,7 +3,7 @@ import os
 import json
 
 import wx
-from wx.core import ItemAttr, MultiChoiceDialog
+from wx.core import MultiChoiceDialog
 
 from ttk_data import Data, DataItem, DataRoot
 from panel import Panel, FRAME_SIZE
@@ -27,6 +27,32 @@ ID_ADD_TO_DB = wx.NewIdRef()
 
 CLOSE_ITEM_MSG = "Sulje valitut tarjoukset"
 CLOSE_ITEM_CAP = "Sulje tarjoukset"
+ROOTDATA_FILE = "ttk_rootdata.json"
+SETUP_FILE = "ttk_setup.json"
+
+
+def read_file(path, file) -> dict:
+    if path is None:
+        filepath = file
+    else:
+        filepath = path + '\\' + file
+    try:
+        with open(filepath, 'r') as rf:
+            return json.load(rf)
+    except FileNotFoundError as e:
+        print(f"{e}")
+        return None
+    except json.decoder.JSONDecodeError as e:
+        print(f"{filepath}\n\tFile is not a valid json.")
+        return None
+
+def write_file(path, file, data):
+    if path is None:
+        filepath = file
+    else:
+        filepath = path + '\\' + file
+    with open(filepath, 'w') as wf:
+        json.dump(data, wf, indent=4)
 
 
 class AppFrame(wx.Frame):
@@ -37,29 +63,16 @@ class AppFrame(wx.Frame):
             size=FRAME_SIZE,
             style=wx.DEFAULT_FRAME_STYLE|wx.FULL_REPAINT_ON_RESIZE
         )
-        self.data: Data = data
-        self.setup = setup
-        self.workspace = {
-            "open_offers": []
-        }
-        
-        # Load workspace info from file.
-        try:
-            with open(WORKSPACE_FILE, 'r') as rf:
-                self.workspace = json.load(rf)
-        except FileNotFoundError as e:
-            print(f"No workspace file found: {e}")
-        # else:
-            # Load offers open in last session.
-            # for path in self.workspace['open_offers']:
-            #     try:
-            #         with open(path, 'r') as rf:
-            #             offer = Offer.from_dict(json.load(rf))
-            #             data.offers.append(offer)
-            #     except FileNotFoundError as e:
-            #         print(f"{e}")
-            #     except json.decoder.JSONDecodeError as e:
-            #         print(f"{path}\n\tFile is not a valid json.")
+
+        self.setup: dict = read_file(None, SETUP_FILE)
+        if self.setup is None:
+            self.setup: dict = setup
+
+        from_file = read_file(None, ROOTDATA_FILE)
+        if from_file is None:
+            self.data: Data = data
+        else:
+            self.data: Data = Data.from_dict(from_file, self.setup)
 
         self.CenterOnScreen()
         self.create_menubar()
@@ -70,15 +83,10 @@ class AppFrame(wx.Frame):
 
     def on_close_window(self, evt):
         print("Closing frame.")
-        # Save open offers to session workspace file.
-        # self.workspace['open_offers'] = []
-        # for offer in self.panel.data.offers:
-        #     if offer.info.filepath != "":
-        #         self.workspace['open_offers'].append(offer.info.filepath)
-
-        # # Save offer dictionary to selected file.
-        # with open(WORKSPACE_FILE, 'w') as fp:
-        #     json.dump(self.workspace, fp, indent=4)
+        root = self.data.get([0])
+        root.delete_all_children()
+        # write_file(None, ROOTDATA_FILE, root.get_dict())
+        # write_file(None, SETUP_FILE, self.setup)
 
         self.Destroy()
 
@@ -122,46 +130,45 @@ class AppFrame(wx.Frame):
     def menu_open(self, evt):
         """Handle event for opening an offer from a file."""
         print("Frame.menu_open - TO BE IMPLEMENTED")
-        # dlg = wx.FileDialog(
-        #     self,
-        #     message=OPEN_FILE_MESSAGE,
-        #     defaultDir=os.getcwd(),
-        #     defaultFile="",
-        #     wildcard=WILDCARD,
-        #     style=wx.FD_OPEN | wx.FD_MULTIPLE | wx.FD_CHANGE_DIR |
-        #           wx.FD_FILE_MUST_EXIST | wx.FD_PREVIEW
-        # )
+        dlg = wx.FileDialog(
+            self,
+            message=OPEN_FILE_MESSAGE,
+            defaultDir=os.getcwd(),
+            defaultFile="",
+            wildcard=WILDCARD,
+            style=wx.FD_OPEN | wx.FD_MULTIPLE | wx.FD_CHANGE_DIR |
+                  wx.FD_FILE_MUST_EXIST | wx.FD_PREVIEW
+        )
 
-        # # Get return code from dialog.
-        # if dlg.ShowModal() == wx.ID_OK:
+        # Get return code from dialog.
+        if dlg.ShowModal() == wx.ID_OK:
+            root = self.data.get([0])
+            for path in dlg.GetPaths():
+                # Check if an offer with 'path' is already open.
+                if root.file_open(path):
+                    print(f"Selected offer is already opened from path\n\t{path}.")
+                    dlg.Destroy()
+                    return
 
-        #     for path in dlg.GetPaths():
-        #         # Check if an offer with 'path' is already open.
-        #         if self.panel.data.file_opened(path):
-        #             print(f"Selected offer is already opened from path {path}.")
-        #             dlg.Destroy()
-        #             return
+                # Open and read the file at path.
+                print(OPENING_FILE.format(path))
+                item_dict = read_file(None, path)
 
-        #         # Open and read the file at path.
-        #         print(OPENING_FILE.format(path))
-        #         with open(path, 'r') as rf:
-        #             offer_dict = json.load(rf)
+                # Create DataItem object from dictionary
+                item: DataItem = DataItem.from_dict(item_dict)
+                itemdata = item.get_data('file')
+                itemdata['Polku'] = path
 
-        #         # Create offer object from dictionary
-        #         offer = Offer.from_dict(offer_dict)
-        #         offer.info.filepath = path
-        #         self.panel.data.offers.append(offer)
-
-        #     # Refresh TreeList with new offers.
-        #     self.panel.create_tree()
-        # dlg.Destroy()
+            # Refresh TreeList with new offers.
+            self.panel.refresh_tree()
+        dlg.Destroy()
 
     def menu_close(self, evt):
         """Open dialog for closing DataItems."""
         print("Frame.menu_close - TO BE IMPLEMENTED")
-        offer_list = [item.get_name() for item in self.data.get([0]).get_children()]
+        itemlist = [item.get_name() for item in self.data.get([0]).get_children()]
         with MultiChoiceDialog(
-            self, CLOSE_ITEM_MSG, CLOSE_ITEM_CAP, len(offer_list), offer_list
+            self, CLOSE_ITEM_MSG, CLOSE_ITEM_CAP, itemlist
         ) as dlg:
             if dlg.ShowModal() == wx.ID_OK:
                 selected: list = dlg.GetSelections()
@@ -172,19 +179,22 @@ class AppFrame(wx.Frame):
                 self.panel.refresh_tree()
 
     def menu_save(self, evt):
-        """Save selected offer to info.filepath if not empty."""
+        """Save selected offer to file.path if not empty."""
         # Get dictionary of selected offer.
-        link = self.panel.treepanel.get_selected_link()[-2:]
-        item: DataItem = self.data.get(link)
-        path = item.get_data('info')['Polku']
-        file = item.get_data('info')['Tiedosto']
+        item: DataItem = self.data.get_active()
+
+        if not isinstance(item, DataItem):
+            print("No offer selected.")
+            return
+
+        path = item.get_data('file')['Polku']
+        # file = item.get_data('file')['Tiedosto']
 
         if path != "":
-            print(f"Saving '{item.get_name()}' to '{path}{file}'")
+            print(f"Saving '{item.get_name()}' to \n\t{path}")
 
             # Save offer dictionary to selected file.
-            with open(path + file, 'w') as fp:
-                json.dump(item.get_dict(), fp, indent=4)
+            write_file(None, path, item.get_dict())
         else:
             print(SAVE_NO_PATH)
             self.menu_saveas(self, evt)
@@ -192,8 +202,12 @@ class AppFrame(wx.Frame):
     def menu_saveas(self, evt):
         """Handle event for 'save as'."""
         # Get selected offer.
-        link = self.panel.treepanel.get_selected_link()[-2:]
-        item: DataItem = self.data.get(link)
+        item: DataItem = self.data.get_active()
+
+        if not isinstance(item, DataItem):
+            print("No offer selected.")
+            return
+
         print(f"Saving '{item.get_name()}'")
 
         # Open FileDialog for Saving.
@@ -201,7 +215,7 @@ class AppFrame(wx.Frame):
             self,
             message=SAVE_FILE_MESSAGE,
             defaultDir=os.getcwd(),
-            defaultFile=item.get_data('info')['Tiedosto'],
+            defaultFile="",
             wildcard=WILDCARD,
             style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT
         )
@@ -210,12 +224,11 @@ class AppFrame(wx.Frame):
         # Get return code from dialog.
         if dlg.ShowModal() == wx.ID_OK:
             path = dlg.GetPath()
-            item.get_data('info')['Tiedosto'] = path
+            item.get_data('file')['Polku'] = path
             print(SAVING_TO.format(path))
 
-            # Save offer dictionary to selected file.
-            with open(path, 'w') as fp:
-                json.dump(item.get_dict(), fp, indent=4)
+            # Save item dictionary to selected file.
+            write_file(None, path, item.get_dict())
 
         else:
             print(SAVEAS_CANCEL)
