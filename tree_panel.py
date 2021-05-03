@@ -30,7 +30,7 @@ class TreePanel(wx.Panel):
         root = dv.NullDataViewItem
         item = dv.NullDataViewItem
 
-        for (name, link) in treelist:
+        for (link, name) in treelist:
             try:
                 expanded = self.expanded[str(link)]
             except KeyError:
@@ -58,6 +58,12 @@ class TreePanel(wx.Panel):
                     self.tree.Expand(item)
             elif len(link) == 3:    # TreeChild
                 self.tree.AppendItem(item, name, data=link)
+        # self.Refresh()
+
+    def get_selected_link(self):
+        """Return link to selected item."""
+        link = self.tree.GetItemData(self.tree.GetSelection())
+        return [n for n in link]
 
     def on_collapsing(self, evt):
         link = self.tree.GetItemData(evt.GetItem())

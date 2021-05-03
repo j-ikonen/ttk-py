@@ -2,7 +2,6 @@
 TODO:
     Is Asennusyksikkö choice or string?
 
-    Create ItemPage instead of current infopage implementation.
     Create RootPage instead of current rootpage implementation.
     Add the new data and setup initializations with defaults.
     Test test test test test.
@@ -72,25 +71,92 @@ Codes:
 import wx
 import wx.grid
 
-from data import Data
+# from data import Data
 from frame import AppFrame
 from database import Database
+from ttk_data import Data, DataRoot, DataItem, DataChild
 
+
+DEFAULT_SETUP = {
+    str(Data): {},
+    str(DataRoot): {
+        "__name": "Tarjoukset",
+        "fc_mult": {
+            "type": "SetupGrid",
+            "fields": [
+                ["unit", "string", "Asennusyksikkö"],
+                ["mult", "double:6,2", "Kerroin (€/n)"]
+            ]
+        }
+    },
+    str(DataItem): {
+        "__name": "Tarjous",
+        "info": {
+            "type": "SetupGrid",
+            "fields": [
+                ["Tiedosto", "string"],
+                ["Etunimi", "string"],
+                ["Sukunimi", "string"],
+                ["Puh.", "string"],
+                ["Sähköposti", "string"],
+                ["Osoite", "string"],
+                ["Lisätiedot", "string"],
+            ]
+        },
+        "fieldcount": {
+            "type": "DataGrid",
+            "fields": [
+                ["unit", "Asennusyksikkö", "string"],
+                ["mult", "Kerroin (€/n)", "double"],
+                ["count", "Määrä (n)", "long"],
+                ["cost", "Hinta (€)", "double"]
+            ]
+        }
+    },
+    str(DataChild): {
+        "__name": "Ryhmä",
+        "__refresh_n": 3,
+        "predefs": {
+            "type": "DataGrid",
+            "name": "Esimääritykset",
+            "fields": []
+        },
+        "materials": {
+            "type": "DataGrid",
+            "name": "Materiaalit",
+            "fields": []
+        },
+        "products": {
+            "type": "DataGrid",
+            "name": "Tuotteet",
+            "fields": []
+        },
+        "parts": {
+            "type": "DataGrid",
+            "name": "Tuotetta ei ole valittu",
+            "name_on_parent_selection": "Tuotteen '{}' osat",
+            "parent_name_key": "code",
+            "fields": []
+        }
+    },
+}
 
 def main():
     app = wx.App(useBestVisual=True)
 
-    data = Data()
+    setup = DEFAULT_SETUP
+    data = Data('ttk-py', setup)
+    data.push('Tarjoukset', setup)
 
     indexes = Database('materials').get_indexes()
     if 'code' not in indexes:
         Database('materials').index('code', True)
-    
+
     indexes = Database('products').get_indexes()
     if 'code' not in indexes:
         Database('products').index('code', True)
 
-    frame = AppFrame(data)
+    frame = AppFrame(data, setup)
     frame.Show()
     frame.Layout()
 
