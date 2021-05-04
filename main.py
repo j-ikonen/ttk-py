@@ -14,6 +14,7 @@ TODO:
     Add FoldPanelBar to fold grids hidden.
     Change use_predef column in parts to bool.
     Change Info into something closer to GridData.
+    Change TtkData.init_data to select the data on something other than isinstance(v, dict)
 
     DONE:
     Add field count multiplier global and local editing.
@@ -83,65 +84,204 @@ DEFAULT_SETUP = {
         "fc_mult": {
             "type": "SetupGrid",
             "fields": [
-                ["unit", "string", "Asennusyksikkö"],
-                ["mult", "double:6,2", "Kerroin (€/n)"]
+                ["unit", "Asennusyksikkö", "string"],
+                ["mult", "Kerroin (€/n)", "double:6,2"]
             ]
         }
     },
     str(DataItem): {
         "__name": "Tarjous",
+        "__default_instance_name": "Uusi tarjous",
         "file": {
             "type": "SetupGrid",
             "fields": [
-                ["Tiedosto", "string"],
-                ["Polku", "string"]
+                ["file", "Tiedosto", "string"],
+                ["path", "Polku", "string"]
             ]
         },
         "info": {
             "type": "SetupGrid",
             "fields": [
-                ["Etunimi", "string"],
-                ["Sukunimi", "string"],
-                ["Puh.", "string"],
-                ["Sähköposti", "string"],
-                ["Osoite", "string"],
-                ["Lisätiedot", "string"],
+                ["firstname", "Etunimi", "string"],
+                ["lastname", "Sukunimi", "string"],
+                ["phone", "Puh.", "string"],
+                ["email", "Sähköposti", "string"],
+                ["address", "Osoite", "string"],
+                ["info", "Lisätiedot", "string"],
             ]
         },
         "fieldcount": {
             "type": "DataGrid",
-            "fields": [
-                ["unit", "Asennusyksikkö", "string"],
-                ["mult", "Kerroin (€/n)", "double"],
-                ["count", "Määrä (n)", "long"],
-                ["cost", "Hinta (€)", "double"]
-            ]
+            "fields": {
+                "unit": ["", "Asennusyksikkö", "string", True],
+                "mult": [0.0 , "Kerroin (€/n)", "double:6,2", False],
+                "count": [0, "Määrä (n)", "long", True],
+                "cost": [0.0, "Hinta (€)", "double:6,2", True]
+            },
+            "columns": ["unit", "mult", "count", "cost"],
+            "prevent_new_row": True
         }
     },
     str(DataChild): {
         "__name": "Ryhmä",
+        "__default_instance_name": "Uusi ryhmä",
         "__refresh_n": 3,
         "predefs": {
             "type": "DataGrid",
             "name": "Esimääritykset",
-            "fields": []
+            "fields": {
+                "part": ["", "Osa", "string", False],
+                "material": ["", "Materiaali", "string", False]
+            },
+            "columns": ["part", "material"]
         },
         "materials": {
             "type": "DataGrid",
             "name": "Materiaalit",
-            "fields": []
+            "db": "materials",
+            "fields": {
+                'code': ['', 'Koodi', 'string', False],
+                'edited': ['E', 'Muokattu', 'string', True],
+                'desc': ['', 'Kuvaus', 'string', False],
+                'thck': [0, 'Paksuus (mm)', 'long', False],
+                'prod': ['', 'Valmistaja', 'string', False],
+                'loss': [0.0, 'Hukka', 'double:6,2', False],
+                'unit': ['€/m2', 'Hintayksikkö', 'choice:€/m2,€/kpl', False],
+                'cost': [0.0, 'Hinta', 'double:6,2', False],
+                'edg_cost': [0.0, 'Reunanauhan hinta', 'double:6,2', False],
+                'add_cost': [0.0, 'Lisähinta', 'double:6,2', False],
+                'discount': [0.0, 'Alennus', 'double:6,2', False],
+                'tot_cost': [0.0, 'Kok. Hinta', 'double:6,2', True],
+                'code_tot_cost': [
+                    "(obj['cost'] + obj['edg_cost'] + obj['add_cost']) * obj['discount'] * obj['loss']",
+                    'Kokonaishinnan koodi', 'string', False
+                ],
+                'code_edited': [
+                    "db.get_edited(flt(obj))",
+                    'Muokattu koodi', 'string', False
+                ],
+            },
+            "columns": [
+                'code',
+                'edited',
+                'desc',
+                'thck',
+                'prod',
+                'loss',
+                'unit',
+                'cost',
+                'edg_cost',
+                'add_cost',
+                'discount',
+                'tot_cost'
+            ],
+            "codes": {
+                'tot_cost': 'code_tot_cost',
+                'edited': 'code_edited'
+            }
         },
         "products": {
             "type": "DataGrid",
             "name": "Tuotteet",
-            "fields": []
+            "db": "products",
+            "child": "parts",
+            "eq_keys": ['code', 'group', 'desc', 'prod', 'x', 'y', 'z'],
+            "child_eq_keys": ['code', 'desc', 'code_x', 'code_y', 'code_z'],
+            "fields": {
+                'code': ['', 'Koodi', 'string', False],
+                'edited': ['E', 'Muokattu', 'string', True],
+                'count': [1, 'Määrä', 'long', False],
+                'group': ['', 'Tuoteryhmä', 'string', False],
+                'desc': ['', 'Kuvaus', 'string', False],
+                'prod': ['', 'Valmistaja', 'string', False],
+                'x': [0, 'Leveys', 'long', False],
+                'y': [0, 'Korkeus', 'long', False],
+                'z': [0, 'Syvyys', 'long', False],
+                'work_time': [0.0, 'Työaika', 'double:6,2', False],
+                'work_cost': [0.0, 'Työhinta', 'double:6,2', False],
+                'part_cost': [0.0, 'Osahinta', 'double:6,2', True],
+                'tot_cost': [0.0, 'Kok. Hinta', 'double:6,2', True],
+                'inst_unit': ['', 'Asennusyksikkö', 'string', False],
+                'code_edited':
+                [
+                    "db.get_edited(flt(obj))",
+                    'Muokattu koodi', 'string', True
+                ],
+                'code_part_cost':
+                [
+                    "sum(obj['parts'], 'cost')", 'Osahinnan koodi', 'string', False
+                ],
+                'code_tot_cost':
+                [
+                    "(obj['work_time'] * obj['work_cost']) + obj['part_cost']",
+                    'Kokonaishinnan koodi', 'string', False
+                ],
+                'parts': [None, 'Osat', 'griddata', False]
+            },
+            "columns": [
+                "code",
+                "edited",
+                "count",
+                "group",
+                "desc",
+                "prod",
+                "x",
+                "y",
+                "z",
+                "inst_unit",
+                "work_time",
+                "work_cost",
+                "part_cost",
+                "tot_cost",
+            ],
+            "codes": {
+                'part_cost': 'code_part_cost',
+                'tot_cost': 'code_tot_cost',
+                'edited': 'code_edited'
+            }
         },
         "parts": {
             "type": "DataGrid",
             "name": "Tuotetta ei ole valittu",
             "name_on_parent_selection": "Tuotteen '{}' osat",
             "parent_name_key": "code",
-            "fields": []
+            "fields": {
+                'code': ['', 'Koodi', 'string', False],
+                'desc': ['', 'Kuvaus', 'string', False],
+                'use_predef': ['', 'Esimääritys', 'string', False],
+                'mat': ['', 'Materiaali', 'string', False],
+                'use_mat': ['', 'Käyt. Mat.', 'string', True],
+                'x': [0, 'Leveys', 'long', True],
+                'y': [0, 'Korkeus', 'long', True],
+                'z': [0, 'Syvyys', 'long', True],
+                'cost': [0.0, 'Hinta', 'double:6,2', True],
+                'code_use_mat': 
+                [
+                    "find('predefs', 'mat', 'part', obj['code']) "+
+                    "if is_true(obj['use_predef']) else obj['mat']",
+                    'Leveys koodi', 'string', False
+                ],
+                'code_x': ["0", 'Leveys koodi', 'string', False],
+                'code_y': ["0", 'Korkeus koodi', 'string', False],
+                'code_z': ["0", 'Syvyys koodi', 'string', False],
+                'code_cost': 
+                [
+                    "obj['x'] * obj['y'] * "+
+                    "find('materials', 'cost', 'code', obj['use_mat'])",
+                    'Hinta koodi', 'string', False
+                ]
+            },
+            "columns": [
+                'code', 'desc', 'use_predef', 'mat',
+                'use_mat', 'x', 'y', 'z', 'cost'
+            ],
+            "codes": {
+                'use_mat': "code_use_mat",
+                'x': "code_x",
+                'y': "code_y",
+                'z': "code_z",
+                'cost': "code_cost"
+            }
         }
     },
 }

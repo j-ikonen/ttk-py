@@ -92,7 +92,7 @@ class ItemPage(wx.Panel):
 
         self.grid_info = SetupGrid(self, self.setup['info'])
         self.grid_file = SetupGrid(self, self.setup['file'])
-        self.grid_fc = TtkGrid(self, self.setup['fieldcount'])
+        self.grid_fc = TtkGrid(self, 'fieldcount', self.setup['fieldcount'])
         grid_file_size = len(self.setup['file']['fields'])
         grid_info_size = len(self.setup['info']['fields'])
 
@@ -112,28 +112,37 @@ class ItemPage(wx.Panel):
         sizer_name.Add((80, 5), 0, wx.EXPAND|wx.RIGHT, BORDER)
         sizer_name.Add(self.btn_add_child, 0, wx.EXPAND|wx.RIGHT, BORDER)
         sizer_name.Add(btn_del_child, 0, wx.EXPAND|wx.RIGHT, BORDER)
+        sizer_name.Add(chk_fc, 0, wx.EXPAND|wx.RIGHT, BORDER)
 
         sizer_info.Add(self.grid_file, grid_file_size, wx.EXPAND)
         sizer_info.Add(self.grid_info, grid_info_size, wx.EXPAND)
 
-        sizer_fc.Add(chk_fc, 0, wx.EXPAND|wx.ALL, BORDER)
-        sizer_fc.Add(self.grid_fc, 0, wx.EXPAND)
+        # sizer_fc.Add(chk_fc, 0, wx.EXPAND|wx.ALL, BORDER)
+        sizer_fc.Add(self.grid_fc, 1, wx.EXPAND)
 
         sizer_grids.Add(sizer_info, 1, wx.EXPAND)
         sizer_grids.Add(sizer_fc, 1, wx.EXPAND)
-
         sizer.Add(sizer_name, 0, wx.EXPAND|wx.ALL, BORDER)
         sizer.Add(sizer_grids, 1, wx.EXPAND)
 
         self.SetSizer(sizer)
 
+    def refresh(self, name=False, fc=False, info=False, file=False):
+        """Refresh the content of the page with self.data."""
+        if name:
+            self.txtc_name.SetValue(self.data.get_name())
+        if fc:
+            self.update_fieldcount()
+        if info:
+            self.grid_info.change_data(self.data.get_data('info'))
+        if file:
+            self.grid_file.change_data(self.data.get_data('file'))
+
     def change_data(self, data: DataItem):
         """Change the data to a new DataItem."""
         # self.fc = self.data.get_data('fieldcount')
         self.data = data
-        self.txtc_name.SetValue(data.get_name())
-        self.update_fieldcount()
-        self.grid_info.change_data(data.get_data('info'))
+        self.refresh(True, True, True, True)
         print(f"ItemPage.change_data - name: {self.data.get_name()}")
 
     def on_add_child(self, evt):
@@ -171,7 +180,6 @@ class ItemPage(wx.Panel):
 
     def on_text(self, evt):
         """Update the DataItem name."""
-        print("ItemPage.on_text - Implement changing DataItem name here.")
         if self.data is not None:
             txtc: wx.TextCtrl = evt.GetEventObject()
             self.data.set_name(txtc.GetValue())
@@ -213,10 +221,10 @@ class ChildPage(wx.Panel):
         txt_products = wx.StaticText(self, label=self.setup['products']['name'])
         self.txt_parts = wx.StaticText(self, label=self.setup['parts']['name'])
 
-        self.grid_predefs = TtkGrid(self, self.setup['predefs'])
-        self.grid_materials = TtkGrid(self, self.setup['materials'])
-        self.grid_products = TtkGrid(self, self.setup['products'])
-        self.grid_parts = TtkGrid(self, self.setup['parts'])
+        self.grid_predefs = TtkGrid(self, 'predefs', self.setup['predefs'])
+        self.grid_materials = TtkGrid(self, 'materials', self.setup['materials'])
+        self.grid_products = TtkGrid(self, 'products', self.setup['products'])
+        self.grid_parts = TtkGrid(self, 'parts', self.setup['parts'])
 
         self.Bind(wx.EVT_TEXT, self.on_text, self.txtc_name)
         self.Bind(wx.EVT_BUTTON, self.on_btn_refresh, btn_refresh)
@@ -225,10 +233,11 @@ class ChildPage(wx.Panel):
 
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer_label = wx.BoxSizer(wx.HORIZONTAL)
-        sizer_predefs = wx.BoxSizer(wx.HORIZONTAL)
-        sizer_materials = wx.BoxSizer(wx.HORIZONTAL)
-        sizer_products = wx.BoxSizer(wx.HORIZONTAL)
-        sizer_parts = wx.BoxSizer(wx.HORIZONTAL)
+        sizer_twogrids = wx.BoxSizer(wx.HORIZONTAL)
+        sizer_predefs = wx.BoxSizer(wx.VERTICAL)
+        sizer_materials = wx.BoxSizer(wx.VERTICAL)
+        sizer_products = wx.BoxSizer(wx.VERTICAL)
+        sizer_parts = wx.BoxSizer(wx.VERTICAL)
 
         sizer_label.Add(txt_name, 0, wx.EXPAND|wx.RIGHT, BORDER)
         sizer_label.Add(self.txtc_name, 0, wx.EXPAND|wx.RIGHT, BORDER)
@@ -236,20 +245,25 @@ class ChildPage(wx.Panel):
         sizer_label.Add(btn_refresh, 0, wx.EXPAND|wx.RIGHT, BORDER)
         sizer_label.Add(btn_db, 0, wx.EXPAND|wx.RIGHT, BORDER)
 
-        sizer_predefs.Add(txt_predefs, 0, wx.EXPAND|wx.RIGHT, BORDER)
-        sizer_materials.Add(txt_materials, 0, wx.EXPAND|wx.RIGHT, BORDER)
-        sizer_products.Add(txt_products, 0, wx.EXPAND|wx.RIGHT, BORDER)
-        sizer_parts.Add(self.txt_parts, 0, wx.EXPAND|wx.RIGHT, BORDER)
+        sizer_predefs.Add(txt_predefs, 0, wx.EXPAND|wx.TOP|wx.BOTTOM, BORDER)
+        sizer_predefs.Add(self.grid_predefs, 1, wx.EXPAND)
+
+        sizer_materials.Add(txt_materials, 0, wx.EXPAND|wx.TOP|wx.BOTTOM, BORDER)
+        sizer_materials.Add(self.grid_materials, 1, wx.EXPAND)
+
+        sizer_products.Add(txt_products, 0, wx.EXPAND|wx.TOP|wx.BOTTOM, BORDER)
+        sizer_products.Add(self.grid_products, 1, wx.EXPAND)
+
+        sizer_parts.Add(self.txt_parts, 0, wx.EXPAND|wx.TOP|wx.BOTTOM, BORDER)
+        sizer_parts.Add(self.grid_parts, 1, wx.EXPAND)
+
+        sizer_twogrids.Add(sizer_predefs, 0, wx.EXPAND|wx.ALL, BORDER)
+        sizer_twogrids.Add(sizer_materials, 0, wx.EXPAND|wx.ALL, BORDER)
 
         sizer.Add(sizer_label, 0, wx.EXPAND|wx.ALL, BORDER)
-        sizer.Add(sizer_predefs, 0, wx.EXPAND|wx.ALL, BORDER)
-        sizer.Add(self.grid_predefs, 1, wx.EXPAND)
-        sizer.Add(sizer_materials, 0, wx.EXPAND|wx.ALL, BORDER)
-        sizer.Add(self.grid_materials, 1, wx.EXPAND)
-        sizer.Add(sizer_products, 0, wx.EXPAND|wx.ALL, BORDER)
-        sizer.Add(self.grid_products, 1, wx.EXPAND)
-        sizer.Add(sizer_parts, 0, wx.EXPAND|wx.ALL, BORDER)
-        sizer.Add(self.grid_parts, 1, wx.EXPAND)
+        sizer.Add(sizer_twogrids, 1, wx.EXPAND|wx.ALL, BORDER)
+        sizer.Add(sizer_products, 1, wx.EXPAND|wx.ALL, BORDER)
+        sizer.Add(sizer_parts, 1, wx.EXPAND|wx.ALL, BORDER)
 
         self.SetSizer(sizer)
         
@@ -306,7 +320,6 @@ class ChildPage(wx.Panel):
 
     def on_select_product(self, evt):
         """Change the parts grid content to new product selection."""
-        print("ChildPage.on_select_product - Implement changing parts grid to new data here.")
         row = evt.GetRow()
         product_name_key = self.setup['parts']['parent_name_key']
 
@@ -324,6 +337,10 @@ class ChildPage(wx.Panel):
         # Update the parts label and grid.
         else:
             parts = products[row]['parts']
+            if parts is None:
+                products[row]['parts'] = []
+                parts = products[row]['parts']
+
             product_name = products[row][product_name_key]
             label = self.setup['parts']['name_on_parent_selection'].format(product_name)
 

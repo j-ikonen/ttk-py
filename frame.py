@@ -1,11 +1,12 @@
 
 import os
 import json
+from pages import ItemPage
 
 import wx
 from wx.core import MultiChoiceDialog
 
-from ttk_data import Data, DataItem, DataRoot
+from ttk_data import Data, DataChild, DataItem, DataRoot
 from panel import Panel, FRAME_SIZE
 
 
@@ -53,6 +54,13 @@ def write_file(path, file, data):
         filepath = path + '\\' + file
     with open(filepath, 'w') as wf:
         json.dump(data, wf, indent=4)
+
+def split_path(filepath: str):
+    """Split the full filepath into path and file strings (path, file)."""
+    file_start = filepath.rfind('\\') + 1
+    file = filepath[file_start:]
+    path = filepath[:file_start-1]
+    return (path, file)
 
 
 class AppFrame(wx.Frame):
@@ -123,13 +131,15 @@ class AppFrame(wx.Frame):
     def menu_new(self, evt):
         """Create new offer."""
         # self.panel.data.new_offer()
-        data_item = self.data.get([0]).push("Uusi Tarjous", self.setup)
-        data_item.push("Uusi ryhmä", self.setup)
+        def_item_name = self.setup[str(DataItem)]["__default_instance_name"]
+        def_child_name = self.setup[str(DataChild)]["__default_instance_name"]
+        data_item = self.data.get([0]).push(def_item_name, self.setup)
+        data_item.push(def_child_name, self.setup)
         self.panel.refresh_tree()
 
     def menu_open(self, evt):
         """Handle event for opening an offer from a file."""
-        print("Frame.menu_open - TO BE IMPLEMENTED")
+        
         dlg = wx.FileDialog(
             self,
             message=OPEN_FILE_MESSAGE,
@@ -144,8 +154,9 @@ class AppFrame(wx.Frame):
         if dlg.ShowModal() == wx.ID_OK:
             root = self.data.get([0])
             for path in dlg.GetPaths():
+                (folder, file) = split_path(path)
                 # Check if an offer with 'path' is already open.
-                if root.file_open(path):
+                if root.file_open(folder, file):
                     print(f"Selected offer is already opened from path\n\t{path}.")
                     dlg.Destroy()
                     return
@@ -153,11 +164,11 @@ class AppFrame(wx.Frame):
                 # Open and read the file at path.
                 print(OPENING_FILE.format(path))
                 item_dict = read_file(None, path)
+                file_dict = item_dict['data']['file']
+                file_dict['path'] = folder
+                file_dict['file'] = file
 
-                # Create DataItem object from dictionary
-                item: DataItem = DataItem.from_dict(item_dict)
-                itemdata = item.get_data('file')
-                itemdata['Polku'] = path
+                root.push_from_dict(item_dict, self.setup)
 
             # Refresh TreeList with new offers.
             self.panel.refresh_tree()
@@ -174,7 +185,13 @@ class AppFrame(wx.Frame):
                 selected: list = dlg.GetSelections()
                 selected.sort(reverse=True)
                 root: DataRoot = self.data.get([0])
+                selected_treeitem = self.panel.treepanel.tree.GetSelection()
+                selected_link = self.panel.treepanel.tree.GetItemData(selected_treeitem)
                 for n in selected:
+                    # Move from deleted page to rootpage.
+                    if selected_link[-2] == n:
+                        self.panel.book.ChangeSelection(1)
+
                     root.delete_child(n)
                 self.panel.refresh_tree()
 
@@ -187,17 +204,17 @@ class AppFrame(wx.Frame):
             print("No offer selected.")
             return
 
-        path = item.get_data('file')['Polku']
-        # file = item.get_data('file')['Tiedosto']
+        path = item.get_data('file')['path']
+        file = item.get_data('file')['file']
 
         if path != "":
-            print(f"Saving '{item.get_name()}' to \n\t{path}")
+            print(f"Saving '{item.get_name()}'\n\tpath:{path}\n\tfile: {file}")
 
             # Save offer dictionary to selected file.
-            write_file(None, path, item.get_dict())
+            write_file(path, file, item.get_dict())
         else:
             print(SAVE_NO_PATH)
-            self.menu_saveas(self, evt)
+            self.menu_saveas(evt)
 
     def menu_saveas(self, evt):
         """Handle event for 'save as'."""
@@ -224,11 +241,19 @@ class AppFrame(wx.Frame):
         # Get return code from dialog.
         if dlg.ShowModal() == wx.ID_OK:
             path = dlg.GetPath()
-            item.get_data('file')['Polku'] = path
+            (folder, file) = split_path(path)
+            item.get_data('file')['path'] = folder
+            item.get_data('file')['file'] = file
             print(SAVING_TO.format(path))
 
             # Save item dictionary to selected file.
             write_file(None, path, item.get_dict())
+            self.panel.book.GetSelection()
+            page_idx = self.panel.book.GetSelection()
+            page = self.panel.book.GetPage(page_idx)
+
+            if isinstance(page, ItemPage):
+                page.refresh(file=True)
 
         else:
             print(SAVEAS_CANCEL)

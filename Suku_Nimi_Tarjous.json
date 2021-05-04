@@ -1,0 +1,38 @@
+{
+    "name": "Suku Nimi Tarjous",
+    "data": {
+        "file": {
+            "file": "Suku_Nimi_Tarjous.json",
+            "path": "C:\\Users\\Cosa Dove Ky\\Desktop\\Uusi kansio\\koodi\\ttk-py"
+        },
+        "info": {
+            "firstname": "Nimi",
+            "lastname": "Suku",
+            "phone": "012 345 678",
+            "email": "nimi.suku@sposti.fi",
+            "address": "Suvuntie 11",
+            "info": ""
+        },
+        "fieldcount": []
+    },
+    "ttkdata_children": [
+        {
+            "name": "Keitti\u00f6",
+            "data": {
+                "predefs": [],
+                "materials": [],
+                "products": [],
+                "parts": []
+            }
+        },
+        {
+            "name": "Makuuhuone",
+            "data": {
+                "predefs": [],
+                "materials": [],
+                "products": [],
+                "parts": []
+            }
+        }
+    ]
+}

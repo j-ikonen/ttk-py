@@ -119,6 +119,5 @@ class Panel(wx.Panel):
 
     def refresh_tree(self):
         """Handle refreshing the tree."""
-        print("Panel.refresh_tree")
         datatree = self.treedata.get_tree()
         self.treepanel.fill(datatree)

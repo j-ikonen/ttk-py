@@ -1,4 +1,5 @@
 from copy import deepcopy
+from database import Database
 
 TYPES = {
     'string': str,
@@ -10,13 +11,30 @@ TYPES = {
     'DataGrid': list
 }
 FIELD_KEY = 0
-FIELD_TYPE = 1
-FIELD_READONLY = 2
-FIELD_DEF = 3
+FIELD_LABEL = 1
+FIELD_TYPE = 2
+FIELD_READONLY = 3
+FIELD_DEF = 4
 
-def type_default(type_string: str):
-    return TYPES[type_string.split(':')[0]]()
 
+def type_default(typestring: str):
+    return TYPES[typestring.split(':')[0]]()
+
+def str2type(typestring: str, value: str):
+    """Convert the given valuestring to given type by typestring."""
+    split = typestring.split(':')
+    if split[0] == "double":
+        mod_value = value.replace(',', '.')
+    else:
+        mod_value = value
+    return TYPES[split[0]](mod_value)
+
+def type2str(value):
+    """Convert the give value to a string for wx.grid.Grid."""
+    strvalue = str(value)
+    if isinstance(value, float):
+        return strvalue.replace('.', ',')
+    return strvalue
 
 class TtkData:
     def __init__(self, name, page, setup, child):
@@ -44,6 +62,10 @@ class TtkData:
     def __len__(self):
         return len(self.children)
 
+    def push_from_dict(self, data, setup):
+        """Push a new child created from dictionary data."""
+        self.children.append(self.child.from_dict(data, setup))
+
     def delete_child(self, idx: int):
         """Delete a child at idx."""
         del self.children[idx]
@@ -54,6 +76,7 @@ class TtkData:
 
     @classmethod
     def from_dict(cls, data: dict, setup: dict):
+        """Return a Data object created from dictionary data."""
         obj = cls(data['name'], setup)
         obj.data = deepcopy(data['data'])
         if obj.child is not None:
@@ -87,6 +110,9 @@ class TtkData:
     def get_setup(self):
         return self.setup
 
+    def get_child(self, idx):
+        return self.children(idx)
+
     def get_children(self) -> list:
         return self.children
 
@@ -113,23 +139,18 @@ class TtkData:
 
     def init_data(self):
         """Initialize the data."""
-        print(f"\n{type(self)}.init_data\n\t{self.setup.keys()}")
-        st = self.setup#[str(type(self))]
-        for k, v in st.items():
-            # print(f"{type(self)}.init_data - {v}")
+        for k, v in self.setup.items():
             if isinstance(v, dict):
                 if v['type'] == "SetupGrid":
                     fs = v['fields']
                     self.data[k] = {f[FIELD_KEY]: type_default(f[FIELD_TYPE]) for f in fs}
-                # elif v['type'] == "DataGrid":
-                #     fs = v['fields']
-                #     self.data[k] = []
+
                 else:
                     self.data[k] = type_default(v['type'])
 
     def push(self, name, setup):
         """Add a new child to end of list. Return the new child.
-        
+
         Args:
         - name (str): Name of new child.
         - setup (dict): Setup dictionary for the new child.
@@ -143,6 +164,22 @@ class TtkData:
 
     def set_name(self, name):
         self.name = name
+
+    def sum(self, objkey, fieldkey):
+        """Return the sum of all values at fieldkey in list of objects at objkey.
+        
+        Args:
+        - objkey (str|list): Key to objectlist or the objectlist itself.
+        - fieldkey (str): Key to the field in object.
+        """
+        if isinstance(objkey, str):
+            objlist = self.get_data[objkey]
+        else:
+            objlist = objkey
+        total = 0
+        for item in objlist:
+            total += item[fieldkey]
+        return total
 
 
 class Data(TtkData):
@@ -177,20 +214,24 @@ class Data(TtkData):
                     tree.append(([n_c, n_i, n_r], child.get_name()))
         return tree
 
+
 class DataRoot(TtkData):
     def __init__(self, name, setup):
         super().__init__(name, 1, setup, DataItem)
 
-    def file_open(self, path):
+    def file_open(self, folder, file):
         """Return True if the child is already opened."""
         for child in self.children:
-            if path == child.get_data('file')['Polku']:
+            if (folder == child.get_data('file')['path'] and
+                file == child.get_data('file')['file']):
                 return True
         return False
+
 
 class DataItem(TtkData):
     def __init__(self, name, setup):
         super().__init__(name, 2, setup, DataChild)
+
 
 class DataChild(TtkData):
     def __init__(self, name, setup):
@@ -199,3 +240,55 @@ class DataChild(TtkData):
     def process_codes(self):
         """Process the coded fields in data."""
         print("DataChild.process_codes")
+        sum = self.sum
+        flt = self.get_edited_filter
+        grd = self.data
+        find = self.find
+        is_true = self.is_true
+        for key, value in self.data.items():
+            if 'codes' in self.setup[key]:
+                db = Database(key)
+                for obj in value:
+                    for value_key, code_key in self.setup[key]['codes'].items():
+                        obj[value_key] = eval(obj[code_key])
+
+    def find(self, datakey, returnkey, matchkey, matchvalue):
+        for item in self.get_data(datakey):
+            if item[matchkey] == matchvalue:
+                return item[returnkey]
+
+    def is_true(self, strvalue):
+        false_strings = [
+            "n", "e", "false", "False"
+        ]
+        return False if strvalue in false_strings else True
+
+    def get_edited_filter(self, obj):
+        """Return the filter for database to check if obj exists in it.
+        
+        Using this in codes that are in object that does not have a database collection will
+        result in undefined behaviour.
+        """
+        flt = {}
+        try:
+            childname = self.setup['child']
+        except:
+            childname = None
+        try:
+            eq_keys = self.setup['eq_keys']
+        except:
+            eq_keys = []
+        try:
+            child_eq_keys = self.setup['child_eq_keys']
+        except:
+            child_eq_keys = []
+
+        if childname:
+            for key in eq_keys:
+                flt[key] = obj[key]
+            
+            for n, childobj in enumerate(obj[childname]):
+                for key in child_eq_keys:
+                    childkey = childname + "." + str(n) + key
+                    flt[childkey] = childobj[key]
+        return flt

@@ -68,6 +68,7 @@ class TreePanel(wx.Panel):
     def on_collapsing(self, evt):
         link = self.tree.GetItemData(evt.GetItem())
         self.expanded[str(link)] = False
+        evt.Skip()
 
     def on_edit(self, evt):
         """Prevent editing."""
@@ -76,6 +77,7 @@ class TreePanel(wx.Panel):
     def on_expanding(self, evt):
         link = self.tree.GetItemData(evt.GetItem())
         self.expanded[str(link)] = True
+        evt.Skip()
 
     def on_select(self, evt):
         tree = evt.GetEventObject()

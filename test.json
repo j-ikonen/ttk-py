@@ -1,0 +1,200 @@
+{
+    "name": "Uusi tarjous",
+    "data": {
+        "file": {
+            "file": "test.json",
+            "path": "C:\\Users\\Cosa Dove Ky\\Desktop\\Uusi kansio\\koodi\\ttk-py"
+        },
+        "info": {
+            "firstname": "",
+            "lastname": "",
+            "phone": "",
+            "email": "",
+            "address": "",
+            "info": ""
+        },
+        "fieldcount": []
+    },
+    "ttkdata_children": [
+        {
+            "name": "Uusi ryhm\u00e4",
+            "data": {
+                "predefs": [],
+                "materials": [],
+                "products": [
+                    {
+                        "code": "asd",
+                        "edited": "E",
+                        "count": 1,
+                        "group": "",
+                        "desc": "",
+                        "prod": "",
+                        "x": 0,
+                        "y": 0,
+                        "z": 0,
+                        "work_time": 0.0,
+                        "work_cost": 0.0,
+                        "part_cost": 0.0,
+                        "tot_cost": 0.0,
+                        "inst_unit": "",
+                        "code_edited": "db.get_edited(self.get_edited_filter(obj))",
+                        "code_part_cost": "obj['parts'].sum('cost')",
+                        "code_tot_cost": "(obj['work_time'] * obj['work_cost']) + obj['part_cost']",
+                        "parts": [
+                            {
+                                "code": "123",
+                                "desc": "",
+                                "use_predef": "",
+                                "mat": "",
+                                "use_mat": "",
+                                "x": 0,
+                                "y": 0,
+                                "z": 0,
+                                "cost": 0.0,
+                                "code_use_mat": "osd['predefs'].find('part', obj['code'], 'mat') if self.is_true(obj['use_predef']) else obj['mat']",
+                                "code_x": "0",
+                                "code_y": "0",
+                                "code_z": "0",
+                                "code_cost": "obj['x'] * obj['y'] * osd['materials'].find('code', obj['use_mat'], 'cost')"
+                            },
+                            {
+                                "code": "qwe",
+                                "desc": "",
+                                "use_predef": "",
+                                "mat": "",
+                                "use_mat": "",
+                                "x": 0,
+                                "y": 0,
+                                "z": 0,
+                                "cost": 0.0,
+                                "code_use_mat": "osd['predefs'].find('part', obj['code'], 'mat') if self.is_true(obj['use_predef']) else obj['mat']",
+                                "code_x": "0",
+                                "code_y": "0",
+                                "code_z": "0",
+                                "code_cost": "obj['x'] * obj['y'] * osd['materials'].find('code', obj['use_mat'], 'cost')"
+                            },
+                            {
+                                "code": "asd",
+                                "desc": "",
+                                "use_predef": "",
+                                "mat": "",
+                                "use_mat": "",
+                                "x": 0,
+                                "y": 0,
+                                "z": 0,
+                                "cost": 0.0,
+                                "code_use_mat": "osd['predefs'].find('part', obj['code'], 'mat') if self.is_true(obj['use_predef']) else obj['mat']",
+                                "code_x": "0",
+                                "code_y": "0",
+                                "code_z": "0",
+                                "code_cost": "obj['x'] * obj['y'] * osd['materials'].find('code', obj['use_mat'], 'cost')"
+                            },
+                            {
+                                "code": "ghjghj",
+                                "desc": "",
+                                "use_predef": "",
+                                "mat": "",
+                                "use_mat": "",
+                                "x": 0,
+                                "y": 0,
+                                "z": 0,
+                                "cost": 0.0,
+                                "code_use_mat": "osd['predefs'].find('part', obj['code'], 'mat') if self.is_true(obj['use_predef']) else obj['mat']",
+                                "code_x": "0",
+                                "code_y": "0",
+                                "code_z": "0",
+                                "code_cost": "obj['x'] * obj['y'] * osd['materials'].find('code', obj['use_mat'], 'cost')"
+                            },
+                            {
+                                "code": "cdvxcv",
+                                "desc": "",
+                                "use_predef": "",
+                                "mat": "",
+                                "use_mat": "",
+                                "x": 0,
+                                "y": 0,
+                                "z": 0,
+                                "cost": 0.0,
+                                "code_use_mat": "osd['predefs'].find('part', obj['code'], 'mat') if self.is_true(obj['use_predef']) else obj['mat']",
+                                "code_x": "0",
+                                "code_y": "0",
+                                "code_z": "0",
+                                "code_cost": "obj['x'] * obj['y'] * osd['materials'].find('code', obj['use_mat'], 'cost')"
+                            }
+                        ]
+                    },
+                    {
+                        "code": "123",
+                        "edited": "E",
+                        "count": 1,
+                        "group": "",
+                        "desc": "",
+                        "prod": "",
+                        "x": 0,
+                        "y": 0,
+                        "z": 0,
+                        "work_time": 0.0,
+                        "work_cost": 0.0,
+                        "part_cost": 0.0,
+                        "tot_cost": 0.0,
+                        "inst_unit": "",
+                        "code_edited": "db.get_edited(self.get_edited_filter(obj))",
+                        "code_part_cost": "obj['parts'].sum('cost')",
+                        "code_tot_cost": "(obj['work_time'] * obj['work_cost']) + obj['part_cost']",
+                        "parts": [
+                            {
+                                "code": "123",
+                                "desc": "",
+                                "use_predef": "",
+                                "mat": "",
+                                "use_mat": "",
+                                "x": 0,
+                                "y": 0,
+                                "z": 0,
+                                "cost": 0.0,
+                                "code_use_mat": "osd['predefs'].find('part', obj['code'], 'mat') if self.is_true(obj['use_predef']) else obj['mat']",
+                                "code_x": "0",
+                                "code_y": "0",
+                                "code_z": "0",
+                                "code_cost": "obj['x'] * obj['y'] * osd['materials'].find('code', obj['use_mat'], 'cost')"
+                            },
+                            {
+                                "code": "qwe",
+                                "desc": "",
+                                "use_predef": "",
+                                "mat": "",
+                                "use_mat": "",
+                                "x": 0,
+                                "y": 0,
+                                "z": 0,
+                                "cost": 0.0,
+                                "code_use_mat": "osd['predefs'].find('part', obj['code'], 'mat') if self.is_true(obj['use_predef']) else obj['mat']",
+                                "code_x": "0",
+                                "code_y": "0",
+                                "code_z": "0",
+                                "code_cost": "obj['x'] * obj['y'] * osd['materials'].find('code', obj['use_mat'], 'cost')"
+                            },
+                            {
+                                "code": "zxc",
+                                "desc": "",
+                                "use_predef": "",
+                                "mat": "",
+                                "use_mat": "",
+                                "x": 0,
+                                "y": 0,
+                                "z": 0,
+                                "cost": 0.0,
+                                "code_use_mat": "osd['predefs'].find('part', obj['code'], 'mat') if self.is_true(obj['use_predef']) else obj['mat']",
+                                "code_x": "0",
+                                "code_y": "0",
+                                "code_z": "0",
+                                "code_cost": "obj['x'] * obj['y'] * osd['materials'].find('code', obj['use_mat'], 'cost')"
+                            }
+                        ]
+                    }
+                ],
+                "parts": []
+            }
+        }
+    ]
+}
