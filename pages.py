@@ -1,7 +1,8 @@
 import wx
 
-from ttk_grid import TtkGrid, SetupGrid
-from ttk_data import DataChild, DataItem, DataRoot, Data
+from setup_grid import SetupGrid
+from ttk_grid import TtkGrid
+from ttk_data import DataChild, DataItem, DataRoot, Data, str2type, type2str
 
 
 BORDER = 5
@@ -79,8 +80,7 @@ class ItemPage(wx.Panel):
         self.data: DataItem = None
         self.refresh_tree = refresh_tree
         self.use_global = False
-        self.gfc_mult = fc_mult
-        self.fc = []
+        self.global_mult = fc_mult
 
         txt_name = wx.StaticText(self, label=self.setup['__name'])
         self.txtc_name = wx.TextCtrl(self, value="", size=TXTC_NAME_SIZE)
@@ -95,6 +95,13 @@ class ItemPage(wx.Panel):
         self.grid_fc = TtkGrid(self, 'fieldcount', self.setup['fieldcount'])
         grid_file_size = len(self.setup['file']['fields'])
         grid_info_size = len(self.setup['info']['fields'])
+
+        # Set row labels to match the bigger grid labels.
+        info_size = self.grid_info.GetRowLabelSize()
+        file_size = self.grid_file.GetRowLabelSize()
+        label_size = info_size if info_size > file_size else file_size
+        self.grid_info.SetRowLabelSize(label_size)
+        self.grid_file.SetRowLabelSize(label_size)
 
         self.Bind(wx.EVT_TEXT, self.on_text, self.txtc_name)
         self.Bind(wx.EVT_BUTTON, self.on_add_child, self.btn_add_child)
@@ -138,9 +145,9 @@ class ItemPage(wx.Panel):
         if file:
             self.grid_file.change_data(self.data.get_data('file'))
 
-    def change_data(self, data: DataItem):
+    def change_data(self, data: DataItem, fc_mult: list):
         """Change the data to a new DataItem."""
-        # self.fc = self.data.get_data('fieldcount')
+        self.global_mult = fc_mult
         self.data = data
         self.refresh(True, True, True, True)
         print(f"ItemPage.change_data - name: {self.data.get_name()}")
@@ -187,18 +194,33 @@ class ItemPage(wx.Panel):
 
     def update_fieldcount(self):
         """Update the fieldcount data and display."""
-        self.fc.clear()
-        fcdata = self.data.get_data('fieldcount')
-        print(f"ItemPage.update_fieldcount - {fcdata}")
-        for item in fcdata:
-            mult = self.gfc_mult[item['unit']] if self.use_global else item['mult']
-            self.fc.append({
-                'unit': item['unit'],
-                'mult': mult,
-                'count': item['count'],
-                'cost': mult * item['count']
-            })
-        self.grid_fc.change_data(self.fc)
+        new_count = {}
+        local_mult = self.data.get_data('fc_mult')
+        # Iterate over all DataChild objects.
+        for child in self.data.get_children():
+            # Iterate over all rows in products grid.
+            for obj in child.get_data('products'):
+                unit = obj['inst_unit']
+                try:
+                    new_count[unit]['count'] += 1
+                # Init the unit on first count
+                except KeyError:
+                    mult = self.global_mult[unit] if self.use_global else local_mult[unit]
+                    new_count[unit] = {'mult': mult, 'count': 0, 'cost': 0.0}
+
+        # Form a list of dictionaries
+        new_fc = []
+        for unit, value in new_count.items():
+            new_obj = {
+                'unit': unit,
+                'mult': value['mult'],
+                'count': value['count'],
+                'cost': value['mult'] * value['count'],
+            }
+            new_fc.append(new_obj)
+
+        self.data.set_data('fieldcount', new_fc)
+        self.grid_fc.change_data(new_fc)
 
 
 class ChildPage(wx.Panel):
@@ -225,6 +247,8 @@ class ChildPage(wx.Panel):
         self.grid_materials = TtkGrid(self, 'materials', self.setup['materials'])
         self.grid_products = TtkGrid(self, 'products', self.setup['products'])
         self.grid_parts = TtkGrid(self, 'parts', self.setup['parts'])
+
+        self.grid_products.set_child_grid(self.grid_parts)
 
         self.Bind(wx.EVT_TEXT, self.on_text, self.txtc_name)
         self.Bind(wx.EVT_BUTTON, self.on_btn_refresh, btn_refresh)
@@ -332,19 +356,19 @@ class ChildPage(wx.Panel):
         # Row that is not initialized in data selected.
         if row >= len(products):
             label = self.setup['parts']['name']
-            parts = None
+            # parts = None
 
         # Update the parts label and grid.
         else:
-            parts = products[row]['parts']
-            if parts is None:
-                products[row]['parts'] = []
-                parts = products[row]['parts']
+            # parts = products[row]['parts']
+            # if parts is None:
+                # products[row]['parts'] = []
+                # parts = products[row]['parts']
 
             product_name = products[row][product_name_key]
             label = self.setup['parts']['name_on_parent_selection'].format(product_name)
 
-        self.grid_parts.change_data(parts)
+        # self.grid_parts.change_data(parts)
         self.txt_parts.SetLabel(label)
 
     def on_text(self, evt):

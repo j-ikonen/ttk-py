@@ -114,7 +114,11 @@ class Panel(wx.Panel):
         # Refresh page
         page = self.book.GetPage(selection_new)
         active_data = self.treedata.get_active()
-        page.change_data(active_data)
+        if selection_new == 2:
+            fcmult = self.treedata.get([0]).get_data('fc_mult')
+            page.change_data(active_data, fcmult)
+        else:
+            page.change_data(active_data)
         evt.Skip()
 
     def refresh_tree(self):

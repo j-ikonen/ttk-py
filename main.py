@@ -2,7 +2,8 @@
 TODO:
     Is Asennusyksikkö choice or string?
 
-    Implement SetupGrid and DataGrid
+    Implement dialog for editing offer and global fieldcount multipliers.
+    Fix database dialog to work with new stuff.
     testtestestesttestesttesttesttest
 
     Create dialog with Treebook for settings / global values.
@@ -82,11 +83,12 @@ DEFAULT_SETUP = {
     str(DataRoot): {
         "__name": "Tarjoukset",
         "fc_mult": {
-            "type": "SetupGrid",
-            "fields": [
-                ["unit", "Asennusyksikkö", "string"],
-                ["mult", "Kerroin (€/n)", "double:6,2"]
-            ]
+            "type": "DataGrid",
+            "fields": {
+                "unit": ["", "Asennusyksikkö", "string", False],
+                "mult": [0.0, "Kerroin (€/n)", "double:6,2", False]
+            },
+            "columns": ["unit", "mult"],
         }
     },
     str(DataItem): {
@@ -94,32 +96,40 @@ DEFAULT_SETUP = {
         "__default_instance_name": "Uusi tarjous",
         "file": {
             "type": "SetupGrid",
-            "fields": [
-                ["file", "Tiedosto", "string"],
-                ["path", "Polku", "string"]
-            ]
+            "fields": {
+                "file": ["", "Tiedosto", "string", False],
+                "path": ["", "Polku", "string", False]
+            }
         },
         "info": {
             "type": "SetupGrid",
-            "fields": [
-                ["firstname", "Etunimi", "string"],
-                ["lastname", "Sukunimi", "string"],
-                ["phone", "Puh.", "string"],
-                ["email", "Sähköposti", "string"],
-                ["address", "Osoite", "string"],
-                ["info", "Lisätiedot", "string"],
-            ]
+            "fields": {
+                "firstname": ["", "Etunimi", "string", False],
+                "lastname": ["", "Sukunimi", "string", False],
+                "phone": ["", "Puh.", "string", False],
+                "email": ["", "Sähköposti", "string", False],
+                "address": ["", "Osoite", "string", False],
+                "info": ["", "Lisätiedot", "string", False],
+            }
         },
         "fieldcount": {
             "type": "DataGrid",
             "fields": {
                 "unit": ["", "Asennusyksikkö", "string", True],
-                "mult": [0.0 , "Kerroin (€/n)", "double:6,2", False],
+                "mult": [0.0 , "Kerroin (€/n)", "double:6,2", True],
                 "count": [0, "Määrä (n)", "long", True],
                 "cost": [0.0, "Hinta (€)", "double:6,2", True]
             },
             "columns": ["unit", "mult", "count", "cost"],
             "prevent_new_row": True
+        },
+        "fc_mult": {
+            "type": "DataGrid",
+            "fields": {
+                "unit": ["", "Asennusyksikkö", "string", False],
+                "mult": [0.0, "Kerroin (€/n)", "double:6,2", False]
+            },
+            "columns": ["unit", "mult"],
         }
     },
     str(DataChild): {
@@ -128,6 +138,7 @@ DEFAULT_SETUP = {
         "__refresh_n": 3,
         "predefs": {
             "type": "DataGrid",
+            "label": "Esimääritykset",
             "name": "Esimääritykset",
             "fields": {
                 "part": ["", "Osa", "string", False],
@@ -137,11 +148,12 @@ DEFAULT_SETUP = {
         },
         "materials": {
             "type": "DataGrid",
+            "label": "Materiaalit",
             "name": "Materiaalit",
             "db": "materials",
             "fields": {
                 'code': ['', 'Koodi', 'string', False],
-                'edited': ['E', 'Muokattu', 'string', True],
+                'edited': ['', 'Muokattu', 'string', True],
                 'desc': ['', 'Kuvaus', 'string', False],
                 'thck': [0, 'Paksuus (mm)', 'long', False],
                 'prod': ['', 'Valmistaja', 'string', False],
@@ -182,6 +194,7 @@ DEFAULT_SETUP = {
         },
         "products": {
             "type": "DataGrid",
+            "label": "Tuotteet",
             "name": "Tuotteet",
             "db": "products",
             "child": "parts",
@@ -216,7 +229,7 @@ DEFAULT_SETUP = {
                     "(obj['work_time'] * obj['work_cost']) + obj['part_cost']",
                     'Kokonaishinnan koodi', 'string', False
                 ],
-                'parts': [None, 'Osat', 'griddata', False]
+                'parts': [None, 'Osat', 'DataGrid', False]
             },
             "columns": [
                 "code",
@@ -242,6 +255,7 @@ DEFAULT_SETUP = {
         },
         "parts": {
             "type": "DataGrid",
+            "label": "Osat",
             "name": "Tuotetta ei ole valittu",
             "name_on_parent_selection": "Tuotteen '{}' osat",
             "parent_name_key": "code",
@@ -257,17 +271,17 @@ DEFAULT_SETUP = {
                 'cost': [0.0, 'Hinta', 'double:6,2', True],
                 'code_use_mat': 
                 [
-                    "find('predefs', 'mat', 'part', obj['code']) "+
+                    "find('predefs', 'material', 'part', obj['code']) "+
                     "if is_true(obj['use_predef']) else obj['mat']",
-                    'Leveys koodi', 'string', False
+                    'Käyttö Mat. koodi', 'string', False
                 ],
-                'code_x': ["0", 'Leveys koodi', 'string', False],
-                'code_y': ["0", 'Korkeus koodi', 'string', False],
-                'code_z': ["0", 'Syvyys koodi', 'string', False],
+                'code_x': ["parent['x']", 'Leveys koodi', 'string', False],
+                'code_y': ["parent['y']", 'Korkeus koodi', 'string', False],
+                'code_z': ["parent['z']", 'Syvyys koodi', 'string', False],
                 'code_cost': 
                 [
                     "obj['x'] * obj['y'] * "+
-                    "find('materials', 'cost', 'code', obj['use_mat'])",
+                    "find('materials', 'cost', 'code', obj['use_mat']) / 1000000",
                     'Hinta koodi', 'string', False
                 ]
             },

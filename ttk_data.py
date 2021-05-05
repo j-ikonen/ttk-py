@@ -1,6 +1,7 @@
 from copy import deepcopy
 from database import Database
 
+
 TYPES = {
     'string': str,
     'long': int,
@@ -142,8 +143,8 @@ class TtkData:
         for k, v in self.setup.items():
             if isinstance(v, dict):
                 if v['type'] == "SetupGrid":
-                    fs = v['fields']
-                    self.data[k] = {f[FIELD_KEY]: type_default(f[FIELD_TYPE]) for f in fs}
+                    fs = v['fields'].items()
+                    self.data[k] = {k: type_default(f[FIELD_TYPE]) for k, f in fs}
 
                 else:
                     self.data[k] = type_default(v['type'])
@@ -162,6 +163,9 @@ class TtkData:
         child = self.children[-1]
         return child
 
+    def set_data(self, key, value):
+        self.data[key] = value
+
     def set_name(self, name):
         self.name = name
 
@@ -177,8 +181,9 @@ class TtkData:
         else:
             objlist = objkey
         total = 0
-        for item in objlist:
-            total += item[fieldkey]
+        if objlist is not None:
+            for item in objlist:
+                total += item[fieldkey]
         return total
 
 
@@ -245,12 +250,29 @@ class DataChild(TtkData):
         grd = self.data
         find = self.find
         is_true = self.is_true
+        # Iterate over grids.
         for key, value in self.data.items():
             if 'codes' in self.setup[key]:
                 db = Database(key)
+                # Iterate over rows.
                 for obj in value:
+                    # Iterate over coded cells
                     for value_key, code_key in self.setup[key]['codes'].items():
                         obj[value_key] = eval(obj[code_key])
+                    
+                    # Iterate over a child grid.
+                    if 'child' in self.setup[key]:
+                        parent = obj
+                        child_key = self.setup[key]['child']
+                        for obj in parent[child_key]:
+                            for child_vk, child_ck in self.setup[child_key]['codes'].items():
+                                try:
+                                    obj[child_vk] = eval(obj[child_ck])
+                                except TypeError as e:
+                                    print("TtkData.process_codes Error \n\t" +
+                                          f"target key: {child_vk}, code key: {child_ck}\n\t" +
+                                          f"code: {obj[child_ck]}\n\tTypeError: {e}")
+                        obj = parent
 
     def find(self, datakey, returnkey, matchkey, matchvalue):
         for item in self.get_data(datakey):

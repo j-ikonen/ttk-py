@@ -3,7 +3,6 @@ from copy import deepcopy
 import wx
 import wx.dataview as dv
 
-from data import GridData, convert
 from database import Database
 
 
