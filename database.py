@@ -13,6 +13,9 @@ EDITED_NO_MATCH = 0
 EDITED_DIFF_MATCH = 1
 EDITED_MATCH = 2
 EDITED_CHAR = ['P', 'K', 'E']
+MISSING = 'P'
+MATCH = 'K'
+EDITED = 'E'
 
 
 class Database:
@@ -56,23 +59,21 @@ class Database:
         return Database.collection.index_information()
 
     def get_edited(self, filter) -> str:
-        """Return a char for edited status.
+        """Return a char for edited status. Return "" for None filter.
         EDITED_NO_MATCH for no mathcing document found with 'code'.
         EDITED_DIFF_MATCH for edited document found with 'code'.
         EDITED_MATCH for same document found with 'code'
         """
-        # print(f"Database.get_edited")
+        ecode = MISSING
+
         if filter is None:
-            # print(f"\tReturn {EDITED_CHAR[EDITED_NO_MATCH]}\n")
-            return EDITED_CHAR[EDITED_NO_MATCH]
+            ecode = ""
         elif self.count(filter) > 0:
-            # print(f"\tReturn {EDITED_CHAR[EDITED_MATCH]}\n")
-            return EDITED_CHAR[EDITED_MATCH]
+            ecode = MATCH
         elif self.count({'code': filter['code']}) > 0:
-            # print(f"\tReturn {EDITED_CHAR[EDITED_DIFF_MATCH]}\n")
-            return EDITED_CHAR[EDITED_DIFF_MATCH]
-        # print(f"\tReturn {EDITED_CHAR[EDITED_NO_MATCH]}\n")
-        return EDITED_CHAR[EDITED_NO_MATCH]
+            ecode = EDITED
+
+        return ecode
 
     def index(self, key, unique):
         Database.collection.create_index([(key, ASCENDING)], unique=unique)

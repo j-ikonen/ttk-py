@@ -1,3 +1,4 @@
+from dialog import DbDialog
 from datagrid_dialog import NotebookDialog
 import wx
 
@@ -372,6 +373,10 @@ class ChildPage(wx.Panel):
             'products': self.grid_products,
             'parts': self.grid_parts,
         }
+        self.collections = {}
+        for key in self.setup:
+            if 'db' in self.setup[key]:
+                self.collections[key] = self.setup[key]
 
     def append_data(self, data: dict):
         """Append new data to existing DataChild object."""
@@ -398,8 +403,11 @@ class ChildPage(wx.Panel):
         self.grid_parts.change_data(None)
 
     def on_btn_db(self, evt):
-        """."""
+        """Open the database dialog."""
         print("ChildPage.on_btn_db - Implement open db dialog here.")
+        with DbDialog(self, self.collections) as dlg:
+            if dlg.ShowModal() == wx.ID_OK:
+                pass
 
     def on_btn_refresh(self, evt):
         """Do evals on coded cells."""

@@ -45,28 +45,41 @@ Part:
 
 Codes:
     VALUES:
-        osd:    Outside Data
-            osd['predefs']      - GridData
-            osd['materials']    - GridData
-            osd['parts']        - GridData
-            osd['parent']       - Dictionary
-        self:   GridData where the code is.
-        obj:    self[row] - Dictionary where the code is.
+        grd:    TtkData.data    - Dictionary of data in this TtkData
+            grd['predefs']      - List of dictionaries
+            grd['materials']    - List of dictionaries
+            grd['parts']        - List of dictionaries
+            grd['products']     - List of dictionaries
+
+        self:   TtkData where the code is.
+        obj:    Dictionary where the code is.
         db:     Database(self.name)
 
     FUNCTIONS:
-        GridData.find(target_key, target_value, value_key):
+        find(datakey, returnkey, matchkey, matchvalue):
             Find a value in another grid.
             Args:
-                target_key: Key for matching.
-                target_value: Value for matching.
-                value_key:  Key for return value.
-        GridData.is_true(value):
-            Return False if value is ""|"n"|"no"|"e"|"ei"|"False"|"false" else True
-        GridData.sum(key):
-            Return sum of values in all rows at key in grid.
-        db.has(filter)
-            Return True if database has a document matching the filter, else return False.
+                datakey (str):    Key of the grid where value is found.
+                returnkey (str):  Key for the field of value to be returned.
+                matchkey (str):   Key of field to use for matching correct object in list.
+                matchvalue (Any): Value that needs to be at target_key field for a match.
+
+        is_true(value: str):
+            Return False if value is ""|"n"|"e"|"False"|"false" else True
+
+        sum(objkey, fieldkey):
+            Return the sum of all values at fieldkey in list of objects at objkey.
+            Args:
+            - objkey (str|list): Key to objectlist or the objectlist itself.
+            - fieldkey (str): Key to the field in object.
+
+        db.get_edited(filter)
+            Return 'E' for full match found.
+            Return 'K' for match with 'code' found with differing eq_fields.
+            Return 'P' for not match with 'code' field found.
+
+        flt(obj):
+            Return the filter created from obj for db.get_edited function.
 """
 import wx
 import wx.grid
@@ -155,6 +168,7 @@ DEFAULT_SETUP = {
             "label": "Materiaalit",
             "name": "Materiaalit",
             "db": "materials",
+            "eq_keys": ['code', 'desc', 'thck', 'prod', 'loss', 'unit', 'cost'],
             "fields": {
                 'code': ['', 'Koodi', 'string', False],
                 'edited': ['', 'Muokattu', 'string', True],
@@ -201,9 +215,9 @@ DEFAULT_SETUP = {
             "label": "Tuotteet",
             "name": "Tuotteet",
             "db": "products",
-            "child": "parts",
             "eq_keys": ['code', 'group', 'desc', 'prod', 'x', 'y', 'z'],
             "child_eq_keys": ['code', 'desc', 'code_x', 'code_y', 'code_z'],
+            "child": "parts",
             "fields": {
                 'code': ['', 'Koodi', 'string', False],
                 'edited': ['E', 'Muokattu', 'string', True],

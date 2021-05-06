@@ -1,4 +1,6 @@
 from copy import deepcopy
+from setup_grid import SetupGrid
+from ttk_data import FIELD_LABEL, str2type
 
 import wx
 import wx.dataview as dv
@@ -58,14 +60,16 @@ class ConfirmDialog(wx.Dialog):
 
 
 class DbDialog(wx.Dialog):
-    def __init__(self, parent, collection, key=None, value=""):
+    def __init__(self, parent, collections, active_collection=None, key='code', value=""):
         """Initialize a database dialog.
         
         Args:
             - parent: Parent wx.Window.
-            - collection (str): Name of database collection.
-            - key (str): Key to a field in collection.
-            - value (str): Search value.
+            - collections (dict): Dictionary collection_name: collection_setup
+            - active_collection (str): Key to the collection to be opened.
+            Defaults to idx 0 in collections.
+            - key (str): Key to a field in collection. Defaults to 'code'.
+            - value (str): Search value. Defaults to "".
         """
         super().__init__(
             parent,
@@ -76,18 +80,28 @@ class DbDialog(wx.Dialog):
 
         self.CenterOnParent()
 
-        self.collection = collection
+        self.collections: dict = collections
+        self.collection = active_collection
+        if self.collection is None:
+            self.collection = list(self.collections.keys())[0]
+        self.setup = self.collections[self.collection]
         self.key = key
         self.search_value = value
-        self.sample = GridData(self.collection)
+
         self.objects = []
-        self.to_offer = {self.collection: []}  # {collection: [{obj_key: obj_val}]}
 
-        self.collection_keys = GridData.get_db_keys()
-        self.column_keys = self.sample.get_columns()
+        # {collection: [{obj_key: obj_val}]}
+        self.to_offer = {key: [] for key in self.collections.keys()}
 
-        self.collection_choices = [self.sample.get_label(key, True) for key in self.collection_keys]
-        self.column_choices = [self.sample.get_label(key) for key in self.column_keys]
+        self.collection_keys = list(self.collections.keys())
+        self.column_keys = list(self.setup['fields'].keys())
+
+        self.collection_choices = [
+            self.collections[key]['label'] for key in self.collection_keys
+        ]
+        self.column_choices = [
+            self.setup['fields'][key][FIELD_LABEL] for key in self.column_keys
+        ]
 
         self.collection_sel = self.collection_keys.index(self.collection)
         self.column_sel = 0
@@ -169,14 +183,16 @@ class DbDialog(wx.Dialog):
         self.column_sel = 0
 
         self.collection = self.collection_keys[self.collection_sel]
-        self.sample = GridData(self.collection)
+        self.setup = self.collections[self.collection]
 
-        if self.collection not in self.to_offer:
-            self.to_offer[self.collection] = []
+        # if self.collection not in self.to_offer:
+        #     self.to_offer[self.collection] = []
 
         # Get new column information.
-        self.column_keys = self.sample.get_columns()
-        self.column_choices = [self.sample.get_label(key) for key in self.column_keys]
+        self.column_keys = list(self.setup['fields'].keys())
+        self.column_choices = [
+            self.setup['fields'][key][FIELD_LABEL] for key in self.column_keys
+        ]
         self.key = self.column_keys[self.column_sel]
 
         # Set new columns to Choice.
@@ -226,7 +242,7 @@ class DbDialog(wx.Dialog):
         except:
             pass
         # Open dialog to add new item to Database.
-        with DbAddDialog(self, self.collection, self.sample, obj) as dlg:
+        with DbAddDialog(self, self.collection, self.setup, obj) as dlg:
             if dlg.ShowModal() == wx.ID_OK:
                 # Check if item with given 'code already exists.
                 code = dlg.object['code']
@@ -312,21 +328,29 @@ import wx.grid as wxg
 
 
 class DbAddDialog(wx.Dialog):
-    def __init__(self, parent, collection, grid_data, obj=None):
+    def __init__(self, parent, collection, setup, child_setup=None, obj=None):
         """Dialog for adding or editing items to database.
         
         Args:
             parent: Parent wx.Window.
             collection: Name of database collection. Same as name of GridData.
-            grid_data: GridData object for formatting items.
+            setup: Dictionary for formatting items.
             obj: For pre filling fields with data from obj. Default None for default fields.
         """
-        self.gd: GridData = grid_data
-        self.gd_children: dict = {child: GridData(child) for child in self.gd.get_children()}
+        self.setup: dict = setup
+        self.child_setup: dict = child_setup
+
+        if child_setup is None:
+            self.child_name = None
+        else:
+            self.child_name = setup['child']
+
         self.child_lists = {}
         self.child_add_btns = {}
         self.child_labels = {}
-        self.object: dict = self.gd.get_default_dict()
+        self.object: dict = {k: v[0] for k, v in self.setup['fields'].items()}
+        if self.child_name is not None:
+            self.object[self.child_name] = []
 
         # Overwrite default object fields with ones from arg obj.
         if obj:
@@ -342,42 +366,45 @@ class DbAddDialog(wx.Dialog):
         )
         self.CenterOnParent()
 
-        self.grid = wxg.Grid(self)
-        self.grid.CreateGrid(len(self.object) - len(self.gd_children), 1)
-        for n, (k, v) in enumerate(self.object.items()):
-            if k not in self.gd_children:
-                if isinstance(v, int):
-                    self.grid.SetCellEditor(n, 0, wxg.GridCellNumberEditor())
-                    self.grid.SetCellRenderer(n, 0, wxg.GridCellNumberRenderer())
-                elif isinstance(v, float):
-                    self.grid.SetCellEditor(n, 0, wxg.GridCellFloatEditor(6, 2))
-                    self.grid.SetCellRenderer(n, 0, wxg.GridCellFloatRenderer(6, 2))
-                    self.grid.SetCellValue(n, 0, str(v).replace('.', ','))
-                    self.grid.SetRowLabelValue(n, self.gd.get_label(k))
-                    continue
-                elif isinstance(v, (list, dict)):
-                    continue
-                self.grid.SetCellValue(n, 0, str(v))
-                self.grid.SetRowLabelValue(n, self.gd.get_label(k))
+        # self.grid = wxg.Grid(self)
+        # objlen = len(self.object) - (0 if self.child_setup is None else 1)
+        # self.grid.CreateGrid(objlen, 1)
 
-        self.grid.SetColLabelSize(1)
-        self.grid.SetColSize(0, DBAD_GRID_COL_W)
+        # **********************************
+        # REPLACE HERE WITH SETUPGRID
+        # **********************************
+
+        self.grid = SetupGrid(self, self.setup)
+        # for n, (k, v) in enumerate(self.object.items()):
+        #     if k not in self.gd_children:
+        #         if isinstance(v, int):
+        #             self.grid.SetCellEditor(n, 0, wxg.GridCellNumberEditor())
+        #             self.grid.SetCellRenderer(n, 0, wxg.GridCellNumberRenderer())
+        #         elif isinstance(v, float):
+        #             self.grid.SetCellEditor(n, 0, wxg.GridCellFloatEditor(6, 2))
+        #             self.grid.SetCellRenderer(n, 0, wxg.GridCellFloatRenderer(6, 2))
+        #             self.grid.SetCellValue(n, 0, str(v).replace('.', ','))
+        #             self.grid.SetRowLabelValue(n, self.gd.get_label(k))
+        #             continue
+        #         elif isinstance(v, (list, dict)):
+        #             continue
+        #         self.grid.SetCellValue(n, 0, str(v))
+        #         self.grid.SetRowLabelValue(n, self.gd.get_label(k))
+
+        # self.grid.SetColLabelSize(1)
+        # self.grid.SetColSize(0, DBAD_GRID_COL_W)
         self.Bind(wxg.EVT_GRID_CELL_CHANGED, self.on_cell_changed, self.grid)
 
-        for child_key in self.gd_children.keys():
+        if self.child_setup is not None:
             child_list = dv.DataViewListCtrl(self)
             child_add = wx.Button(self, label=BTN_ADD)
-            child_label = wx.StaticText(self, label=self.gd.get_label(child_key))
+            child_label = wx.StaticText(self, label=self.child_setup['label'])
+            default: dict = {k: v[0] for k, v in self.child_setup['fields'].items()}
 
-            default = self.gd_children[child_key].get_default_dict()
             for key in default.keys():
-                child_list.AppendTextColumn(self.gd_children[child_key].get_label(key))
+                child_list.AppendTextColumn(self.child_setup['fields'][key])
 
-            self.child_lists[child_key] = child_list
-            self.child_add_btns[child_key] = child_add
-            self.child_labels[child_key] = child_label
-
-            self.Bind(wx.EVT_BUTTON, self.on_btn_child_add, self.child_add_btns[child_key])
+            self.Bind(wx.EVT_BUTTON, self.on_btn_child_add, child_add)
 
         # Dialog ending buttons.
         btn_ok = wx.Button(self, wx.ID_OK)
@@ -394,13 +421,12 @@ class DbAddDialog(wx.Dialog):
 
         sizer.Add(self.grid, 0, wx.EXPAND|wx.ALL, BORDER)
 
-        for key, btn in self.child_add_btns.items():
-            sizer.Add(wx.StaticLine(self), 0, wx.EXPAND|wx.TOP, BORDER)
-            sizer_child_label = wx.BoxSizer(wx.HORIZONTAL)
-            sizer_child_label.Add(btn, 0, wx.EXPAND|wx.ALL, BORDER)
-            sizer_child_label.Add(self.child_labels[key], 0, wx.EXPAND|wx.ALL, BORDER)
-            sizer.Add(sizer_child_label, 0, wx.EXPAND)
-            sizer.Add(self.child_lists[key], 1, wx.EXPAND|wx.ALL, BORDER)
+        sizer.Add(wx.StaticLine(self), 0, wx.EXPAND|wx.TOP, BORDER)
+        sizer_child_label = wx.BoxSizer(wx.HORIZONTAL)
+        sizer_child_label.Add(child_add, 0, wx.EXPAND|wx.ALL, BORDER)
+        sizer_child_label.Add(child_label, 0, wx.EXPAND|wx.ALL, BORDER)
+        sizer.Add(sizer_child_label, 0, wx.EXPAND)
+        sizer.Add(child_list, 1, wx.EXPAND|wx.ALL, BORDER)
 
         sizer.Add(wx.StaticLine(self), 0, wx.EXPAND)
         sizer.Add(sizer_btn, 0, wx.ALL, BORDER)
@@ -412,23 +438,18 @@ class DbAddDialog(wx.Dialog):
         """Update the edited value to the item to add."""
         row = evt.GetRow()
         key = list(self.object)[row]   # Uses all fields instead of columns.
-        value = self.grid.GetCellValue(row, 0)
-        self.object[key] = convert(self.gd.get_type(key), value)
+        value = str2type(self.grid.GetCellValue(row, 0))
+        self.object[key] = value
 
     def on_btn_child_add(self, evt):
         """Open dialog for adding a child item."""
-        collection = ""
-        for key, btn in self.child_add_btns.items():
-            if btn == evt.GetEventObject():
-                collection = key
-
-        if collection != "":
-            with DbAddDialog(self, collection, self.gd_children[key]) as dlg:
+        if self.child_setup is not None:
+            with DbAddDialog(self, self.collection, self.child_setup) as dlg:
                 if dlg.ShowModal() == wx.ID_OK:
-                    if not isinstance(self.object[collection], list):
-                        self.object[collection] = []
+                    if not isinstance(self.object[self.collection], list):
+                        self.object[self.collection] = []
 
-                    self.object[collection].append(deepcopy(dlg.object))
+                    self.object[self.collection].append(deepcopy(dlg.object))
 
                     str_list = [str(val) for val in dlg.object.values()]
-                    self.child_lists[collection].AppendItem(str_list)
+                    self.child_lists[self.collection].AppendItem(str_list)

@@ -276,13 +276,22 @@ class DataChild(TtkData):
                         obj = parent
 
     def find(self, datakey, returnkey, matchkey, matchvalue):
+        """Find a value in another grid.
+
+        Args:
+            datakey (str):    Key of the grid where value is found.
+            returnkey (str):  Key for the value to be returned.
+            matchkey (str):   Key of field to use for matching correct object in list.
+            matchvalue (Any): Value that needs to be at target_key field for a match.
+        """
         for item in self.get_data(datakey):
             if item[matchkey] == matchvalue:
                 return item[returnkey]
 
-    def is_true(self, strvalue):
+    def is_true(self, strvalue: str):
+        """Return False if value is ""|"n"|"e"|"False"|"false" else True."""
         false_strings = [
-            "n", "e", "false", "False"
+            "", "n", "e", "false", "False"
         ]
         return False if strvalue in false_strings else True
 
@@ -293,25 +302,23 @@ class DataChild(TtkData):
         result in undefined behaviour.
         """
         flt = {}
-        try:
+        if 'db' not in self.setup or 'eq_keys' not in self.setup:
+            return None
+        eq_keys = self.setup['eq_keys']
+
+        for key in eq_keys:
+            flt[key] = obj[key]
+
+        try:    # Do not test child objects if one of required setup fields does not exist
             childname = self.setup['child']
-        except:
-            childname = None
-        try:
-            eq_keys = self.setup['eq_keys']
-        except:
-            eq_keys = []
-        try:
             child_eq_keys = self.setup['child_eq_keys']
-        except:
-            child_eq_keys = []
+        except KeyError:
+            childname = None
 
         if childname:
-            for key in eq_keys:
-                flt[key] = obj[key]
-            
             for n, childobj in enumerate(obj[childname]):
                 for key in child_eq_keys:
                     childkey = childname + "." + str(n) + key
                     flt[childkey] = childobj[key]
+
         return flt
