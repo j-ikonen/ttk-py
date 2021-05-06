@@ -1,4 +1,5 @@
 from copy import deepcopy
+from dialog import DbDialog
 
 import wx
 import wx.grid as wxg
@@ -131,6 +132,21 @@ class TtkGrid(wxg.Grid):
         for n, k in enumerate(self.setup['columns']):
             self.SetCellValue(new_row_idx, n, type2str(self.data[new_row_idx][k]))
         self.EndBatch()
+        return new_row_idx
+
+    def push(self, object: dict):
+        """Push a new row with data from object to the grid."""
+        row = self.init_row()
+        self.changed_rows(1)
+        self.BeginBatch()
+        for key, value in object.items():
+            if key in self.setup['columns']:
+                col = self.setup['columns'].index(key)
+                grid_value = type2str(value)
+                self.SetCellValue(row, col, grid_value)
+
+            self.data[row][key] = deepcopy(value)
+        self.EndBatch()
 
     def on_cell_changed(self, evt):
         """Save changed value to data and append a row if edit is at last row."""
@@ -168,12 +184,12 @@ class TtkGrid(wxg.Grid):
         """Update the data in child grid."""
         if child_key is not None and self.data is not None:
             if row >= len(self.data):
-                child_data = None
+                self.child_grid.change_data(None)
             else:
                 if self.data[row][child_key] is None:
                     self.data[row][child_key] = []
-                child_data = self.data[row][child_key]
-            self.child_grid.change_data(child_data)
+
+                self.child_grid.change_data(self.data[row][child_key])
 
     def on_cell_rclick(self, evt):
         """Open menu on right click."""
@@ -261,6 +277,9 @@ class TtkGrid(wxg.Grid):
         """Veto event if cell is readonly."""
         col = evt.GetCol()
         key = self.setup['columns'][col]
+        if self.data is None:
+            print(f"TtkGrid.on_editor_shown - No data initialized.")
+            evt.Veto()
         if self.setup['fields'][key][FIELD_READONLY]:
             print(f"TtkGrid.on_editor_shown - Key '{key}' is read only.")
             evt.Veto()
@@ -313,10 +332,19 @@ class TtkGrid(wxg.Grid):
     def on_find_from_db(self, evt):
         """Open database dialog with current grid selected."""
         print("TtkGrid.on_find_from_db TO BE IMPLEMENTED")
+        with DbDialog(self, {self.name: self.setup}, None) as dlg:
+            if dlg.ShowModal() == wx.ID_OK:
+                for key, objlist in dlg.to_offer.items():
+                    if key == self.name:
+                        for obj in objlist:
+                            self.push(obj)
 
     def refresh_attr(self):
         """Refresh the cell attributes where required."""
         print("TtkGrid.refresh_attr")
+        if self.data is None:
+            return
+
         try:
             col = self.setup['columns'].index('edited')
         except ValueError:
@@ -331,7 +359,6 @@ class TtkGrid(wxg.Grid):
                     colour = COLOUR_WHITE
                 self.SetCellBackgroundColour(row, col, colour)
         self.refresh_data()
-        # self.Refresh()
 
     def set_col_format(self, col, typestring):
         """Set column format."""

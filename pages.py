@@ -156,7 +156,7 @@ class ItemPage(wx.Panel):
         if file:
             self.grid_file.change_data(self.data.get_data('file'))
 
-    def change_data(self, data: DataItem, fc_mult: list=None):
+    def change_data(self, data: DataItem):
         """Change the data to a new DataItem."""
         # self.global_mult = fc_mult
         self.data = data
@@ -375,8 +375,11 @@ class ChildPage(wx.Panel):
         }
         self.collections = {}
         for key in self.setup:
-            if 'db' in self.setup[key]:
-                self.collections[key] = self.setup[key]
+            try:
+                if 'db' in self.setup[key]:
+                    self.collections[key] = self.setup[key]
+            except:
+                continue
 
     def append_data(self, data: dict):
         """Append new data to existing DataChild object."""
@@ -396,6 +399,7 @@ class ChildPage(wx.Panel):
         self.data = data
 
         self.txtc_name.SetValue(data.get_name())
+        self.txt_parts.SetLabel(self.setup['parts']['name'])
 
         self.grid_predefs.change_data(data.get_data('predefs'))
         self.grid_materials.change_data(data.get_data('materials'))
@@ -404,10 +408,12 @@ class ChildPage(wx.Panel):
 
     def on_btn_db(self, evt):
         """Open the database dialog."""
-        print("ChildPage.on_btn_db - Implement open db dialog here.")
-        with DbDialog(self, self.collections) as dlg:
+        child_setups = {'products.parts': self.setup['parts']}
+        with DbDialog(self, self.collections, child_setups) as dlg:
             if dlg.ShowModal() == wx.ID_OK:
-                pass
+                for key, objlist in dlg.to_offer.items():
+                    for obj in objlist:
+                        self.grids[key].push(obj)
 
     def on_btn_refresh(self, evt):
         """Do evals on coded cells."""

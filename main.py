@@ -2,12 +2,11 @@
 TODO:
     Is Asennusyksikkö choice or string?
 
-    Fix database dialog to work with new stuff.
-    testtestestesttestesttesttesttest
+    Add remove from database button to database dialog.
+    Add database keys to setup to exclude keys from database operations.
 
     Create dialog with Treebook for settings / global values.
     Add predefined column widths.
-    Add remove from database functionality.
     Add part editing in database dialogs.
     Add code editor.
     Add ctrl arrow key scrolling to choice cells.
@@ -54,6 +53,7 @@ Codes:
         self:   TtkData where the code is.
         obj:    Dictionary where the code is.
         db:     Database(self.name)
+        parent: Parent dicionary.
 
     FUNCTIONS:
         find(datakey, returnkey, matchkey, matchvalue):
