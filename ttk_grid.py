@@ -1,5 +1,7 @@
-import wx.grid as wxg
+from copy import deepcopy
+
 import wx
+import wx.grid as wxg
 
 from dataobj_dialog import DataObjectDialog
 from ttk_data import str2type, FIELD_KEY, FIELD_LABEL, FIELD_TYPE, FIELD_READONLY, type2str
@@ -40,7 +42,7 @@ class TtkGrid(wxg.Grid):
         
         ### Args:
         - parent: Parent wx.Window.
-        - name (str): Key for this grids setup information.
+        - name (str): Key for this grids setup information. Used as database collection.
         - setup (dict): Setup information. Must contain keys 'fields' and 'columns'."""
         super().__init__(parent)
 
@@ -71,7 +73,7 @@ class TtkGrid(wxg.Grid):
 
     def change_data(self, data):
         """Change the data to given source."""
-        print(f"TtkGrid.change_data - name: {self.name}")
+        # print(f"TtkGrid.change_data - name: {self.name}")
         try:
             current_len = len(self.data)
         except TypeError:
@@ -82,11 +84,11 @@ class TtkGrid(wxg.Grid):
             new_len = 0
 
         if data is None:
-            print("\tclear grid")
+            # print("\tclear grid")
             self.DeleteRows(0, current_len)
             self.data = data
         else:
-            print("\trefresh to new size")
+            # print("\trefresh to new size")
             sz_change = new_len - current_len
             self.data = data
 
@@ -106,7 +108,7 @@ class TtkGrid(wxg.Grid):
         
         Positive n_change for added rows. Negative for deleted.
         """
-        print(f"TtkGrid.changed_rows - name: {self.name} rows changed: {n_change}")
+        # print(f"TtkGrid.changed_rows - name: {self.name} rows changed: {n_change}")
         if n_change > 0:
             self.AppendRows(n_change)
         elif n_change < 0:
@@ -175,8 +177,12 @@ class TtkGrid(wxg.Grid):
 
     def on_cell_rclick(self, evt):
         """Open menu on right click."""
+        # Return before opening menu if grid is set as read only.
         selected = self.GetSelectedRows()
         self.rclick_row = evt.GetRow()
+
+        if 'read_only' in self.setup:
+            return
 
         if not hasattr(self, 'id_copy'):
             self.id_copy = wx.NewIdRef()
@@ -230,7 +236,7 @@ class TtkGrid(wxg.Grid):
         self.copied = []
 
         for n in selection:
-            obj = self.data[n]
+            obj = deepcopy(self.data[n])
             self.copied.append(obj)
 
     def on_paste(self, evt):
@@ -249,7 +255,8 @@ class TtkGrid(wxg.Grid):
         except TypeError:
             newlen = 0
         self.changed_rows(newlen - oldlen)
-
+        self.refresh_data()
+        
     def on_editor_shown(self, evt):
         """Veto event if cell is readonly."""
         col = evt.GetCol()

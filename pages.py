@@ -1,3 +1,4 @@
+from datagrid_dialog import NotebookDialog
 import wx
 
 from setup_grid import SetupGrid
@@ -11,6 +12,7 @@ BTN_DB = "Tietokanta"
 BTN_NEW_CHILD = "Lisää ryhmä"
 BTN_DEL_CHILD = "Poista ryhmä"
 BTN_CLOSE_ITEM = "Sulje tarjous"
+BTN_MULT = "Kertoimet"
 CHK_FC_LABEL = "Käytä yleisiä kertoimia"
 TEDLG_MSG = "Uuden ryhmän nimi"
 MCDLG_MSG = "Valitse poistettavat ryhmät"
@@ -87,12 +89,14 @@ class ItemPage(wx.Panel):
 
         self.btn_add_child = wx.Button(self, label=BTN_NEW_CHILD)
         btn_del_child = wx.Button(self, label=BTN_DEL_CHILD)
+        btn_mult = wx.Button(self, label=BTN_MULT)
 
-        chk_fc = wx.CheckBox(self, label=CHK_FC_LABEL)
+        self.chk_fc = wx.CheckBox(self, label=CHK_FC_LABEL)
 
         self.grid_info = SetupGrid(self, self.setup['info'])
         self.grid_file = SetupGrid(self, self.setup['file'])
         self.grid_fc = TtkGrid(self, 'fieldcount', self.setup['fieldcount'])
+
         grid_file_size = len(self.setup['file']['fields'])
         grid_info_size = len(self.setup['info']['fields'])
 
@@ -106,7 +110,8 @@ class ItemPage(wx.Panel):
         self.Bind(wx.EVT_TEXT, self.on_text, self.txtc_name)
         self.Bind(wx.EVT_BUTTON, self.on_add_child, self.btn_add_child)
         self.Bind(wx.EVT_BUTTON, self.on_del_child, btn_del_child)
-        self.Bind(wx.EVT_CHECKBOX, self.on_check, chk_fc)
+        self.Bind(wx.EVT_BUTTON, self.on_mult_edit, btn_mult)
+        self.Bind(wx.EVT_CHECKBOX, self.on_check, self.chk_fc)
 
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer_name = wx.BoxSizer(wx.HORIZONTAL)
@@ -119,7 +124,8 @@ class ItemPage(wx.Panel):
         sizer_name.Add((80, 5), 0, wx.EXPAND|wx.RIGHT, BORDER)
         sizer_name.Add(self.btn_add_child, 0, wx.EXPAND|wx.RIGHT, BORDER)
         sizer_name.Add(btn_del_child, 0, wx.EXPAND|wx.RIGHT, BORDER)
-        sizer_name.Add(chk_fc, 0, wx.EXPAND|wx.RIGHT, BORDER)
+        sizer_name.Add(btn_mult, 0, wx.EXPAND|wx.RIGHT, BORDER)
+        sizer_name.Add(self.chk_fc, 0, wx.EXPAND|wx.RIGHT, BORDER)
 
         sizer_info.Add(self.grid_file, grid_file_size, wx.EXPAND)
         sizer_info.Add(self.grid_info, grid_info_size, wx.EXPAND)
@@ -139,15 +145,19 @@ class ItemPage(wx.Panel):
         if name:
             self.txtc_name.SetValue(self.data.get_name())
         if fc:
+            use_global = self.data.get_data('use_global')
+            if self.chk_fc.IsChecked() != use_global:
+                self.chk_fc.SetValue(use_global)
+
             self.update_fieldcount()
         if info:
             self.grid_info.change_data(self.data.get_data('info'))
         if file:
             self.grid_file.change_data(self.data.get_data('file'))
 
-    def change_data(self, data: DataItem, fc_mult: list):
+    def change_data(self, data: DataItem, fc_mult: list=None):
         """Change the data to a new DataItem."""
-        self.global_mult = fc_mult
+        # self.global_mult = fc_mult
         self.data = data
         self.refresh(True, True, True, True)
         print(f"ItemPage.change_data - name: {self.data.get_name()}")
@@ -164,10 +174,13 @@ class ItemPage(wx.Panel):
     def on_check(self, evt):
         """Get global fieldcount multipliers if box is checked."""
         if evt.IsChecked():
-            self.use_global = True
+            self.data.set_data('use_global', True)
+            # self.use_global = True
         else:
-            self.use_global = False
-        self.update_fieldcount()
+            # self.use_global = False
+            self.data.set_data('use_global', False)
+        fc = self.data.get_data('fieldcount')
+        self.update_multipliers(fc)
 
     def on_del_child(self, evt):
         """Delete a child from DataItem."""
@@ -185,6 +198,24 @@ class ItemPage(wx.Panel):
                         self.data.delete_child(n)
                     self.refresh_tree()
 
+    def on_mult_edit(self, evt):
+        """Open dialog for editing the multipliers."""
+        MULT_DLG_TITLE = "Muokkaa kertoimia"
+        LM_LABEL = "Tarjous"
+        GM_LABEL = "Jaettu"
+        lm = self.data.get_data('fc_mult')
+        gm = self.global_mult
+        st = self.setup['fc_mult']
+        pages = [
+            {'label': LM_LABEL, 'data': lm, 'setup': st, 'name': 'fc_mult'},
+            {'label': GM_LABEL, 'data': gm, 'setup': st, 'name': 'fc_mult'}
+        ]
+
+        with NotebookDialog(self, MULT_DLG_TITLE, pages) as dlg:
+            if dlg.ShowModal() == wx.ID_OK:
+                fc = self.data.get_data('fieldcount')
+                self.update_multipliers(fc)
+
     def on_text(self, evt):
         """Update the DataItem name."""
         if self.data is not None:
@@ -195,30 +226,74 @@ class ItemPage(wx.Panel):
     def update_fieldcount(self):
         """Update the fieldcount data and display."""
         new_count = {}
-        local_mult = self.data.get_data('fc_mult')
         # Iterate over all DataChild objects.
         for child in self.data.get_children():
             # Iterate over all rows in products grid.
             for obj in child.get_data('products'):
                 unit = obj['inst_unit']
                 try:
-                    new_count[unit]['count'] += 1
+                    new_count[unit]['count'] += obj['count']
                 # Init the unit on first count
                 except KeyError:
-                    mult = self.global_mult[unit] if self.use_global else local_mult[unit]
-                    new_count[unit] = {'mult': mult, 'count': 0, 'cost': 0.0}
+                    new_count[unit] = {'mult': 0.0, 'count': obj['count'], 'cost': 0.0}
+        
+        new_list = [
+            {
+                'unit': unit,
+                'mult': v['mult'],
+                'count': v['count'],
+                'cost': v['cost']
+            } for unit, v in new_count.items()]
 
-        # Form a list of dictionaries
+        self.update_multipliers(new_list)
+
+    def update_multipliers(self, datalist):
+        """Update the multipliers in fieldcount data and grid."""
+        local_mult: list = self.data.get_data('fc_mult')
+        use_global: bool = self.data.get_data('use_global')
         new_fc = []
-        for unit, value in new_count.items():
+        total = 0.0
+        total_count = 0
+        weighted_mult_total = 0.0
+        # Form a list of dictionaries
+        for item in datalist:
+            unit = item['unit']
+            if unit == 'TOTAL':
+                continue
+            count = item['count']
+
+            # Get the local or global mult.
+            mult = 0.0
+            source = self.global_mult if use_global else local_mult
+            for mult_obj in source:
+                if mult_obj['unit'] == unit:
+                    mult = mult_obj['mult']
+
+            # print(f"update_multipliers: unit: {unit}, mult: {mult}")
             new_obj = {
                 'unit': unit,
-                'mult': value['mult'],
-                'count': value['count'],
-                'cost': value['mult'] * value['count'],
+                'mult': mult,
+                'count': count,
+                'cost': mult * count,
             }
             new_fc.append(new_obj)
+            total += (mult * count)
+            total_count += count
+            weighted_mult_total += mult * count
 
+        # Insert total as first row.
+        try:
+            wmult = weighted_mult_total / total_count
+        except ZeroDivisionError:
+            wmult = 0.0
+
+        new_obj = {
+            'unit': "TOTAL",
+            'mult': wmult,
+            'count': total_count,
+            'cost': total,
+        }
+        new_fc.insert(0, new_obj)
         self.data.set_data('fieldcount', new_fc)
         self.grid_fc.change_data(new_fc)
 

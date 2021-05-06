@@ -2,7 +2,6 @@
 TODO:
     Is Asennusyksikkö choice or string?
 
-    Implement dialog for editing offer and global fieldcount multipliers.
     Fix database dialog to work with new stuff.
     testtestestesttestesttesttesttest
 
@@ -121,7 +120,8 @@ DEFAULT_SETUP = {
                 "cost": [0.0, "Hinta (€)", "double:6,2", True]
             },
             "columns": ["unit", "mult", "count", "cost"],
-            "prevent_new_row": True
+            "prevent_new_row": True,
+            "read_only": True
         },
         "fc_mult": {
             "type": "DataGrid",
@@ -130,6 +130,10 @@ DEFAULT_SETUP = {
                 "mult": [0.0, "Kerroin (€/n)", "double:6,2", False]
             },
             "columns": ["unit", "mult"],
+        },
+        "use_global": {
+            "type": 'bool',
+            "fields": {"use_global": [False, "Käytä yleisiä arvoja", "bool", False]}
         }
     },
     str(DataChild): {

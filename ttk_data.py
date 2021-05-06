@@ -9,6 +9,7 @@ TYPES = {
     'choice': str,
     'object': dict,
     'array': list,
+    'bool': bool,
     'DataGrid': list
 }
 FIELD_KEY = 0
@@ -244,7 +245,7 @@ class DataChild(TtkData):
 
     def process_codes(self):
         """Process the coded fields in data."""
-        print("DataChild.process_codes")
+        # print("DataChild.process_codes")
         sum = self.sum
         flt = self.get_edited_filter
         grd = self.data
@@ -269,9 +270,9 @@ class DataChild(TtkData):
                                 try:
                                     obj[child_vk] = eval(obj[child_ck])
                                 except TypeError as e:
-                                    print("TtkData.process_codes Error \n\t" +
-                                          f"target key: {child_vk}, code key: {child_ck}\n\t" +
-                                          f"code: {obj[child_ck]}\n\tTypeError: {e}")
+                                    print(f"\n{str(self)}.process_codes Error \n\t" +
+                                          f"TypeError: {e}\n\tcode: {obj[child_ck]}\n\t" +
+                                          f"code key: {child_ck}\n\ttarget key: {child_vk}\n\t")
                         obj = parent
 
     def find(self, datakey, returnkey, matchkey, matchvalue):
