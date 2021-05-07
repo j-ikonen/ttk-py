@@ -1,42 +1,9 @@
 from copy import deepcopy
+
+
 from database import Database
+from setup import Setup
 
-
-TYPES = {
-    'string': str,
-    'long': int,
-    'double': float,
-    'choice': str,
-    'object': dict,
-    'array': list,
-    'bool': bool,
-    'DataGrid': list
-}
-FIELD_KEY = 0
-FIELD_LABEL = 1
-FIELD_TYPE = 2
-FIELD_READONLY = 3
-FIELD_DEF = 4
-
-
-def type_default(typestring: str):
-    return TYPES[typestring.split(':')[0]]()
-
-def str2type(typestring: str, value: str):
-    """Convert the given valuestring to given type by typestring."""
-    split = typestring.split(':')
-    if split[0] == "double":
-        mod_value = value.replace(',', '.')
-    else:
-        mod_value = value
-    return TYPES[split[0]](mod_value)
-
-def type2str(value):
-    """Convert the give value to a string for wx.grid.Grid."""
-    strvalue = str(value)
-    if isinstance(value, float):
-        return strvalue.replace('.', ',')
-    return strvalue
 
 class TtkData:
     def __init__(self, name, page, setup, child):
@@ -50,16 +17,13 @@ class TtkData:
         """
         self.name = name
         self.page = page
-        if str(type(self)) not in setup:
-            self.setup = setup
-        else:
-            self.setup = setup[str(type(self))]
+        self.setup: Setup = setup.get_child(self.key)
 
         self.child = child
         self.children = None if child is None else []
-        self.data = {}
+        self.data = self.setup.get_page_init_data()
 
-        self.init_data()
+        # self.init_data()
 
     def __len__(self):
         return len(self.children)
@@ -77,7 +41,7 @@ class TtkData:
         self.children = None if self.child is None else []
 
     @classmethod
-    def from_dict(cls, data: dict, setup: dict):
+    def from_dict(cls, data: dict, setup):
         """Return a Data object created from dictionary data."""
         obj = cls(data['name'], setup)
         obj.data = deepcopy(data['data'])
@@ -139,16 +103,16 @@ class TtkData:
     def get_page(self) -> int:
         return self.page
 
-    def init_data(self):
-        """Initialize the data."""
-        for k, v in self.setup.items():
-            if isinstance(v, dict):
-                if v['type'] == "SetupGrid":
-                    fs = v['fields'].items()
-                    self.data[k] = {k: type_default(f[FIELD_TYPE]) for k, f in fs}
+    # def init_data(self):
+    #     """Initialize the data."""
+    #     for k, v in self.setup.items():
+    #         if isinstance(v, dict):
+    #             if v['type'] == "SetupGrid":
+    #                 fs = v['fields'].items()
+    #                 self.data[k] = {k: type_default(f[FIELD_TYPE]) for k, f in fs}
 
-                else:
-                    self.data[k] = type_default(v['type'])
+    #             else:
+    #                 self.data[k] = type_default(v['type'])
 
     def push(self, name, setup):
         """Add a new child to end of list. Return the new child.
@@ -189,6 +153,7 @@ class TtkData:
 
 
 class Data(TtkData):
+    key = "app"
     def __init__(self, name, setup):
         super().__init__(name, 0, setup, DataRoot)
         self.active = self
@@ -222,6 +187,7 @@ class Data(TtkData):
 
 
 class DataRoot(TtkData):
+    key = "root"
     def __init__(self, name, setup):
         super().__init__(name, 1, setup, DataItem)
 
@@ -235,11 +201,13 @@ class DataRoot(TtkData):
 
 
 class DataItem(TtkData):
+    key = "item"
     def __init__(self, name, setup):
         super().__init__(name, 2, setup, DataChild)
 
 
 class DataChild(TtkData):
+    key = "child"
     def __init__(self, name, setup):
         super().__init__(name, 3, setup, None)
 
@@ -252,28 +220,34 @@ class DataChild(TtkData):
         find = self.find
         is_true = self.is_true
         # Iterate over grids.
-        for key, value in self.data.items():
-            if 'codes' in self.setup[key]:
-                db = Database(key)
-                # Iterate over rows.
+        for data_key, value in self.data.items():
+            if data_key in self.setup["codes"]:
+                codes = self.setup["codes"][data_key]
+                db = Database(data_key)
+                # for field_key, value in self.setup["data"][data_key]["fields"].items():
                 for obj in value:
-                    # Iterate over coded cells
-                    for value_key, code_key in self.setup[key]['codes'].items():
-                        obj[value_key] = eval(obj[code_key])
-                    
-                    # Iterate over a child grid.
-                    if 'child' in self.setup[key]:
-                        parent = obj
-                        child_key = self.setup[key]['child']
-                        for obj in parent[child_key]:
-                            for child_vk, child_ck in self.setup[child_key]['codes'].items():
-                                try:
-                                    obj[child_vk] = eval(obj[child_ck])
-                                except TypeError as e:
-                                    print(f"\n{str(self)}.process_codes Error \n\t" +
-                                          f"TypeError: {e}\n\tcode: {obj[child_ck]}\n\t" +
-                                          f"code key: {child_ck}\n\ttarget key: {child_vk}\n\t")
-                        obj = parent
+                    for field_key, code in codes.items():
+                        if code[0] == "$":
+                            code = obj[code[1:]]
+                        try:
+                            obj[field_key] = eval(code)
+                        except:
+                            print(f"Error in eval: \n\tfield_key: {field_key}\t\ncode: {code}")
+
+                        if "child_data" in self.setup["data"][data_key]:
+                            child_setup = self.setup["data"][data_key]['child_data']
+                            parent = obj
+                            for child_key, child_value in child_setup.items():
+                                child_codes = self.setup["codes"][child_key]
+                                for cf_key, c_code in child_codes.items():
+                                    for obj in parent[child_key]:
+                                        if code[0] == "$":
+                                            code = obj[code[1:]]
+                                        try:
+                                            obj[cf_key] = eval(c_code)
+                                        except:
+                                            print(f"Error in eval: \n\tfield_key: {cf_key}\t\ncode: {code}")
+                            obj = parent
 
     def find(self, datakey, returnkey, matchkey, matchvalue):
         """Find a value in another grid.
@@ -295,30 +269,27 @@ class DataChild(TtkData):
         ]
         return False if strvalue in false_strings else True
 
-    def get_edited_filter(self, obj):
+    def get_edited_filter(self, obj, key):
         """Return the filter for database to check if obj exists in it.
         
         Using this in codes that are in object that does not have a database collection will
         result in undefined behaviour.
         """
         flt = {}
-        if 'db' not in self.setup or 'eq_keys' not in self.setup:
+        if "database" not in self.setup or key not in self.setup["database"]:
             return None
-        eq_keys = self.setup['eq_keys']
+
+        db_setup = self.setup["database"][key]
+        eq_keys = db_setup['eq_keys']
 
         for key in eq_keys:
             flt[key] = obj[key]
-
-        try:    # Do not test child objects if one of required setup fields does not exist
-            childname = self.setup['child']
-            child_eq_keys = self.setup['child_eq_keys']
-        except KeyError:
-            childname = None
-
-        if childname:
-            for n, childobj in enumerate(obj[childname]):
-                for key in child_eq_keys:
-                    childkey = childname + "." + str(n) + key
-                    flt[childkey] = childobj[key]
-
+        
+        if "children" in db_setup:
+            for child_key, value in db_setup["children"].items():
+                child_eq_keys = value["child_eq_keys"]
+                for n, cobj in enumerate(obj[child_key]):
+                    for key in child_eq_keys:
+                        key = child_key + "." + str(n) + key
+                        flt[key] = cobj[key]
         return flt

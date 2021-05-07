@@ -1,0 +1,52 @@
+Setup json file format
+
+EDIT THE BGCOLOR OF 'code' CELL TO INDICATE EXISTANCE IN DATABASE
+IMPLEMENT from_data(key) METHOD FOR CODE PROCESSING TO EVAL CODE FROM DATA
+
+Information required by Page, RootPage, ItemPage and ChildPage.
+"pages"
+    ["app", "root", "item", "child"]
+    
+        Field static for static data like label texts etc.
+        Field data for editable data in pages. Grids, TextControls etc.
+        Field codes for using eval to get values to data.
+        Field database for that information.
+        ["static", "data", "codes", "database"]
+        
+            Key to be used to find the setup for each UI element.
+            [data_key]
+                Other keys depend on UI element type. If getting it produces
+                KeyError get the setup using list in "link" field.
+                try ["ui_type"] except get ui_type from ["link"]
+                
+                if "ui_type" == "StaticText"
+                ["value"]   String value of the StaticText window.
+                
+                if "ui_type" == "TextCtrl"
+                ["label]    Label for the data.
+                ["value"]   Default value for the ctrl.
+                
+                if "ui_type" == "3StateCheckBox"
+                ["label"]   String label or list or labels for each state.
+                ["value"]   Default int value.
+                
+                if "ui_type" == "ObjectGrid"
+                ["label]    Label for the data.
+                ["fields]
+                    [field_key]
+                        ["type"]    Type string as used by wx.grid.
+                        ["default"] Default value for this field.
+                        ["label"]   Label of the field used as row label.
+                ["columns"]     List of field keys in order to display in grid.
+                ["read_only"]   List field keys that are read only.
+                
+                if "ui_type" == "ArrayOfObjectsGrid"
+                ["label]    Label for the data.
+                ["fields]
+                    [field_key]
+                        ["type"]    Type string as used by wx.grid.
+                        ["default"] Default value for this field.
+                        ["label"]   Label of the field used as column label.
+                        ["width"]   Width of the column.
+                ["columns"]     List of field keys in order to display in grid.
+                ["read_only"]   List field keys that are read only.

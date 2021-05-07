@@ -1,6 +1,5 @@
 
 import os
-import json
 from pages import ItemPage
 
 import wx
@@ -8,6 +7,7 @@ from wx.core import MultiChoiceDialog
 
 from ttk_data import Data, DataChild, DataItem, DataRoot
 from panel import Panel, FRAME_SIZE
+from setup import read_file, write_file, split_path, Setup
 
 
 FRAME_TITLE = "Ttk-py"
@@ -32,37 +32,6 @@ ROOTDATA_FILE = "ttk_rootdata.json"
 SETUP_FILE = "ttk_setup.json"
 
 
-def read_file(path, file) -> dict:
-    if path is None:
-        filepath = file
-    else:
-        filepath = path + '\\' + file
-    try:
-        with open(filepath, 'r') as rf:
-            return json.load(rf)
-    except FileNotFoundError as e:
-        print(f"{e}")
-        return None
-    except json.decoder.JSONDecodeError as e:
-        print(f"{filepath}\n\tFile is not a valid json.")
-        return None
-
-def write_file(path, file, data):
-    if path is None:
-        filepath = file
-    else:
-        filepath = path + '\\' + file
-    with open(filepath, 'w') as wf:
-        json.dump(data, wf, indent=4)
-
-def split_path(filepath: str):
-    """Split the full filepath into path and file strings (path, file)."""
-    file_start = filepath.rfind('\\') + 1
-    file = filepath[file_start:]
-    path = filepath[:file_start-1]
-    return (path, file)
-
-
 class AppFrame(wx.Frame):
     def __init__(self, data, setup):
         super().__init__(
@@ -72,9 +41,7 @@ class AppFrame(wx.Frame):
             style=wx.DEFAULT_FRAME_STYLE|wx.FULL_REPAINT_ON_RESIZE
         )
 
-        self.setup: dict = read_file(None, SETUP_FILE)
-        if self.setup is None:
-            self.setup: dict = setup
+        self.setup: Setup = setup.get_child("pages")
 
         from_file = read_file(None, ROOTDATA_FILE)
         if from_file is None:
@@ -131,8 +98,8 @@ class AppFrame(wx.Frame):
     def menu_new(self, evt):
         """Create new offer."""
         # self.panel.data.new_offer()
-        def_item_name = self.setup[str(DataItem)]["__default_instance_name"]
-        def_child_name = self.setup[str(DataChild)]["__default_instance_name"]
+        def_item_name = self.setup["item"]["data"]["name"]["value"]
+        def_child_name = self.setup["child"]["data"]["name"]["value"]
         data_item = self.data.get([0]).push(def_item_name, self.setup)
         data_item.push(def_child_name, self.setup)
         self.panel.refresh_tree()
@@ -262,13 +229,3 @@ class AppFrame(wx.Frame):
 
     def menu_exit(self, evt):
         self.Close()
-
-    # def menu_db_add(self, evt):
-    #     print("Frame.menu_db_add")
-        # from dialog import InsertToDbDialog
-
-        # with InsertToDbDialog(self) as dlg:
-        #     if dlg.ShowModal() == wx.ID_OK:
-        #         pass
-        #     else:
-        #         pass
