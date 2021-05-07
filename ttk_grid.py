@@ -1,12 +1,12 @@
 from copy import deepcopy
-from dialog import DbDialog
 
 import wx
 import wx.grid as wxg
 
+from dialog import DbDialog
 from dataobj_dialog import DataObjectDialog
-from ttk_data import str2type, FIELD_KEY, FIELD_LABEL, FIELD_TYPE, FIELD_READONLY, type2str
 from database import Database
+from setup import Setup, type2str, str2type
 
 
 GRIDMENU_DELSEL = "Poista"
@@ -48,7 +48,7 @@ class TtkGrid(wxg.Grid):
         super().__init__(parent)
 
         self.data = None
-        self.setup = setup
+        self.setup: Setup = setup
         self.child_grid = None
         self.name = name
         self.copied = []
@@ -60,14 +60,16 @@ class TtkGrid(wxg.Grid):
         self.SetRowLabelSize(30)
 
         for n, key in enumerate(columns):
-            self.set_col_format(n, fields[key][FIELD_TYPE])
-            self.SetColLabelValue(n, fields[key][FIELD_LABEL])
-            self.AutoSizeColLabelSize(n)
+            self.set_col_format(n, fields[key]["type"])
+            self.SetColLabelValue(n, fields[key]["label"])
+            # self.AutoSizeColLabelSize(n)
+            self.SetColSize(n, fields[key]["width"])
 
         self.Bind(wxg.EVT_GRID_CELL_CHANGED, self.on_cell_changed)
         self.Bind(wxg.EVT_GRID_EDITOR_SHOWN, self.on_editor_shown)
         self.Bind(wxg.EVT_GRID_CELL_RIGHT_CLICK, self.on_cell_rclick)
         self.Bind(wxg.EVT_GRID_SELECT_CELL, self.on_cell_select)
+        self.Bind(wxg.EVT_GRID_CMD_COL_SIZE, self.on_col_size)
 
     def set_child_grid(self, grid):
         self.child_grid = grid
@@ -117,15 +119,8 @@ class TtkGrid(wxg.Grid):
 
     def init_row(self):
         """Initialize a new row."""
-        new_row = {}
         new_row_idx = len(self.data)
-        child = self.setup.get('child', None)
-
-        for key, value in self.setup['fields'].items():
-            if child is not None and key == child:
-                new_row[key] = []
-            else:
-                new_row[key] = value[FIELD_KEY]
+        new_row = self.setup.get_default_object(self.name)
         self.data.append(new_row)
 
         self.BeginBatch()
@@ -153,14 +148,14 @@ class TtkGrid(wxg.Grid):
         row = evt.GetRow()
         col = evt.GetCol()
         key = self.setup['columns'][col]
-        typestring = self.setup['fields'][key][FIELD_TYPE]
+        typestring = self.setup['fields'][key]["type"]
         value = str2type(typestring, self.GetCellValue(row, col))
 
-        # if self.data is None:
-        #     self.data = []
-
-        if ("prevent_new_row" not in self.setup and row >= len(self.data)):
-            self.changed_rows(1)
+        try:
+            self.setup["prevent_new_row"]
+        except KeyError:
+            if row >= len(self.data):
+                self.changed_rows(1)
 
         try:
             self.data[row][key] = value
@@ -168,16 +163,20 @@ class TtkGrid(wxg.Grid):
             self.init_row()
             self.data[row][key] = value
             self.SetCellValue(row, col, type2str(value))
-        
+
         self.SetGridCursor(row, col)
         evt.Skip()
-        # print(f"TtkGrid.on_cell_changed - name: {self.name}\n\tNew value in self.data: {self.data[row][key]}")
 
     def on_cell_select(self, evt):
         """Handle select event."""
         row = evt.GetRow()
-        child = self.setup.get('child', None)
-        self.update_child_grid(row, child)
+        try:
+            child = list(self.setup['child_data'].keys())[0]
+        except KeyError:
+            self.update_child_grid(row, None)
+        else:
+            self.update_child_grid(row, child)
+
         evt.Skip()
 
     def update_child_grid(self, row, child_key):
@@ -196,9 +195,13 @@ class TtkGrid(wxg.Grid):
         # Return before opening menu if grid is set as read only.
         selected = self.GetSelectedRows()
         self.rclick_row = evt.GetRow()
+        col = evt.GetCol()
 
-        if 'read_only' in self.setup:
-            return
+        try:
+            if self.setup["fields"][self.setup["columns"][col]]["read_only"]:
+                return
+        except KeyError:
+            pass
 
         if not hasattr(self, 'id_copy'):
             self.id_copy = wx.NewIdRef()
@@ -232,7 +235,7 @@ class TtkGrid(wxg.Grid):
             menu.Enable(self.id_paste, False)
 
         # Append database menuitems if grid has database items.
-        if 'db' in self.setup:
+        if self.name in ["materials", "products"]:
             menu.AppendSeparator()
             menu.Append(self.id_itdb, GRIDMENU_ITDB, GRIDMENU_ITDB_HELP)
             menu.Append(self.id_ffdb, GRIDMENU_FFDB, GRIDMENU_FFDB_HELP)
@@ -243,6 +246,13 @@ class TtkGrid(wxg.Grid):
         self.PopupMenu(menu)
         menu.Destroy()
         self.rclick_row = None
+
+    def on_col_size(self, evt):
+        """Save the new column size to setup."""
+        col = evt.GetRowOrCol()
+        key = self.setup["columns"][col]
+        self.setup['fields'][key]['width'] = self.GetColSize(col)
+        # print(f"New columns width: {self.setup['fields'][key]['width']}")
 
     def on_copy(self, evt):
         """Copy the selected cells."""
@@ -280,7 +290,7 @@ class TtkGrid(wxg.Grid):
         if self.data is None:
             print(f"TtkGrid.on_editor_shown - No data initialized.")
             evt.Veto()
-        if self.setup['fields'][key][FIELD_READONLY]:
+        if self.setup['fields'][key]["read_only"]:
             print(f"TtkGrid.on_editor_shown - Key '{key}' is read only.")
             evt.Veto()
         evt.Skip()
@@ -345,19 +355,19 @@ class TtkGrid(wxg.Grid):
         if self.data is None:
             return
 
-        try:
-            col = self.setup['columns'].index('edited')
-        except ValueError:
-            pass
-        else:
-            for row, item in enumerate(self.data):
-                # value = self.GetCellValue(row, col)
-                value = item['edited']
-                try:
-                    colour = COLOUR_EDITED[value]
-                except KeyError:
-                    colour = COLOUR_WHITE
-                self.SetCellBackgroundColour(row, col, colour)
+        # try:
+        #     col = self.setup['columns'].index('edited')
+        # except ValueError:
+        #     pass
+        # else:
+        #     for row, item in enumerate(self.data):
+        #         # value = self.GetCellValue(row, col)
+        #         value = item['edited']
+        #         try:
+        #             colour = COLOUR_EDITED[value]
+        #         except KeyError:
+        #             colour = COLOUR_WHITE
+        #         self.SetCellBackgroundColour(row, col, colour)
         self.refresh_data()
 
     def set_col_format(self, col, typestring):

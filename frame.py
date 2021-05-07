@@ -41,7 +41,7 @@ class AppFrame(wx.Frame):
             style=wx.DEFAULT_FRAME_STYLE|wx.FULL_REPAINT_ON_RESIZE
         )
 
-        self.setup: Setup = setup.get_child("pages")
+        self.setup: Setup = setup
 
         from_file = read_file(None, ROOTDATA_FILE)
         if from_file is None:
@@ -58,11 +58,11 @@ class AppFrame(wx.Frame):
 
     def on_close_window(self, evt):
         print("Closing frame.")
+        self.setup.close()
         root = self.data.get([0])
         root.delete_all_children()
         # write_file(None, ROOTDATA_FILE, root.get_dict())
         # write_file(None, SETUP_FILE, self.setup)
-
         self.Destroy()
 
     def create_menubar(self):
@@ -97,11 +97,8 @@ class AppFrame(wx.Frame):
 
     def menu_new(self, evt):
         """Create new offer."""
-        # self.panel.data.new_offer()
-        def_item_name = self.setup["item"]["data"]["name"]["value"]
-        def_child_name = self.setup["child"]["data"]["name"]["value"]
-        data_item = self.data.get([0]).push(def_item_name, self.setup)
-        data_item.push(def_child_name, self.setup)
+        data_item = self.data.get([0]).push(self.setup)
+        data_item.push(self.setup)
         self.panel.refresh_tree()
 
     def menu_open(self, evt):

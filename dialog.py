@@ -1,11 +1,11 @@
 from copy import deepcopy
-from setup_grid import SetupGrid
-from ttk_data import FIELD_LABEL, FIELD_TYPE, str2type
 
 import wx
 import wx.dataview as dv
 
+from setup_grid import SetupGrid
 from database import Database
+from setup import Setup, str2type
 
 
 DBD_TITLE = "Tietokanta"
@@ -84,7 +84,7 @@ class DbDialog(wx.Dialog):
         self.collection = active_collection
         if self.collection is None:
             self.collection = list(self.collections.keys())[0]
-        self.setup = self.collections[self.collection]
+        self.setup: Setup = self.collections[self.collection]
         self.key = key
         self.search_value = value
         self.child_setups = child_setups
@@ -100,7 +100,7 @@ class DbDialog(wx.Dialog):
             self.collections[key]['label'] for key in self.collection_keys
         ]
         self.column_choices = [
-            self.setup['fields'][key][FIELD_LABEL] for key in self.column_keys
+            self.setup['fields'][key]["label"] for key in self.column_keys
         ]
 
         self.collection_sel = self.collection_keys.index(self.collection)
@@ -191,7 +191,7 @@ class DbDialog(wx.Dialog):
         # Get new column information.
         self.column_keys = list(self.setup['fields'].keys())
         self.column_choices = [
-            self.setup['fields'][key][FIELD_LABEL] for key in self.column_keys
+            self.setup['fields'][key]["label"] for key in self.column_keys
         ]
         self.key = self.column_keys[self.column_sel]
 
@@ -384,7 +384,7 @@ class DbAddDialog(wx.Dialog):
             child_label = wx.StaticText(self, label=self.child_setup['label'])
 
             for value in self.child_setup['fields'].values():
-                self.child_list.AppendTextColumn(value[FIELD_LABEL])
+                self.child_list.AppendTextColumn(value["label"])
 
             self.Bind(wx.EVT_BUTTON, self.on_btn_child_add, child_add)
 
@@ -425,7 +425,7 @@ class DbAddDialog(wx.Dialog):
         """Update the edited value to the item to add."""
         row = evt.GetRow()
         key = list(self.object)[row]   # Uses all fields instead of columns.
-        value = str2type(self.setup['fields'][key][FIELD_TYPE], self.grid.GetCellValue(row, 0))
+        value = str2type(self.setup['fields'][key]["type"], self.grid.GetCellValue(row, 0))
         self.object[key] = value
 
     def on_btn_child_add(self, evt):
@@ -450,6 +450,6 @@ class DbAddDialog(wx.Dialog):
         for idx in sel_idx:
             self.child_list.DeleteItem(self.child_list.RowToItem(idx))
             try:
-                del self.object[self.setup['child']][idx]
+                del self.object["parts"][idx]
             except:
                 pass

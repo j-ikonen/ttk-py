@@ -6,7 +6,7 @@ from setup import Setup
 
 
 class TtkData:
-    def __init__(self, name, page, setup, child):
+    def __init__(self, page, setup, child):
         """### Initiate the TtkData super class.
 
         ### Args:
@@ -15,13 +15,14 @@ class TtkData:
         - setup (dict): Setup dictionary for self.data formatting etc.
         - children (bool): Does this instance have children. Default False.
         """
-        self.name = name
+        self.name = setup[self.key]["static"]["label"]["value"]
         self.page = page
         self.setup: Setup = setup.get_child(self.key)
 
         self.child = child
         self.children = None if child is None else []
         self.data = self.setup.get_page_init_data()
+        # print(f"\nTtkData - self.data:\n\n {self.data}\n")
 
         # self.init_data()
 
@@ -43,7 +44,7 @@ class TtkData:
     @classmethod
     def from_dict(cls, data: dict, setup):
         """Return a Data object created from dictionary data."""
-        obj = cls(data['name'], setup)
+        obj = cls(setup)
         obj.data = deepcopy(data['data'])
         if obj.child is not None:
             for child in data['ttkdata_children']:
@@ -98,33 +99,21 @@ class TtkData:
         return obj
 
     def get_name(self) -> str:
-        return self.name
+        return self.data["name"]
     
     def get_page(self) -> int:
         return self.page
 
-    # def init_data(self):
-    #     """Initialize the data."""
-    #     for k, v in self.setup.items():
-    #         if isinstance(v, dict):
-    #             if v['type'] == "SetupGrid":
-    #                 fs = v['fields'].items()
-    #                 self.data[k] = {k: type_default(f[FIELD_TYPE]) for k, f in fs}
-
-    #             else:
-    #                 self.data[k] = type_default(v['type'])
-
-    def push(self, name, setup):
+    def push(self, setup):
         """Add a new child to end of list. Return the new child.
 
         Args:
-        - name (str): Name of new child.
         - setup (dict): Setup dictionary for the new child.
         """
         if self.child is None:
             raise AttributeError(f"{type(self)} with name '{self.name}' does " +
                                   "not have children.")
-        self.children.append(self.child(name, setup))
+        self.children.append(self.child(setup))
         child = self.children[-1]
         return child
 
@@ -154,8 +143,8 @@ class TtkData:
 
 class Data(TtkData):
     key = "app"
-    def __init__(self, name, setup):
-        super().__init__(name, 0, setup, DataRoot)
+    def __init__(self, setup):
+        super().__init__(0, setup, DataRoot)
         self.active = self
 
     def delete(self, link: list):
@@ -188,8 +177,8 @@ class Data(TtkData):
 
 class DataRoot(TtkData):
     key = "root"
-    def __init__(self, name, setup):
-        super().__init__(name, 1, setup, DataItem)
+    def __init__(self, setup):
+        super().__init__(1, setup, DataItem)
 
     def file_open(self, folder, file):
         """Return True if the child is already opened."""
@@ -202,14 +191,14 @@ class DataRoot(TtkData):
 
 class DataItem(TtkData):
     key = "item"
-    def __init__(self, name, setup):
-        super().__init__(name, 2, setup, DataChild)
+    def __init__(self, setup):
+        super().__init__(2, setup, DataChild)
 
 
 class DataChild(TtkData):
     key = "child"
-    def __init__(self, name, setup):
-        super().__init__(name, 3, setup, None)
+    def __init__(self, setup):
+        super().__init__(3, setup, None)
 
     def process_codes(self):
         """Process the coded fields in data."""
@@ -232,21 +221,25 @@ class DataChild(TtkData):
                         try:
                             obj[field_key] = eval(code)
                         except:
-                            print(f"Error in eval: \n\tfield_key: {field_key}\t\ncode: {code}")
+                            print(f"Error in eval: \n\tfield_key: {field_key}\n\tcode: {code}" +
+                                  f"\n\tobj: {obj}")
 
                         if "child_data" in self.setup["data"][data_key]:
                             child_setup = self.setup["data"][data_key]['child_data']
                             parent = obj
-                            for child_key, child_value in child_setup.items():
+                            for child_key in child_setup.keys():
                                 child_codes = self.setup["codes"][child_key]
                                 for cf_key, c_code in child_codes.items():
                                     for obj in parent[child_key]:
-                                        if code[0] == "$":
-                                            code = obj[code[1:]]
+                                        if c_code[0] == "$":
+                                            c_code = obj[c_code[1:]]
                                         try:
                                             obj[cf_key] = eval(c_code)
                                         except:
-                                            print(f"Error in eval: \n\tfield_key: {cf_key}\t\ncode: {code}")
+                                            print(f"Error in eval:\n"+ 
+                                                  f"\tfield_key: {cf_key}\n" +
+                                                  f"\tcode: {c_code}\n" +
+                                                  f"\tobj: {obj}")
                             obj = parent
 
     def find(self, datakey, returnkey, matchkey, matchvalue):

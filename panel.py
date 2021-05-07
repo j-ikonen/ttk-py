@@ -1,3 +1,4 @@
+from setup import Setup
 import wx
 import wx.adv
 import wx.dataview as dv
@@ -25,7 +26,7 @@ class Panel(wx.Panel):
         super().__init__(parent)
 
         self.treedata: ttk.Data = data
-        self.setup: dict = setup
+        self.setup: Setup = setup
 
         winids = []
         self.left_win = self.create_left_window(winids)
@@ -40,11 +41,11 @@ class Panel(wx.Panel):
         self.Bind(wx.EVT_SIZE, self.on_size)
         self.Bind(dv.EVT_DATAVIEW_SELECTION_CHANGED, self.on_tree_select)
 
-        fcmult = self.treedata.get([0]).get_data('fc_mult')
-        page = Page(self.book, self.setup)
-        rootpage = RootPage(self.book, self.setup, self.refresh_tree)
-        itempage = ItemPage(self.book, self.setup, fcmult, self.refresh_tree)
-        childpage = ChildPage(self.book, self.setup, self.refresh_tree)
+        fcmult = self.treedata.get([0]).get_data('fieldcount_multiplier')
+        page = Page(self.book, self.setup.get_child("app"))
+        rootpage = RootPage(self.book, self.setup.get_child("root"), self.refresh_tree)
+        itempage = ItemPage(self.book, self.setup.get_child("item"), fcmult, self.refresh_tree)
+        childpage = ChildPage(self.book, self.setup.get_child("child"), self.refresh_tree)
 
         self.book.AddPage(page, "page", True)
         self.book.AddPage(rootpage, "rootpage")
