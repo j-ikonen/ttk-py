@@ -131,7 +131,7 @@ class TtkGrid(wxg.Grid):
     def init_row(self):
         """Initialize a new row."""
         new_row_idx = len(self.data)
-        new_row = self.setup.get_default_object(self.name)
+        new_row = self.setup.get_default_object()
         self.data.append(new_row)
 
         self.BeginBatch()
@@ -188,7 +188,7 @@ class TtkGrid(wxg.Grid):
             x edit namekey cell
             x edit on uninitiated row
         """
-        print(f"\non_cell_select - row: {evt.GetRow()}, col: {evt.GetCol()}")
+        # print(f"\non_cell_select - row: {evt.GetRow()}, col: {evt.GetCol()}")
         row = evt.GetRow()
         if self.data is None:
             evt.Skip()
@@ -381,7 +381,7 @@ class TtkGrid(wxg.Grid):
     def on_find_from_db(self, evt):
         """Open database dialog with current grid selected."""
         print("TtkGrid.on_find_from_db TO BE IMPLEMENTED")
-        with DbDialog(self, {self.name: self.setup}, None) as dlg:
+        with DbDialog(self, self.setup.get_grandparent(), {self.name: self.setup}) as dlg:
             if dlg.ShowModal() == wx.ID_OK:
                 for key, objlist in dlg.to_offer.items():
                     if key == self.name:

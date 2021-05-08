@@ -83,6 +83,10 @@ class Setup:
 
         self.link = link
         self.local = self.get_from_root(link)
+        
+        # Make sure local is not a link.
+        if "link" in self.local:
+            self.local = self.get_from_root(self.local["link"])
 
     def __getitem__(self, key):
         return self.local[key]
@@ -96,17 +100,17 @@ class Setup:
     def close(self):
         write_file(None, Setup.savefile, Setup.root)
 
-    def get_default_object(self, objkey) -> dict:
+    def get_default_object(self, objkey=None) -> dict:
         """Return the local defined default object. Dictionary or a row in a list.
         
         Args:
         - key (str): Key of the object.
         """
         object = {}
-        try:
-            obj_setup = self.local["data"][objkey]
-        except KeyError:
+        if objkey is None:
             obj_setup = self.local
+        else:
+            obj_setup = self.local["data"][objkey]
 
         if "fields" in obj_setup:
             # print("Setup.get_default_object")

@@ -24,7 +24,7 @@ class NotebookDialog(wx.Dialog):
 
         for obj in self.pagedata:
             panel = wx.Panel(self.book)
-            if obj['setup']['type'] == "DataGrid":
+            if obj['setup']['ui_type'] == "ArrayOfObjectsGrid":
                 sizer_grid = wx.BoxSizer(wx.VERTICAL)
                 grid = TtkGrid(panel, obj['name'], obj['setup'])
                 grid.change_data(obj['data'])

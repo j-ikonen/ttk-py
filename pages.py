@@ -80,7 +80,7 @@ class ItemPage(wx.Panel):
         super().__init__(parent)
         self.SetBackgroundColour((255, 255, 200))
 
-        self.setup_child: Setup = setup.get_parent().get_child("child")
+        # self.setup_child: Setup = setup.get_parent().get_child("child")
         self.setup: Setup = setup
         self.data: DataItem = None
         self.refresh_tree = refresh_tree
@@ -89,7 +89,7 @@ class ItemPage(wx.Panel):
 
         setup_label: dict = self.setup["static"]["label"]
         setup_use_global: dict = self.setup['data']["use_global"]
-        self.setup_fcmult = self.setup.get("data", "fieldcount_multiplier")
+        self.setup_fcmult = self.setup.get_grandchild("data", "fieldcount_multiplier")
 
         txt_name = wx.StaticText(self, label=setup_label["value"])
         self.txtc_name = wx.TextCtrl(self, value="", size=TXTC_NAME_SIZE)
@@ -100,7 +100,7 @@ class ItemPage(wx.Panel):
 
         self.chk_labels = setup_use_global["label"]
         self.chk_fc = wx.CheckBox(
-            self, label=self.chk_labels[0],
+            self, label=self.chk_labels[0], size=(200,-1),
             style=wx.CHK_3STATE|wx.CHK_ALLOW_3RD_STATE_FOR_USER
         )
         self.chk_fc.Set3StateValue(setup_use_global["value"])
@@ -181,7 +181,8 @@ class ItemPage(wx.Panel):
             with wx.TextEntryDialog(self, TEDLG_MSG) as dlg:
                 if dlg.ShowModal() == wx.ID_OK:
                     name = dlg.GetValue()
-                    self.data.push(self.setup_child)
+                    new_obj: DataChild = self.data.push(self.setup.get_parent())
+                    new_obj.set_data("name", name)
                     self.refresh_tree()
 
     def on_check(self, evt):
@@ -196,11 +197,8 @@ class ItemPage(wx.Panel):
         """Delete a child from DataItem."""
         if self.data is not None:
             child_list = [child.get_name() for child in self.data.get_children()]
-            with wx.MultiChoiceDialog(
-                self, MCDLG_MSG, MCDLG_CAP,
-                len(child_list), child_list
-            ) as dlg:
 
+            with wx.MultiChoiceDialog(self, MCDLG_MSG, MCDLG_CAP, child_list) as dlg:
                 if dlg.ShowModal() == wx.ID_OK:
                     selections: list = dlg.GetSelections()
                     selections.sort(reverse=True)
@@ -229,7 +227,7 @@ class ItemPage(wx.Panel):
         """Update the DataItem name."""
         if self.data is not None:
             txtc: wx.TextCtrl = evt.GetEventObject()
-            self.data.set_name(txtc.GetValue())
+            self.data.set_data("name", txtc.GetValue())
             self.refresh_tree()
 
     def update_fieldcount(self):
@@ -260,6 +258,7 @@ class ItemPage(wx.Panel):
         """Update the multipliers in fieldcount data and grid."""
         local_mult: list = self.data.get_data('fieldcount_multiplier')
         use_global: int = self.data.get_data('use_global')
+        local_unit_test = [row["unit"] for row in local_mult]
         new_fc = []
         total = 0.0
         total_count = 0
@@ -273,7 +272,7 @@ class ItemPage(wx.Panel):
 
             # Get the local or global mult.
             mult = 0.0
-            if use_global == 0 or unit in local_mult:
+            if use_global == 0 or (use_global == 2 and unit in local_unit_test):
                 source = local_mult
             else:
                 source = self.global_mult
@@ -426,11 +425,13 @@ class ChildPage(wx.Panel):
         self.grid_materials.change_data(data.get_data('materials'))
         self.grid_products.change_data(data.get_data('products'))
         self.grid_parts.change_data(None)
+        if len(self.grid_products.data) > 0:
+            self.grid_products.update_children(0)
 
     def on_btn_db(self, evt):
         """Open the database dialog."""
         # child_setups = {'products.parts': self.setup_parts}
-        with DbDialog(self, self.setup_collections) as dlg:
+        with DbDialog(self, self.setup, self.setup_collections) as dlg:
             if dlg.ShowModal() == wx.ID_OK:
                 for key, objlist in dlg.to_offer.items():
                     for obj in objlist:

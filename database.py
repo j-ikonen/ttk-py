@@ -32,20 +32,42 @@ class Database:
             Database.collection = Database.db[collection_name]
 
     def count(self, filter=None):
+        """Return the number of documents matching filter in database.
+
+        Args:
+        - filter (dict): Filter used to match the documents.
+        Default None for all documents.
+        """
         if filter is None:
             return Database.collection.count_documents()
         else:
             return Database.collection.count_documents(filter)
     
-    def find(self, filter, many=False, page=0):
-        """Return a document or list of documents.
-        
+    def delete(self, obj):
+        """Delete document from database.
+
         Args:
-            - filter (dict): Filter document used for finding a match.
-            - many (bool): If True return list of results matching the filter
-            instead of a single document.
-            - page (int): The result page number. Limit * page determines how 
-            many results will be skipped from beginning.
+        - obj (dict): The object or list of objects to delete.
+
+        Return:
+        - (int) Number of deleted items.
+        """
+        return Database.collection.delete_one(obj).deleted_count
+
+    def find(self, filter, many=False, page=0):
+        """Find documents in database.
+
+        Args:
+        - filter (dict): Filter document used for finding a match.
+
+        - many (bool): If True return list of results matching the filter
+        instead of a single document.
+
+        - page (int): The result page number. Limit * page determines how 
+        many results will be skipped from beginning.
+        
+        Returns:
+        - The document or list of documents.
         """
         if not many:
             return Database.collection.find_one(filter)
@@ -59,11 +81,7 @@ class Database:
         return Database.collection.index_information()
 
     def get_edited(self, filter) -> str:
-        """Return a char for edited status. Return "" for None filter.
-        EDITED_NO_MATCH for no mathcing document found with 'code'.
-        EDITED_DIFF_MATCH for edited document found with 'code'.
-        EDITED_MATCH for same document found with 'code'
-        """
+        """Return a char for edited status. Return "" for None filter."""
         ecode = MISSING
 
         if filter is None:
@@ -92,8 +110,13 @@ class Database:
     def replace(self, filter, replacement, upsert=False) -> int:
         """Replace a document matching filter with replacement.
         
-        If upsert is True insert the replacement if filter finds nothing.
-        Return the count of modified documents.
+        Args:
+        - filter (dict): Dictionary used to find the document to replace.
+        - replacement (dict): The new document.
+        - upsert (bool): Use insert if no match found with filter.
+
+        Returns:
+        - The count of modified documents.
         """
         result = Database.collection.replace_one(filter, replacement, upsert)
         return result.modified_count

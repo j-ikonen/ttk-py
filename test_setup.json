@@ -155,19 +155,19 @@
                 },
                 "materials": {
                     "ui_type": "ArrayOfObjectsGrid",
-                    "label": "",
+                    "label": "Materiaalit",
                     "fields": {
                         "code": {"type": "string", "default": "", "label": "Koodi", "width": 65, "read_only": false},
                         "desc": {"type": "string", "default": "", "label": "Kuvaus", "width": 80, "read_only": false},
-                        "thck": {"type": "long", "default": 0, "label": "Paksuus (mm)", "width": 25, "read_only": false},
+                        "thck": {"type": "long", "default": 0, "label": "Paksuus (mm)", "width": 35, "read_only": false},
                         "prod": {"type": "string", "default": "", "label": "Valmistaja", "width": 80, "read_only": false},
-                        "loss": {"type": "double:6,2", "default": 0.0, "label": "Hukka", "width": 25, "read_only": false},
-                        "unit": {"type": "choice:€/m2,€/kpl", "default": "€/m2", "label": "Hintayksikkö", "width": 35, "read_only": false},
-                        "cost": {"type": "double:6,2", "default": 0.0, "label": "Hinta", "width": 25, "read_only": false},
-                        "edg_cost": {"type": "double:6,2", "default": 0.0, "label": "Reunanauhan hinta", "width": 25, "read_only": false},
-                        "add_cost": {"type": "double:6,2", "default": 0.0, "label": "Lisähinta", "width": 25, "read_only": false},
-                        "discount": {"type": "double:6,2", "default": 1.0, "label": "Alennus", "width": 25, "read_only": false},
-                        "tot_cost": {"type": "double:6,2", "default": 0.0, "label": "Kok. Hinta", "width": 25, "read_only": true}
+                        "loss": {"type": "double:6,2", "default": 0.0, "label": "Hukka", "width": 35, "read_only": false},
+                        "unit": {"type": "choice:€/m2,€/kpl", "default": "€/m2", "label": "Hintayksikkö", "width": 45, "read_only": false},
+                        "cost": {"type": "double:6,2", "default": 0.0, "label": "Hinta", "width": 35, "read_only": false},
+                        "edg_cost": {"type": "double:6,2", "default": 0.0, "label": "Reunanauhan hinta", "width": 35, "read_only": false},
+                        "add_cost": {"type": "double:6,2", "default": 0.0, "label": "Lisähinta", "width": 35, "read_only": false},
+                        "discount": {"type": "double:6,2", "default": 0.0, "label": "Alennus", "width": 35, "read_only": false},
+                        "tot_cost": {"type": "double:6,2", "default": 0.0, "label": "Kok. Hinta", "width": 35, "read_only": true}
                     },
                     "columns": [
                         "code",
@@ -189,18 +189,18 @@
                     "namekey": "code",
                     "fields": {
                         "code": {"type": "string", "default": "", "label": "Koodi", "width": 80, "read_only": false},
-                        "count": {"type": "long", "default": 0, "label": "Määrä", "width": 80, "read_only": false},
-                        "group": {"type": "string", "default": "", "label": "Tuoteryhmä", "width": 80, "read_only": false},
-                        "desc": {"type": "string", "default": "", "label": "Kuvaus", "width": 80, "read_only": false},
-                        "prod": {"type": "string", "default": "", "label": "Valmistaja", "width": 80, "read_only": false},
+                        "count": {"type": "long", "default": 0, "label": "Määrä", "width": 45, "read_only": false},
+                        "group": {"type": "string", "default": "", "label": "Tuoteryhmä", "width": 100, "read_only": false},
+                        "desc": {"type": "string", "default": "", "label": "Kuvaus", "width": 100, "read_only": false},
+                        "prod": {"type": "string", "default": "", "label": "Valmistaja", "width": 100, "read_only": false},
                         "inst_unit": {"type": "string", "default": "", "label": "Asennusyksikkö", "width": 80, "read_only": false},
-                        "x": {"type": "long", "default": 0, "label": "Leveys", "width": 80, "read_only": false},
-                        "y": {"type": "long", "default": 0, "label": "Korkeus", "width": 80, "read_only": false},
-                        "z": {"type": "long", "default": 0, "label": "Syvyys", "width": 80, "read_only": false},
-                        "work_time": {"type": "double:6,2", "default": 0.0, "label": "Työaika", "width": 80, "read_only": false},
-                        "work_cost": {"type": "double:6,2", "default": 0.0, "label": "Työhinta", "width": 80, "read_only": false},
-                        "part_cost": {"type": "double:6,2", "default": 0.0, "label": "Osahinta", "width": 80, "read_only": true},
-                        "tot_cost": {"type": "double:6,2", "default": 0.0, "label": "Kok. Hinta", "width": 80, "read_only": true}
+                        "x": {"type": "long", "default": 0, "label": "Leveys", "width": 55, "read_only": false},
+                        "y": {"type": "long", "default": 0, "label": "Korkeus", "width": 55, "read_only": false},
+                        "z": {"type": "long", "default": 0, "label": "Syvyys", "width": 55, "read_only": false},
+                        "work_time": {"type": "double:6,2", "default": 0.0, "label": "Työaika", "width": 45, "read_only": false},
+                        "work_cost": {"type": "double:6,2", "default": 0.0, "label": "Työhinta", "width": 45, "read_only": false},
+                        "part_cost": {"type": "double:6,2", "default": 0.0, "label": "Osahinta", "width": 45, "read_only": true},
+                        "tot_cost": {"type": "double:6,2", "default": 0.0, "label": "Kok. Hinta", "width": 45, "read_only": true}
                     },
                     "columns": [
                         "code",
@@ -227,7 +227,7 @@
                             "fields": {
                                 "code": {"type": "string", "default": "", "label": "Koodi", "width": 80, "read_only": false},
                                 "desc": {"type": "string", "default": "", "label": "Kuvaus", "width": 80, "read_only": false},
-                                "use_predef": {"type": "string", "default": "", "label": "Esimääritys", "width": 25, "read_only": false},
+                                "use_predef": {"type": "string", "default": "", "label": "Esimääritys", "width": 35, "read_only": false},
                                 "mat": {"type": "string", "default": "", "label": "Materiaali", "width": 55, "read_only": false},
                                 "use_mat": {"type": "string", "default": "", "label": "Käyt. Mat", "width": 55, "read_only": true},
                                 "x": {"type": "long", "default": 0, "label": "Leveys", "width": 55, "read_only": true},
@@ -275,6 +275,8 @@
             "database": {
                 "materials": {
                     "collection": "materials",
+                    "unique_keys": ["code"],
+                    "ignore_keys": ["tot_cost"],
                     "eq_keys": [
                         "code",
                         "desc",
@@ -287,6 +289,8 @@
                 },
                 "products": {
                     "collection": "products",
+                    "unique_keys": ["code"],
+                    "ignore_keys": ["count", "part_cost", "tot_cost"],
                     "eq_keys": [
                         "code",
                         "group",
@@ -298,9 +302,9 @@
                     ],
                     "children": {
                         "parts": {
+                            "ignore_keys": ["x", "y", "z", "cost"],
                             "child_eq_keys": [
                                 "code",
-                                "desc",
                                 "code_x",
                                 "code_y",
                                 "code_z"

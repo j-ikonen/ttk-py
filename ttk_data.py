@@ -209,11 +209,10 @@ class DataChild(TtkData):
         find = self.find
         is_true = self.is_true
         # Iterate over grids.
-        for data_key, value in self.data.items():
-            if data_key in self.setup["codes"]:
-                codes = self.setup["codes"][data_key]
-                db = Database(data_key)
-                # for field_key, value in self.setup["data"][data_key]["fields"].items():
+        for grid_key, value in self.data.items():
+            if grid_key in self.setup["codes"]:
+                codes = self.setup["codes"][grid_key]
+                db = Database(grid_key)
                 for obj in value:
                     for field_key, code in codes.items():
                         if code[0] == "$":
@@ -225,22 +224,23 @@ class DataChild(TtkData):
                             # print(f"Error in eval: \n\tfield_key: {field_key}\n\tcode: {code}" +
                             #       f"\n\tobj: {obj}")
 
-                        if "child_data" in self.setup["data"][data_key]:
-                            child_setup = self.setup["data"][data_key]['child_data']
+                        if "child_data" in self.setup["data"][grid_key]:
+                            child_setup = self.setup["data"][grid_key]['child_data']
                             parent = obj
                             for child_key in child_setup.keys():
                                 child_codes = self.setup["codes"][child_key]
-                                for cf_key, c_code in child_codes.items():
-                                    for obj in parent[child_key]:
-                                        if c_code[0] == "$":
-                                            c_code = obj[c_code[1:]]
+
+                                for obj in parent[child_key]:
+                                    for ckey, ccode in child_codes.items():
+                                        if ccode[0] == "$":
+                                            ccode = obj[ccode[1:]]
                                         try:
-                                            obj[cf_key] = eval(c_code)
+                                            obj[ckey] = eval(ccode)
                                         except:
                                             pass
                                             # print(f"Error in eval:\n"+ 
                                             #       f"\tfield_key: {cf_key}\n" +
-                                            #       f"\tcode: {c_code}\n" +
+                                            #       f"\tcode: {ccode}\n" +
                                             #       f"\tobj: {obj}")
                             obj = parent
 

@@ -153,8 +153,13 @@ class AppFrame(wx.Frame):
                 selected_link = self.panel.treepanel.tree.GetItemData(selected_treeitem)
                 for n in selected:
                     # Move from deleted page to rootpage.
-                    if selected_link[-2] == n:
-                        self.panel.book.ChangeSelection(1)
+                    try:
+                        # Change to a safe page.
+                        if selected_link[-2] == n:
+                            self.panel.book.ChangeSelection(1)
+                    # Selected page is safe.
+                    except IndexError:
+                        pass
 
                     root.delete_child(n)
                 self.panel.refresh_tree()
