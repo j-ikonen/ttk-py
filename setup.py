@@ -90,6 +90,9 @@ class Setup:
     def __setitem__(self, key, value):
         self.local[key] = value
 
+    def __contains__(self, key):
+        return key in self.local
+
     def close(self):
         write_file(None, Setup.savefile, Setup.root)
 
@@ -144,6 +147,9 @@ class Setup:
                 print(f"Setup.get_page_init_data - ui_type '{value['ui_type']}'" +
                        " not defined.")
         return data
+
+    def get_keys(self):
+        return self.local.keys()
 
     def get_parent(self):
         return Setup(self.link[:-1])

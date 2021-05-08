@@ -339,6 +339,7 @@
                 "products": {
                     "ui_type": "ArrayOfObjectsGrid",
                     "label": "Tuotteet",
+                    "namekey": "code",
                     "fields": {
                         "code": {
                             "type": "string",
@@ -453,7 +454,7 @@
                             "label": "Osat",
                             "label_w_parent": "Osat tuotteeseen '{}'",
                             "label_wo_parent": "Tuotetta ei ole valittu",
-                            "key_parent_label_field": "code",
+                            "namekey_of_selected": "code",
                             "fields": {
                                 "code": {
                                     "type": "string",

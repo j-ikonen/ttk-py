@@ -38,32 +38,39 @@ COLOUR_WHITE = (255, 255, 255)
 
 
 class TtkGrid(wxg.Grid):
-    def __init__(self, parent, name, setup):
+    def __init__(self, parent, key, setup):
         """### Grid window for a list of objects.
-        
+
+        Supports updating only the first child defined in 'child_data' setup.
+
         ### Args:
         - parent: Parent wx.Window.
-        - name (str): Key for this grids setup information. Used as database collection.
-        - setup (dict): Setup information. Must contain keys 'fields' and 'columns'."""
+        - key (str): Key for this grids setup information. Used as database collection.
+        - setup (Setup): Setup information. Must contain atleast keys 'fields' and 'columns'."""
         super().__init__(parent)
 
         self.data = None
         self.setup: Setup = setup
         self.child_grid = None
-        self.name = name
+        self.child_label = None
+        self.setup_children = None
+        self.name = key
         self.copied = []
         self.rclick_row = None
+        self.is_child_changed = None
+        self.namekey = None
+        self.last_row = None
 
-        fields = self.setup['fields']
-        columns = self.setup['columns']
-        self.CreateGrid(1, len(columns))
+        self.fields = self.setup['fields']
+        self.columns = self.setup['columns']
+        self.SetDefaultRowSize(30)
+        self.CreateGrid(1, len(self.columns))
         self.SetRowLabelSize(30)
 
-        for n, key in enumerate(columns):
-            self.set_col_format(n, fields[key]["type"])
-            self.SetColLabelValue(n, fields[key]["label"])
-            # self.AutoSizeColLabelSize(n)
-            self.SetColSize(n, fields[key]["width"])
+        for n, key in enumerate(self.columns):
+            self.set_col_format(n, self.fields[key]["type"])
+            self.SetColLabelValue(n, self.fields[key]["label"])
+            self.SetColSize(n, self.fields[key]["width"])
 
         self.Bind(wxg.EVT_GRID_CELL_CHANGED, self.on_cell_changed)
         self.Bind(wxg.EVT_GRID_EDITOR_SHOWN, self.on_editor_shown)
@@ -71,8 +78,12 @@ class TtkGrid(wxg.Grid):
         self.Bind(wxg.EVT_GRID_SELECT_CELL, self.on_cell_select)
         self.Bind(wxg.EVT_GRID_CMD_COL_SIZE, self.on_col_size)
 
-    def set_child_grid(self, grid):
+    def set_child(self, grid, label):
+        """Set the Grid and StaticText labels for a child of this grid."""
         self.child_grid = grid
+        self.child_label = label
+        self.setup_children = self.setup["child_data"]
+        self.namekey = self.setup["namekey"]
 
     def change_data(self, data):
         """Change the data to given source."""
@@ -102,7 +113,7 @@ class TtkGrid(wxg.Grid):
         """Refresh the data."""
         self.BeginBatch()
         for row, item in enumerate(self.data):
-            for col, key in enumerate(self.setup['columns']):
+            for col, key in enumerate(self.columns):
                 self.SetCellValue(row, col, type2str(item[key]))
         self.EndBatch()
 
@@ -124,7 +135,7 @@ class TtkGrid(wxg.Grid):
         self.data.append(new_row)
 
         self.BeginBatch()
-        for n, k in enumerate(self.setup['columns']):
+        for n, k in enumerate(self.columns):
             self.SetCellValue(new_row_idx, n, type2str(self.data[new_row_idx][k]))
         self.EndBatch()
         return new_row_idx
@@ -135,8 +146,8 @@ class TtkGrid(wxg.Grid):
         self.changed_rows(1)
         self.BeginBatch()
         for key, value in object.items():
-            if key in self.setup['columns']:
-                col = self.setup['columns'].index(key)
+            if key in self.columns:
+                col = self.columns.index(key)
                 grid_value = type2str(value)
                 self.SetCellValue(row, col, grid_value)
 
@@ -147,15 +158,15 @@ class TtkGrid(wxg.Grid):
         """Save changed value to data and append a row if edit is at last row."""
         row = evt.GetRow()
         col = evt.GetCol()
-        key = self.setup['columns'][col]
-        typestring = self.setup['fields'][key]["type"]
+        key = self.columns[col]
+        typestring = self.fields[key]["type"]
         value = str2type(typestring, self.GetCellValue(row, col))
 
-        try:
-            self.setup["prevent_new_row"]
-        except KeyError:
-            if row >= len(self.data):
-                self.changed_rows(1)
+        # If "prevent_new_row" key does not exist and 
+        # changed cell is in last row of grid with uninitiated data, 
+        # notify the grid of an added row.
+        if "prevent_new_row" not in self.setup and row >= len(self.data):
+            self.changed_rows(1)
 
         try:
             self.data[row][key] = value
@@ -163,32 +174,60 @@ class TtkGrid(wxg.Grid):
             self.init_row()
             self.data[row][key] = value
             self.SetCellValue(row, col, type2str(value))
+            self.update_children(row)
 
-        self.SetGridCursor(row, col)
         evt.Skip()
 
     def on_cell_select(self, evt):
-        """Handle select event."""
+        """Handle select event.
+        
+        Supports updating only the first child defined in 'child_data' setup.
+        is_child_changed true when
+            x select uninitiated row after initiated row
+            x select initiated row
+            x edit namekey cell
+            x edit on uninitiated row
+        """
+        print(f"\non_cell_select - row: {evt.GetRow()}, col: {evt.GetCol()}")
         row = evt.GetRow()
-        try:
-            child = list(self.setup['child_data'].keys())[0]
-        except KeyError:
-            self.update_child_grid(row, None)
-        else:
-            self.update_child_grid(row, child)
+        if self.data is None:
+            evt.Skip()
+            return
+
+        if row >= len(self.data) or row != self.last_row:
+            self.update_children(row)
+
+        self.last_row = row
 
         evt.Skip()
 
-    def update_child_grid(self, row, child_key):
+    def update_children(self, row, label_only=False):
         """Update the data in child grid."""
-        if child_key is not None and self.data is not None:
+        if self.setup_children is None:
+            return
+
+        for child_key in self.setup_children.keys():
+
+            csetup = self.setup_children[child_key]
+
             if row >= len(self.data):
-                self.child_grid.change_data(None)
+                label = csetup["label_wo_parent"]
+                data = None
             else:
+                # Init missing child.
                 if self.data[row][child_key] is None:
                     self.data[row][child_key] = []
 
-                self.child_grid.change_data(self.data[row][child_key])
+                namekey_of_selected = self.setup["namekey"]
+                name_of_selected = self.data[row][namekey_of_selected]
+
+                label = csetup["label_w_parent"].format(name_of_selected)
+                data = self.data[row][child_key]
+
+            if not label_only:
+                self.child_grid.change_data(data)
+            self.child_label.SetLabel(label)
+
 
     def on_cell_rclick(self, evt):
         """Open menu on right click."""
@@ -351,7 +390,7 @@ class TtkGrid(wxg.Grid):
 
     def refresh_attr(self):
         """Refresh the cell attributes where required."""
-        print("TtkGrid.refresh_attr")
+        # print("TtkGrid.refresh_attr")
         if self.data is None:
             return
 

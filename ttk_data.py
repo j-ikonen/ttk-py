@@ -221,8 +221,9 @@ class DataChild(TtkData):
                         try:
                             obj[field_key] = eval(code)
                         except:
-                            print(f"Error in eval: \n\tfield_key: {field_key}\n\tcode: {code}" +
-                                  f"\n\tobj: {obj}")
+                            pass
+                            # print(f"Error in eval: \n\tfield_key: {field_key}\n\tcode: {code}" +
+                            #       f"\n\tobj: {obj}")
 
                         if "child_data" in self.setup["data"][data_key]:
                             child_setup = self.setup["data"][data_key]['child_data']
@@ -236,10 +237,11 @@ class DataChild(TtkData):
                                         try:
                                             obj[cf_key] = eval(c_code)
                                         except:
-                                            print(f"Error in eval:\n"+ 
-                                                  f"\tfield_key: {cf_key}\n" +
-                                                  f"\tcode: {c_code}\n" +
-                                                  f"\tobj: {obj}")
+                                            pass
+                                            # print(f"Error in eval:\n"+ 
+                                            #       f"\tfield_key: {cf_key}\n" +
+                                            #       f"\tcode: {c_code}\n" +
+                                            #       f"\tobj: {obj}")
                             obj = parent
 
     def find(self, datakey, returnkey, matchkey, matchvalue):

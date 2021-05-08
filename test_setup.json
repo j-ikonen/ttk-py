@@ -186,6 +186,7 @@
                 "products": {
                     "ui_type": "ArrayOfObjectsGrid",
                     "label": "Tuotteet",
+                    "namekey": "code",
                     "fields": {
                         "code": {"type": "string", "default": "", "label": "Koodi", "width": 80, "read_only": false},
                         "count": {"type": "long", "default": 0, "label": "Määrä", "width": 80, "read_only": false},
@@ -222,7 +223,7 @@
                             "label": "Osat",
                             "label_w_parent": "Osat tuotteeseen '{}'",
                             "label_wo_parent": "Tuotetta ei ole valittu",
-                            "key_parent_label_field": "code",
+                            "namekey_of_selected": "code",
                             "fields": {
                                 "code": {"type": "string", "default": "", "label": "Koodi", "width": 80, "read_only": false},
                                 "desc": {"type": "string", "default": "", "label": "Kuvaus", "width": 80, "read_only": false},
