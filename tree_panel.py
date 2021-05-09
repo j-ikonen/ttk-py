@@ -60,6 +60,41 @@ class TreePanel(wx.Panel):
                 self.tree.AppendItem(item, name, data=link)
         # self.Refresh()
 
+    def refresh(self, treelist):
+        """Refresh the content of the tree with new data."""
+        self.tree.DeleteAllItems()
+        item = dv.NullDataViewItem
+
+        for tup in treelist:
+            if len(tup) == 2:
+                expanded = self.get_expanded(tup[0])
+                item = self.tree.AppendContainer(
+                    dv.NullDataViewItem,
+                    tup[1],
+                    expanded=expanded,
+                    data={'offer_id': tup[0]}
+                )
+            elif len(tup) == 3:
+                expanded = self.get_expanded(tup[0] + tup[2])
+                self.tree.AppendItem(
+                    item,
+                    tup[1],
+                    data={'offer_id': tup[0], "group_id": tup[2]}
+                )
+            else:
+                pass
+
+
+
+    def get_expanded(self, key):
+        """Return True if expanded or init if not set before."""
+        if key in self.expanded:
+            expanded = self.expanded[key]
+        else:
+            self.expanded[key] = True
+            expanded = True
+        return expanded
+
     def get_selected_link(self):
         """Return link to selected item."""
         link = self.tree.GetItemData(self.tree.GetSelection())

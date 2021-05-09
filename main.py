@@ -1,35 +1,18 @@
 """
 TODO:
-    Is Asennusyksikkö choice or string?
     Do part dimensions differ in a way that requires cost code for each part?
 
-    Add remove from database button to database dialog.
-
-    Create dialog with Treebook for settings / global values.
-    Add predefined column widths.
+    Add coloring code cell based on database existance.
     Add part editing in database dialogs.
     Add code editor.
     Add ctrl arrow key scrolling to choice cells.
+    Create dialog with Treebook for settings / global values.
     Add FoldPanelBar to fold grids hidden.
     Change use_predef column in parts to bool.
-    Change Info into something closer to GridData.
-    Change TtkData.init_data to select the data on something other than isinstance(v, dict)
-    TtkGrid open rclickmenu needs collection keys.
 
-    DONE:
-    Add field count multiplier global and local editing.
-    Add field count list title and a check box for global/local multiplier
-    Add inst_unit variables and multipliers to offer.info.
-    Add Installunit count with multiplier and a total costs on offer page.
-    Make refresh on gridpage check for edited status.
-    Format edited columns as a colored cell.
-    Test Database dialogs with new column additions.
-    Change DbDialog to append items to grids in gridpage.
-    Fix adding parts to database.
 
 BUGS:
-    Possibly linking same groups list object across different offers on some unknown condition.
-        No way to reproduce found. Only happened once. Possibly fixed.
+
 
 Fields:
     edited:
@@ -89,7 +72,7 @@ from frame import AppFrame
 from database import Database
 from ttk_data import Data
 from setup import Setup
-
+from table import OfferTables
 
 def main():
     app = wx.App(useBestVisual=True)
@@ -97,6 +80,7 @@ def main():
     setup = Setup(['pages'])
     data = Data(setup)
     data.push(setup)
+    tables = OfferTables()
 
     indexes = Database('materials').get_indexes()
     if 'code' not in indexes:
@@ -106,7 +90,7 @@ def main():
     if 'code' not in indexes:
         Database('products').index('code', True)
 
-    frame = AppFrame(data, setup)
+    frame = AppFrame(tables, data, setup)
     frame.Show()
     frame.Layout()
 

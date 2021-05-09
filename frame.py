@@ -1,10 +1,11 @@
 
 import os
-from pages import ItemPage
 
 import wx
 from wx.core import MultiChoiceDialog
 
+from table import OfferTables
+from pages import ItemPage
 from ttk_data import Data, DataChild, DataItem, DataRoot
 from panel import Panel, FRAME_SIZE
 from setup import read_file, write_file, split_path, Setup
@@ -33,7 +34,7 @@ SETUP_FILE = "ttk_setup.json"
 
 
 class AppFrame(wx.Frame):
-    def __init__(self, data, setup):
+    def __init__(self, tables, data, setup):
         super().__init__(
             None,
             title=FRAME_TITLE,
@@ -42,6 +43,7 @@ class AppFrame(wx.Frame):
         )
 
         self.setup: Setup = setup
+        self.tables: OfferTables = tables
 
         from_file = read_file(None, ROOTDATA_FILE)
         if from_file is None:
@@ -52,7 +54,7 @@ class AppFrame(wx.Frame):
         self.CenterOnScreen()
         self.create_menubar()
 
-        self.panel = Panel(self, data, setup)
+        self.panel = Panel(self, tables, data, setup)
 
         self.Bind(wx.EVT_CLOSE, self.on_close_window)
 

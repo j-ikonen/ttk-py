@@ -1,3 +1,4 @@
+from table import OfferTables
 from setup import Setup
 import wx
 import wx.adv
@@ -15,7 +16,7 @@ BORDER = 5
 
 
 class Panel(wx.Panel):
-    def __init__(self, parent, data, setup):
+    def __init__(self, parent, tables, data, setup):
         """Handle MainPanel windows.
         
         Args:
@@ -27,6 +28,8 @@ class Panel(wx.Panel):
 
         self.treedata: ttk.Data = data
         self.setup: Setup = setup
+        self.tables: OfferTables = tables
+        self.offers = []
 
         winids = []
         self.left_win = self.create_left_window(winids)
@@ -122,3 +125,6 @@ class Panel(wx.Panel):
         """Handle refreshing the tree."""
         datatree = self.treedata.get_tree()
         self.treepanel.fill(datatree)
+
+        treelist = self.tables.get_treelist(self.offers)
+        self.treepanel.refresh(treelist)
