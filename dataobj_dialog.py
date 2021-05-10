@@ -1,4 +1,5 @@
 from copy import deepcopy
+from table import OfferTables
 import wx
 
 from setup_grid import SetupGrid
@@ -24,10 +25,11 @@ class DataObjectDialog(wx.Dialog):
 
         self.obj = obj
         self.setup = setup
+        self.tables = OfferTables()
 
         # wx.Windows
         txt_msg = wx.StaticText(self, label=DOD_MSG.format(setup['label']))
-        grid = SetupGrid(self, setup)
+        grid = SetupGrid(self, self.tables, "", "")
         btn_ok = wx.Button(self, wx.ID_OK)
         btn_cancel = wx.Button(self, wx.ID_CANCEL)
 
@@ -36,7 +38,7 @@ class DataObjectDialog(wx.Dialog):
         # Setup
         self.CenterOnParent()
         grid.SetColSize(0, DOD_COL_SIZE)
-        grid.change_data(obj)
+        grid.change_data(obj, ("",))
         btn_ok.SetDefault()
 
         # Sizers

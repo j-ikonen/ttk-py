@@ -1,4 +1,5 @@
 from copy import deepcopy
+from table import OfferTables
 
 import wx
 import wx.grid as wxg
@@ -38,7 +39,7 @@ COLOUR_WHITE = (255, 255, 255)
 
 
 class TtkGrid(wxg.Grid):
-    def __init__(self, parent, key, setup):
+    def __init__(self, parent, tables, gridname: str, key, setup):
         """### Grid window for a list of objects.
 
         Supports updating only the first child defined in 'child_data' setup.
@@ -50,6 +51,9 @@ class TtkGrid(wxg.Grid):
         super().__init__(parent)
 
         self.data = None
+        self.tables: OfferTables = tables
+        self.tablename = gridname.split('.')[0]
+        self.gridname = gridname
         self.setup: Setup = setup
         self.child_grid = None
         self.child_label = None
@@ -87,34 +91,16 @@ class TtkGrid(wxg.Grid):
 
     def change_data(self, data):
         """Change the data to given source."""
-        # print(f"TtkGrid.change_data - name: {self.name}")
-        try:
-            current_len = len(self.data)
-        except TypeError:
-            current_len = 0
-        try:
-            new_len = len(data)
-        except TypeError:
-            new_len = 0
+        self.DeleteRows(0, self.GetNumberRows())
+        self.refresh_data(data)
 
-        if data is None:
-            # print("\tclear grid")
-            self.DeleteRows(0, current_len)
-            self.data = data
-        else:
-            # print("\trefresh to new size")
-            sz_change = new_len - current_len
-            self.data = data
-
-            self.changed_rows(sz_change)
-            self.refresh_data()
-
-    def refresh_data(self):
+    def refresh_data(self, data):
         """Refresh the data."""
         self.BeginBatch()
-        for row, item in enumerate(self.data):
-            for col, key in enumerate(self.columns):
-                self.SetCellValue(row, col, type2str(item[key]))
+        for row, item in enumerate(data):
+            for col, value in enumerate(item):
+                self.SetCellValue(row, col, type2str(value))
+        self.AppendRows()
         self.EndBatch()
 
     def changed_rows(self, n_change):
@@ -128,30 +114,32 @@ class TtkGrid(wxg.Grid):
         elif n_change < 0:
             self.DeleteRows(self.GetNumberRows() - 1 + n_change, 0 - n_change)
 
-    def init_row(self):
-        """Initialize a new row."""
-        new_row_idx = len(self.data)
-        new_row = self.setup.get_default_object()
-        self.data.append(new_row)
+    # def init_row(self):
+    #     """Initialize a new row."""
+    #     new_row_idx = self.GetNumberRows()
+    #     # new_row = self.setup.get_default_object()
+    #     # self.data.append(new_row)
 
-        self.BeginBatch()
-        for n, k in enumerate(self.columns):
-            self.SetCellValue(new_row_idx, n, type2str(self.data[new_row_idx][k]))
-        self.EndBatch()
-        return new_row_idx
 
-    def push(self, object: dict):
+    #     self.BeginBatch()
+    #     for n, k in enumerate(self.columns):
+    #         self.SetCellValue(new_row_idx, n, type2str(self.data[new_row_idx][k]))
+    #     self.EndBatch()
+    #     return new_row_idx
+
+    def push(self, object):
         """Push a new row with data from object to the grid."""
-        row = self.init_row()
-        self.changed_rows(1)
+        # row = self.init_row()
+        # self.changed_rows(1)
+        row = self.GetNumberRows()
+        self.tables.insert(self.gridname, object)
         self.BeginBatch()
-        for key, value in object.items():
-            if key in self.columns:
-                col = self.columns.index(key)
-                grid_value = type2str(value)
-                self.SetCellValue(row, col, grid_value)
+        self.AppendRows()
+        for col, value in enumerate(object):
+            grid_value = type2str(value)
+            self.SetCellValue(row, col, grid_value)
 
-            self.data[row][key] = deepcopy(value)
+            # self.data[row][key] = deepcopy(value)
         self.EndBatch()
 
     def on_cell_changed(self, evt):

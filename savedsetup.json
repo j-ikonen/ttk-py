@@ -85,14 +85,14 @@
                             "type": "double:6,2",
                             "default": 0.0,
                             "label": "Kerroin [\u20ac/h * (h/kpl)]",
-                            "width": 55,
+                            "width": 124,
                             "read_only": true
                         },
                         "count": {
                             "type": "long",
                             "default": 0,
                             "label": "M\u00e4\u00e4r\u00e4 [kpl]",
-                            "width": 55,
+                            "width": 76,
                             "read_only": true
                         },
                         "cost": {

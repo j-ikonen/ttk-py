@@ -1,3 +1,4 @@
+from table import OfferTables
 import wx
 
 from dialog import DbDialog
@@ -34,12 +35,13 @@ class Page(wx.Panel):
 
 
 class RootPage(wx.Panel):
-    def __init__(self, parent, setup, refresh_tree):
+    def __init__(self, parent, tables, setup, refresh_tree):
         super().__init__(parent)
         self.SetBackgroundColour((200, 255, 255))
 
         self.setup: Setup = setup
-        self.data = None
+        # self.data = None
+        self.tables = tables
         self.refresh_tree = refresh_tree
 
         setup_label: dict = self.setup["static"]["label"]
@@ -58,10 +60,11 @@ class RootPage(wx.Panel):
 
         self.SetSizer(sizer)
 
-    def change_data(self, data: DataRoot):
+    def change_data(self, link):
         """Change the data to a new DataRoot."""
-        self.data = data
-        print(f"RootPage.change_data - name: {self.data.get_data('name')}")
+        pass
+        # self.data = data
+        # print(f"RootPage.change_data - name: {self.data.get_data('name')}")
         # self.txtc_name.SetValue(data.get_name())
         # self.grid_info.change_data(data.get_data('info'))
 
@@ -76,54 +79,63 @@ class RootPage(wx.Panel):
 
 
 class ItemPage(wx.Panel):
-    def __init__(self, parent, setup: Setup, fc_mult, refresh_tree):
+    def __init__(self, parent, tables, setup: Setup, fc_mult, refresh_tree):
         super().__init__(parent)
         self.SetBackgroundColour((255, 255, 200))
 
         # self.setup_child: Setup = setup.get_parent().get_child("child")
         self.setup: Setup = setup
-        self.data: DataItem = None
+        # self.data: DataItem = None
+        self.tables: OfferTables = tables
+        self.offer_id = None
         self.refresh_tree = refresh_tree
         self.use_global = False
         self.global_mult = fc_mult
 
         setup_label: dict = self.setup["static"]["label"]
-        setup_use_global: dict = self.setup['data']["use_global"]
+        # setup_use_global: dict = self.setup['data']["use_global"]
         self.setup_fcmult = self.setup.get_grandchild("data", "fieldcount_multiplier")
 
         txt_name = wx.StaticText(self, label=setup_label["value"])
-        self.txtc_name = wx.TextCtrl(self, value="", size=TXTC_NAME_SIZE)
+        self.txtc_name = wx.TextCtrl(
+            self,
+            size=TXTC_NAME_SIZE,
+            style=wx.TE_PROCESS_ENTER)
 
         self.btn_add_child = wx.Button(self, label=BTN_NEW_CHILD)
         btn_del_child = wx.Button(self, label=BTN_DEL_CHILD)
         btn_mult = wx.Button(self, label=BTN_MULT)
 
-        self.chk_labels = setup_use_global["label"]
-        self.chk_fc = wx.CheckBox(
-            self, label=self.chk_labels[0], size=(200,-1),
-            style=wx.CHK_3STATE|wx.CHK_ALLOW_3RD_STATE_FOR_USER
-        )
-        self.chk_fc.Set3StateValue(setup_use_global["value"])
+        # self.chk_labels = setup_use_global["label"]
+        # self.chk_fc = wx.CheckBox(
+        #     self, label=self.chk_labels[0], size=(200,-1),
+        #     style=wx.CHK_3STATE|wx.CHK_ALLOW_3RD_STATE_FOR_USER
+        # )
+        # self.chk_fc.Set3StateValue(setup_use_global["value"])
 
-        self.grid_client = SetupGrid(self, self.setup.get_grandchild("data", "client"))
-        self.grid_file = SetupGrid(self, self.setup.get_grandchild("data", "save_file"))
-        self.grid_fc = TtkGrid(self, 'fieldcount', self.setup.get_grandchild("data", "fieldcount"))
+        self.grid_client = SetupGrid(self, tables, "offers", "client")
+        self.grid_fc = TtkGrid(
+            self,
+            tables,
+            "fieldcount",
+            'fieldcount',
+            self.setup.get_grandchild("data", "fieldcount"))
 
-        grid_file_size = len(self.grid_file.setup['fields'])
-        grid_info_size = len(self.grid_client.setup['fields'])
+        # grid_file_size = len(self.grid_file.setup['fields'])
+        grid_info_size = self.grid_client.rows
 
         # Set row labels to match the bigger grid labels.
         info_size = self.grid_client.GetRowLabelSize()
-        file_size = self.grid_file.GetRowLabelSize()
-        label_size = info_size if info_size > file_size else file_size
-        self.grid_client.SetRowLabelSize(label_size)
-        self.grid_file.SetRowLabelSize(label_size)
+        # file_size = self.grid_file.GetRowLabelSize()
+        # label_size = info_size if info_size > file_size else file_size
+        self.grid_client.SetRowLabelSize(info_size)
+        # self.grid_file.SetRowLabelSize(label_size)
 
-        self.Bind(wx.EVT_TEXT, self.on_text, self.txtc_name)
+        self.Bind(wx.EVT_TEXT_ENTER, self.on_text_enter, self.txtc_name)
         self.Bind(wx.EVT_BUTTON, self.on_add_child, self.btn_add_child)
         self.Bind(wx.EVT_BUTTON, self.on_del_child, btn_del_child)
         self.Bind(wx.EVT_BUTTON, self.on_mult_edit, btn_mult)
-        self.Bind(wx.EVT_CHECKBOX, self.on_check, self.chk_fc)
+        # self.Bind(wx.EVT_CHECKBOX, self.on_check, self.chk_fc)
 
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer_name = wx.BoxSizer(wx.HORIZONTAL)
@@ -137,9 +149,9 @@ class ItemPage(wx.Panel):
         sizer_name.Add(self.btn_add_child, 0, wx.EXPAND|wx.RIGHT, BORDER)
         sizer_name.Add(btn_del_child, 0, wx.EXPAND|wx.RIGHT, BORDER)
         sizer_name.Add(btn_mult, 0, wx.EXPAND|wx.RIGHT, BORDER)
-        sizer_name.Add(self.chk_fc, 0, wx.EXPAND|wx.RIGHT, BORDER)
+        # sizer_name.Add(self.chk_fc, 0, wx.EXPAND|wx.RIGHT, BORDER)
 
-        sizer_info.Add(self.grid_file, grid_file_size, wx.EXPAND)
+        # sizer_info.Add(self.grid_file, grid_file_size, wx.EXPAND)
         sizer_info.Add(self.grid_client, grid_info_size, wx.EXPAND)
 
         # sizer_fc.Add(chk_fc, 0, wx.EXPAND|wx.ALL, BORDER)
@@ -152,28 +164,28 @@ class ItemPage(wx.Panel):
 
         self.SetSizer(sizer)
 
-    def refresh(self, name=False, fc=False, info=False, file=False):
-        """Refresh the content of the page with self.data."""
-        if name:
-            self.txtc_name.SetValue(self.data.get_data("name"))
-        if fc:
-            use_global = self.data.get_data('use_global')
-            if self.chk_fc.Get3StateValue() != use_global:
-                self.chk_fc.Set3StateValue(use_global)
-                self.chk_fc.SetLabel(self.chk_labels[use_global])
+    def refresh(self, name=False, fc=False, info=False):
+        """Refresh the content of the page with self.data.
+        offers.name
+        unit, mult FROM fcmults WHERE unit IN relevant_units
+        client_* FROM offers WHERE id=self.offer_id
 
+        """
+        print(f"ItemPage.refresh: offer_id: {self.offer_id}")
+        data = self.tables.get_offer_page(self.offer_id)
+
+        if name:
+            self.txtc_name.SetValue(data[0])
+        if fc:
             self.update_fieldcount()
         if info:
-            self.grid_client.change_data(self.data.get_data('client'))
-        if file:
-            self.grid_file.change_data(self.data.get_data('save_file'))
+            self.grid_client.change_data(data[1:], (self.offer_id,))
 
-    def change_data(self, data: DataItem):
+    def change_data(self, link):
         """Change the data to a new DataItem."""
-        # self.global_mult = fc_mult
-        self.data = data
-        self.refresh(True, True, True, True)
-        print(f"ItemPage.change_data - name: {self.data.get_data('name')}")
+        self.offer_id = link[0]
+        self.refresh(True, True, True)
+        # print(f"ItemPage.change_data - name: {self.data.get_data('name')}")
 
     def on_add_child(self, evt):
         """Add a child data object to current DataItem."""
@@ -181,17 +193,10 @@ class ItemPage(wx.Panel):
             with wx.TextEntryDialog(self, TEDLG_MSG) as dlg:
                 if dlg.ShowModal() == wx.ID_OK:
                     name = dlg.GetValue()
-                    new_obj: DataChild = self.data.push(self.setup.get_parent())
-                    new_obj.set_data("name", name)
+                    group_id = self.tables.insert_group(self.offer_id)
+                    ids = (self.offer_id, group_id)
+                    self.tables.update_one_groups(ids, "groups.name", None, name)
                     self.refresh_tree()
-
-    def on_check(self, evt):
-        """Get global fieldcount multipliers if box is checked."""
-        value = self.chk_fc.Get3StateValue()
-        self.data.set_data('use_global', value)
-        self.chk_fc.SetLabel(self.chk_labels[value])
-        fc = self.data.get_data('fieldcount')
-        self.update_multipliers(fc)
 
     def on_del_child(self, evt):
         """Delete a child from DataItem."""
@@ -202,8 +207,8 @@ class ItemPage(wx.Panel):
                 if dlg.ShowModal() == wx.ID_OK:
                     selections: list = dlg.GetSelections()
                     selections.sort(reverse=True)
-                    for n in selections:
-                        self.data.delete_child(n)
+                    # self.tables.delete()
+                    # for n in selections:
                     self.refresh_tree()
 
     def on_mult_edit(self, evt):
@@ -211,32 +216,33 @@ class ItemPage(wx.Panel):
         MULT_DLG_TITLE = "Muokkaa kertoimia"
         LM_LABEL = "Tarjous"
         GM_LABEL = "Jaettu"
-        lm = self.data.get_data('fieldcount_multiplier')
-        gm = self.global_mult
-        pages = [
-            {'label': LM_LABEL, 'data': lm, 'setup': self.setup_fcmult, 'name': 'fc_mult'},
-            {'label': GM_LABEL, 'data': gm, 'setup': self.setup_fcmult, 'name': 'fc_mult'}
-        ]
+        # lm = self.data.get_data('fieldcount_multiplier')
+        # gm = self.global_mult
+        # pages = [
+        #     {'label': LM_LABEL, 'data': lm, 'setup': self.setup_fcmult, 'name': 'fc_mult'},
+        #     {'label': GM_LABEL, 'data': gm, 'setup': self.setup_fcmult, 'name': 'fc_mult'}
+        # ]
 
-        with NotebookDialog(self, MULT_DLG_TITLE, pages) as dlg:
-            if dlg.ShowModal() == wx.ID_OK:
-                fc = self.data.get_data('fieldcount')
-                self.update_multipliers(fc)
+        # with NotebookDialog(self, MULT_DLG_TITLE, pages) as dlg:
+        #     if dlg.ShowModal() == wx.ID_OK:
+        #         fc = self.data.get_data('fieldcount')
+        #         self.update_multipliers(fc)
 
-    def on_text(self, evt):
+    def on_text_enter(self, evt):
         """Update the DataItem name."""
-        if self.data is not None:
-            txtc: wx.TextCtrl = evt.GetEventObject()
-            self.data.set_data("name", txtc.GetValue())
-            self.refresh_tree()
+        txtc: wx.TextCtrl = evt.GetEventObject()
+        value = txtc.GetValue()
+        self.tables.update_one_offers(self.offer_id, "offers.name", None, value)
+        self.refresh_tree()
+        evt.Skip()
 
     def update_fieldcount(self):
         """Update the fieldcount data and display."""
         new_count = {}
         # Iterate over all DataChild objects.
-        for child in self.data.get_children():
+        for child in []:
             # Iterate over all rows in products grid.
-            for obj in child.get_data('products'):
+            for obj in []:
                 unit = obj['inst_unit']
                 try:
                     new_count[unit]['count'] += obj['count']
@@ -256,9 +262,7 @@ class ItemPage(wx.Panel):
 
     def update_multipliers(self, datalist):
         """Update the multipliers in fieldcount data and grid."""
-        local_mult: list = self.data.get_data('fieldcount_multiplier')
-        use_global: int = self.data.get_data('use_global')
-        local_unit_test = [row["unit"] for row in local_mult]
+        multipliers: list = []
         new_fc = []
         total = 0.0
         total_count = 0
@@ -272,12 +276,8 @@ class ItemPage(wx.Panel):
 
             # Get the local or global mult.
             mult = 0.0
-            if use_global == 0 or (use_global == 2 and unit in local_unit_test):
-                source = local_mult
-            else:
-                source = self.global_mult
 
-            for mult_obj in source:
+            for mult_obj in multipliers:
                 if mult_obj['unit'] == unit:
                     mult = mult_obj['mult']
 
@@ -306,12 +306,12 @@ class ItemPage(wx.Panel):
             'cost': total,
         }
         new_fc.insert(0, new_obj)
-        self.data.set_data('fieldcount', new_fc)
-        self.grid_fc.change_data(new_fc)
+        # self.data.set_data('fieldcount', new_fc)
+        # self.grid_fc.change_data(new_fc)
 
 
 class ChildPage(wx.Panel):
-    def __init__(self, parent, setup, refresh_tree):
+    def __init__(self, parent, tables, setup, refresh_tree):
         super().__init__(parent)
         self.SetBackgroundColour((255, 220, 220))
 
@@ -336,10 +336,10 @@ class ChildPage(wx.Panel):
         txt_products = wx.StaticText(self, label=self.setup_products['label'])
         self.txt_parts = wx.StaticText(self, label=self.setup_parts['label'])
 
-        self.grid_predefs = TtkGrid(self, 'predefs', self.setup_predef)
-        self.grid_materials = TtkGrid(self, 'materials', self.setup_materials)
-        self.grid_products = TtkGrid(self, 'products', self.setup_products)
-        self.grid_parts = TtkGrid(self, 'parts', self.setup_parts)
+        self.grid_predefs = TtkGrid(self, tables, "", 'predefs', self.setup_predef)
+        self.grid_materials = TtkGrid(self, tables, "", 'materials', self.setup_materials)
+        self.grid_products = TtkGrid(self, tables, "", 'products', self.setup_products)
+        self.grid_parts = TtkGrid(self, tables, "", 'parts', self.setup_parts)
 
         self.grid_products.set_child(self.grid_parts, self.txt_parts)
 

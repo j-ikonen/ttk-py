@@ -1,10 +1,9 @@
 import wx
 import wx.grid as wxg
 
-from setup import Setup, str2type, type2str
+from table import OfferTables, str2type, type2str
 
-
-COL_MIN_W = 250
+COL_MIN_W = 350
 ROW_LABEL_SIZE = 120
 
 def get_editor_renderer(typestring):
@@ -46,21 +45,27 @@ def get_editor_renderer(typestring):
 
 
 class SetupGrid(wxg.Grid):
-    def __init__(self, parent, setup):
+    def __init__(self, parent, tables, tablename, gridname):
         super().__init__(parent)
 
         self.data = None
-        self.setup: Setup = setup
+        self.tables: OfferTables = tables
+        self.tablename = tablename
+        self.gridname = tablename + "." + gridname
+        self.ids = None
 
-        fields: dict = self.setup['fields']
-        self.CreateGrid(len(fields), 1)
+        labels: list = self.tables.get_labels(self.gridname)
+        self.types: list = self.tables.get_types(self.gridname)
+        self.rows = len(labels)
+
+        self.CreateGrid(self.rows, 1)
         self.SetColLabelSize(1)
 
-        for n, field in enumerate(fields.values()):
-            (editor, renderer) = get_editor_renderer(field["type"])
+        for n, label in enumerate(labels):
+            (editor, renderer) = get_editor_renderer(self.types[n])
             self.SetCellEditor(n, 0, editor)
             self.SetCellRenderer(n, 0, renderer)
-            self.SetRowLabelValue(n, field["label"])
+            self.SetRowLabelValue(n, label)
 
         self.Bind(wxg.EVT_GRID_CELL_CHANGED, self.on_cell_changed)
         self.Bind(wxg.EVT_GRID_EDITOR_HIDDEN, self.on_editor_hidden)
@@ -70,34 +75,35 @@ class SetupGrid(wxg.Grid):
         self.SetRowLabelSize(wxg.GRID_AUTOSIZE)
         self.SetRowLabelAlignment(wx.ALIGN_RIGHT, wx.ALIGN_CENTER)
 
-    def change_data(self, data: dict):
+    def change_data(self, data: tuple, ids: tuple=None):
         """Change the data to given source."""
-        print("SetupGrid.change_data")
-        self.data = data
+        # print("SetupGrid.change_data")
+        # self.data = data
         if data is None:
-            print("\tClear data from grid.")
+            # print("\tClear data from grid.")
             self.ClearGrid()
+            self.ids = None
         else:
-            print("\tRefresh with new data.")
-            self.refresh_data()
-        self.AutoSizeColumn(0)
+            # print("\tRefresh with new data.")
+            self.refresh_data(data)
+            self.ids = ids
+        # self.AutoSizeColumn(0)
 
-    def refresh_data(self):
+    def refresh_data(self, data):
         self.BeginBatch()
         # print(f"\nSetupGrid.refresh_data - self.data: {self.data}\n")
-        for n, k in enumerate(self.setup['fields'].keys()):
-            self.SetCellValue(n, 0, type2str(self.data[k]))
+        for n in range(self.rows):
+            self.SetCellValue(n, 0, type2str(data[n]))
         self.EndBatch()
 
     def on_cell_changed(self, evt):
         """Handle cell changed event."""
         row = evt.GetRow()
-        key = list(self.setup['fields'].keys())[row]
-        typestring = self.setup['fields'][key]["type"]
+        typestring = self.types[row]
         value = str2type(typestring, self.GetCellValue(row, 0))
-        self.data[key] = value
-        print(f"SetupGrid.on_cell_changed\n\tNew value in self.data: {self.data[key]}" +
-              f"\n\tat row, key: {row}, {key}")
+        self.tables.update_one(self.tablename, self.ids, self.gridname, row, value)
+        # print(f"SetupGrid.on_cell_changed\n\tNew value in tables: {value}" +
+        #       f"\n\tat row, key: {row}")
         evt.Skip()
 
     def on_editor_hidden(self, evt):
