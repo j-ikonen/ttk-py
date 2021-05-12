@@ -63,6 +63,9 @@ TABLE_COLUMNS_MATERIALS = {
     "add_cost": {"label": "Lisähinta", "type": "double:6,2", "width": 55},
     "discount": {"label": "Alennus", "type": "double:6,2", "width": 55}
 }
+EXTRA_COLUMNS_MATERIALS = {
+    "((cost + edg_cost + add_cost) * (1 + loss) * (1 - discount)) tot_cost": {"label": "Kok. Hinta", "type": "double:6,2", "width": 55}
+}
 TABLE_COLUMNS_PRODUCTS = {
     "code": {"label": "Koodi", "type": "string", "width": 55},
     "desc": {"label": "Kuvaus", "type": "string", "width": 55},
@@ -77,12 +80,22 @@ TABLE_COLUMNS_PRODUCTS = {
 TABLE_COLUMNS = {
     "fcmults": TABLE_COLUMNS_FCMULTS,
     "materials": TABLE_COLUMNS_MATERIALS,
-    "products": TABLE_COLUMNS_PRODUCTS
+    "products": TABLE_COLUMNS_PRODUCTS,
+}
+GRID_COLUMNS = {
+    "grouppagegrid.offer_materials": {**TABLE_COLUMNS_MATERIALS, **EXTRA_COLUMNS_MATERIALS}
 }
 TABLE_LABELS = {
+    "offers": "Tarjoukset",
+    "offer_groups": "Ryhmät",
+    "offer_predefs": "Esimääritykset",
+    "offer_materials": "Materiaalit",
+    "offer_products": "Tuotteet",
+    "offer_parts": "Osat",
     "fcmults": "Asennusyksikkökertoimet",
     "materials": "Materiaalit",
-    "products": "Tuotteet"
+    "products": "Tuotteet",
+    "parts": "Osat"
 }
 sql_create_table_fcmults = """
     CREATE TABLE IF NOT EXISTS fcmults (
@@ -92,17 +105,17 @@ sql_create_table_fcmults = """
 """
 sql_create_table_offers = """
     CREATE TABLE IF NOT EXISTS offers (
-        id                  TEXT PRIMARY KEY,
-        name                TEXT DEFAULT 'Uusi Tarjous',
-        client_firstname    TEXT,
-        client_lastname     TEXT,
-        client_company      TEXT,
-        client_phone        TEXT,
-        client_email        TEXT,
-        client_address      TEXT,
-        client_postcode     TEXT,
-        client_postarea     TEXT,
-        client_info         TEXT
+        id          TEXT PRIMARY KEY,
+        name        TEXT DEFAULT 'Uusi Tarjous',
+        firstname   TEXT,
+        lastname    TEXT,
+        company     TEXT,
+        phone       TEXT,
+        email       TEXT,
+        address     TEXT,
+        postcode    TEXT,
+        postarea    TEXT,
+        info        TEXT
     )
 """
 sql_create_table_offer_groups = """
@@ -277,158 +290,6 @@ sql_insert_default = {
 sql_select_general = """SELECT {columns} FROM {table} WHERE {match}{op}{qm}"""
 sql_update_general = """UPDATE {table} SET {column} = ? WHERE {pk} = ({qm})"""
 
-# select_parts = """
-#     SELECT
-#         opa.code,
-#         opa.desc,
-#         opa.use_predef,
-#         opa.default_mat,
-#         CASE
-#             WHEN opa.use_predef = 0 THEN opa.default_mat
-#             WHEN opa.use_predef = 1 
-#                 THEN
-#                     SELECT opd.material 
-#                     FROM offer_predefs opd
-#                     WHERE opd.group_id=opa.group_id AND opd.part=opa.code
-#             ELSE null
-#             END used_mat
-#         (offer_products.width - m.thck) width,
-#         () length,
-#         () thickness,
-#         () cost
-#     FROM offer_parts opa
-#         LEFT JOIN offer_materials m ON p.used_mat=m.code
-#         LEFT JOIN offer_products t ON opr.product_id=t.id
-#     WHERE id=?
-# """
-# sql_insert_materials = """
-#     INSERT INTO materials (
-#         id,
-#         code,
-#         desc,
-#         prod,
-#         unit,
-#         thck,
-#         loss,
-#         cost,
-#         edg_cost,
-#         add_cost,
-#         discount
-#     ) VALUES (?,?,?,?,?,?,?,?,?,?,?)
-# """
-# sql_count_units = """
-#     SELECT inst_unit, SUM(count), mult, SUM(count)*mult
-#     FROM products
-#     LEFT JOIN fcmults ON fcmults.unit = products.inst_unit
-#     GROUP BY inst_unit
-# """
-# sql_insert_default = {
-#     "offers": """INSERT INTO offers (id) VALUES (?)""",
-#     "fcmults": """INSERT INTO fcmults (id) VALUES (?)""",
-#     "groups": """INSERT INTO groups (id, offer_id) VALUES (?, ?)""",
-#     "predefs": """INSERT INTO predefs (id, group_id, offer_id) VALUES (?, ?, ?)""",
-#     "materials": """INSERT INTO materials (id, group_id, offer_id) VALUES (?, ?, ?)""",
-#     "products": """INSERT INTO products (id, group_id, offer_id) VALUES (?, ?, ?)"""
-# }
-
-# sql_select_groups = """
-#     SELECT offer_id, name, id
-#     FROM groups
-#     WHERE offer_id=?
-#     ORDER BY name DESC
-# """
-# sql_select_offers_by_list = """
-#     SELECT id, name
-#     FROM offers
-#     WHERE id IN ({})
-#     ORDER BY name DESC
-# """
-# sql_select_offer_page = """
-#     SELECT 
-#         name,
-#         client_firstname,
-#         client_lastname,
-#         client_company,
-#         client_phone,
-#         client_email,
-#         client_address,
-#         client_postcode,
-#         client_postarea,
-#         client_info
-#     FROM offers
-#     WHERE id=?
-# """
-# offer_labels = [
-#         "ID",
-#         "Tarjouksen nimi",
-#         "Etunimi",
-#         "Sukunimi",
-#         "Yritys",
-#         "Puh.",
-#         "Sähköposti",
-#         "Lähiosoite",
-#         "Postinumero",
-#         "Postitoimipaikka",
-#         "Lisätiedot"
-# ]
-# offer_keys = [
-#     "id",
-#     "name",
-#     "client_firstname",
-#     "client_lastname",
-#     "client_company",
-#     "client_phone",
-#     "client_email",
-#     "client_address",
-#     "client_postcode",
-#     "client_postarea",
-#     "client_info"
-# ]
-# offer_types = ["string"] * len(offer_labels)
-
-# table_labels = {
-#     "offers.name": offer_labels[1],
-#     "offers.client": offer_labels[2:],
-# }
-# table_types = {
-#     "offers.name": offer_types[1],
-#     "offers.client": offer_types[2:]
-# }
-# table_keys = {
-#     "offers.name": offer_keys[1],
-#     "offers.client": offer_keys[2:]
-# }
-# sql_select_fcmults = """
-#     SELECT unit, mult
-#     FROM fcmults
-#     WHERE unit IN ({})
-#     ORDER BY unit DESC
-# """
-# sql_update_one_offers = """
-#     UPDATE offers 
-#     SET {col} = ?
-#     WHERE id = ?
-# """
-# sql_update_one_groups = """
-#     UPDATE groups
-#     SET {col} = ?
-#     WHERE id = ? AND offer_id = ?
-# """
-# sql_update_one = {
-#     "offers": sql_update_one_offers,
-#     "groups": sql_update_one_groups
-# }
-
-# sql_upsert = {
-#     "offer_materials": """
-#         INSERT INTO offer_materials (id, group_id, {column})
-#         VALUES (?, ?, ?)
-#         ON CONFLICT (id) DO UPDATE SET {column}=excluded.{column}
-#     """
-# }
-# sql_select_ids = {
-#     "materials": """SELECT id FROM materials WHERE group_id=?"""
-# }
 
 sql_select_offer_materials_grid = """
     SELECT
@@ -452,76 +313,9 @@ sql_select_grid = {
 }
 
 
-
 class OfferTables:
     con = None
     cur = None
-    keys = {
-        "offer_materials": [
-            "code",
-            "desc",
-            "prod",
-            "unit",
-            "thck",
-            "loss",
-            "cost",
-            "edg_cost",
-            "add_cost",
-            "discount",
-            "tot_cost"
-        ]
-    }
-    labels = {
-        "offer_materials": [
-            "Koodi",
-            "Kuvaus",
-            "Valmistaja",
-            "Yksikkö",
-            "Paksuus",
-            "Hukka",
-            "Materiaalin hinta",
-            "RNauhan hinta",
-            "Lisähinta",
-            "Alennus",
-            "Kokonaishinta"
-        ]
-    }
-    label_sizes = {
-        "offer_materials": [
-            60,
-            100,
-            80,
-            55,
-            45,
-            45,
-            45,
-            45,
-            45,
-            45,
-            45
-        ]
-    }
-    read_only = {
-        "offer_materials": [10]
-    }
-    types = {
-        "offer_materials": [
-            "string",
-            "string",
-            "string",
-            "choice:€/m2,€/kpl",
-            "long",
-            "double:6,2",
-            "double:6,2",
-            "double:6,2",
-            "double:6,2",
-            "double:6,2",
-            "double:6,2"
-        ]
-    }
-    unique = {
-        "offer_materials": [0]
-    }
 
     table_columns = TABLE_COLUMNS
 
@@ -696,6 +490,12 @@ class OfferTables:
             "objectgrid": {
                 "materials": {"label": TABLE_LABELS["materials"], "pk": "code"},
                 "products": {"label": TABLE_LABELS["products"], "pk": "code"}
+            },
+            "grouppagegrid": {
+                "offer_materials": {
+                    "label": TABLE_LABELS["offer_materials"],
+                    "pk": "id",
+                    "read_only": [10]}
             }
         }
         return panel_setup[panel]

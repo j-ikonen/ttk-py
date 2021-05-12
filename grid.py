@@ -43,12 +43,16 @@ class TheGrid(wxg.Grid):
         self.tables: OfferTables = tables
 
         self.key = key
-        self.keys = OfferTables.keys[key]
-        self.labels = OfferTables.labels[key]
-        self.label_sizes = OfferTables.label_sizes[key]
-        self.read_only = OfferTables.read_only[key]
-        self.types = OfferTables.types[key]
-        self.unique = OfferTables.unique[key]
+
+        self.keys = []
+        self.labels = []
+        self.widths = []
+
+        self.read_only = []
+        self.types = []
+        self.unique = []
+
+        self.column_setup()
 
         self.n_columns = len(self.labels)
         self.ids = []
@@ -64,6 +68,15 @@ class TheGrid(wxg.Grid):
 
         self.Bind(wxg.EVT_GRID_EDITOR_SHOWN, self.on_show_editor)
         self.Bind(wxg.EVT_GRID_CELL_CHANGING, self.on_cell_changing)
+
+    def column_setup(self, evt):
+        self.keys = []
+        self.labels = []
+        self.widths = []
+
+        self.read_only = []
+        self.types = []
+        self.unique = []
 
     def on_cell_changing(self, evt):
         """Save changed value to table.

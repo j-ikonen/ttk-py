@@ -1,39 +1,89 @@
 {
-    "offer": {
-        "table": {
-            "_id": {"label": "ID", "type": "oid"},
-            "client_id": {"label": "Asiakas ID", "type": "oid"},
-            "name": {"label": "Nimi", "type": "string"}
-        }},
-    "unitmult": {
-        "table": {
-            "offer_id": {"label": "Tarjous ID", "type": "oid"},
-            "unit": {"label": "Yksikkö", "type": "string"},
-            "mult": {"label": "Kerroin", "type": "double:6,2"}
-        },
-        "display": ["unit", "mult"]
+    "columns": {
+        "offers": {
+            "id": {
+                "label": "ID",
+                "type": "string",
+                "width": 45,
+                "ro": true,
+                "unique": true
+            },
+            "name": {
+                "label": "Nimi",
+                "type": "string",
+                "width": 80,
+                "ro": false,
+                "unique": false
+            },
+            "firstname": {
+                "label": "Etunimi",
+                "type": "string",
+                "width": 80,
+                "ro": false,
+                "unique": false
+            },
+            "lastname": {
+                "label": "Sukunimi",
+                "type": "string",
+                "width": 80,
+                "ro": false,
+                "unique": false
+            },
+            "company": {
+                "label": "Yritys",
+                "type": "string",
+                "width": 80,
+                "ro": false,
+                "unique": false
+            },
+            "phone": {
+                "label": "Puh.",
+                "type": "string",
+                "width": 80,
+                "ro": false,
+                "unique": false
+            },
+            "email": {
+                "label": "Sähköposti",
+                "type": "string",
+                "width": 80,
+                "ro": false,
+                "unique": false
+            },
+            "address": {
+                "label": "Lähiosoite",
+                "type": "string",
+                "width": 80,
+                "ro": false,
+                "unique": false
+            },
+            "postcode": {
+                "label": "Postinumero",
+                "type": "string",
+                "width": 80,
+                "ro": false,
+                "unique": false
+            },
+            "postarea": {
+                "label": "Postitoimipaikka",
+                "type": "string",
+                "width": 80,
+                "ro": false,
+                "unique": false
+            },
+            "info": {
+                "label": "Lisätiedot",
+                "type": "string",
+                "width": 80,
+                "ro": false,
+                "unique": false
+            }
+        }
     },
-    "group": {
-        "table": {
-            "_id": {"label": "ID", "type": "oid"},
-            "offer_id": {"label": "Tarjous ID", "type": "oid"},
-            "name": {"label": "Nimi", "type": "string"}
-        }},
-    "client": {
-        "table": {
-            "_id": {"label": "ID", "type": "oid"},
-            "offer_id": {"label": "Tarjous ID", "type": "oid"},
-            "firstname": {"label": "Etunimi", "type": "string"},
-            "lastname": {"label": "Sukunimi", "type": "string"},
-            "company": {"label": "Yritys", "type": "string"},
-            "phone": {"label": "Puh.", "type": "string"},
-            "email": {"label": "Sähköposti", "type": "string"},
-            "address": {"label": "Katuosoite", "type": "string"},
-            "postcode": {"label": "Postinumero", "type": "string"},
-            "postarea": {"label": "Postitoimipaikka", "type": "string"},
-            "info": {"label": "Lisätiedot", "type": "string"}
-        },
-        "display": [
+    "columns_table": {
+        "offers": [
+            "id",
+            "name",
             "firstname",
             "lastname",
             "company",
@@ -45,118 +95,24 @@
             "info"
         ]
     },
-    "predefs": {
-        "table": {
-            "_id": {"label": "ID", "type": "oid"},
-            "offer_id": {"label": "Tarjous ID", "type": "oid"},
-            "group_id": {"label": "Ryhmä ID", "type": "oid"},
-            "part_code": {"label": "Osa", "type": "string"},
-            "material_code": {"label": "Materiaali", "type": "string"}
-        },
-        "display": ["part_code", "material_code"]
-    },
-    "materials": {
-        "table": {
-            "_id": {"label": "ID", "type": "oid"},
-            "offer_id": {"label": "Tarjous ID", "type": "oid"},
-            "group_id": {"label": "Ryhmä ID", "type": "oid"},
-            "code": {"label": "Tunniste", "type": "string"},
-            "desc": {"label": "Kuvaus", "type": "string"},
-            "thck": {"label": "Paksuus (mm)", "type": "long"},
-            "prod": {"label": "Valmistaja", "type": "string"},
-            "loss": {"label": "Hukka", "type": "double:6,2"},
-            "unit": {"label": "Hintayksikkö", "type": "choice:€/m2,€/kpl"},
-            "cost": {"label": "Hinta", "type": "double:6,2"},
-            "edg_cost": {"label": "Reunanauhan", "type": "double:6,2"},
-            "add_cost": {"label": "Lisähinta", "type": "double:6,2"},
-            "discount": {"label": "Alennus", "type": "double:6,2"}
-        },
-        "eval": {
-            "tot_cost": {"label": "Kok. Hinta", "type": "double:6,2"}
-        },
-        "display": [
-            "code",
-            "desc",
-            "thck",
-            "prod",
-            "loss",
-            "unit",
-            "cost",
-            "edg_cost",
-            "add_cost",
-            "discount",
-            "tot_cost"
-        ]
-    },
-    "products": {
-        "table": {
-            "_id": {"label": "ID", "type": "oid"},
-            "offer_id": {"label": "Tarjous ID", "type": "oid"},
-            "group_id": {"label": "Ryhmä ID", "type": "oid"},
-            "code": {"label": "Koodi", "type": "string"},
-            "count": {"label": "Määrä", "type": "long"},
-            "group": {"label": "Tuoteryhmä", "type": "string"},
-            "desc": {"label": "Kuvaus", "type": "string"},
-            "prod": {"label": "Valmistaja", "type": "string"},
-            "inst_unit": {"label": "Asennusyksikkö", "type": "string"},
-            "x": {"label": "Leveys", "type": "long"},
-            "y": {"label": "Korkeus", "type": "long"},
-            "z": {"label": "Syvyys", "type": "long"},
-            "work_time": {"label": "Työaika", "type": "double:6,2"},
-            "work_cost": {"label": "Työhinta", "type": "double:6,2"}
-        },
-        "eval": {
-            "part_cost": {"label": "Osahinta", "type": "double:6,2"},
-            "tot_cost": {"label": "Kok. Hinta", "type": "double:6,2"}
-        },
-        "display": [
-            "code",
-            "count",
-            "group",
-            "desc",
-            "prod",
-            "inst_unit",
-            "x",
-            "y",
-            "z",
-            "work_time",
-            "work_cost",
-            "part_cost",
-            "tot_cost"
-        ]
-    },
-    "parts": {
-        "table": {
-            "_id": {"label": "ID", "type": "oid"},
-            "offer_id": {"label": "Tarjous ID", "type": "oid"},
-            "product_id": {"label": "Tuote ID", "type": "oid"},
-            "code": {"label": "Koodi", "type": "string"},
-            "desc": {"label": "Kuvaus", "type": "string"},
-            "use_predef": {"label": "Käytä esimääritystä", "type": "bool"},
-            "default_material": {"label": "Oletus materiaali", "type": "string"},
-            "code_x": {"label": "Leveys koodi", "type": "string"},
-            "code_y": {"label": "Pituus koodi", "type": "string"}
-        },
-        "eval": {
-            "material_in_use": {"label": "Käyt. Mat", "type": "string"},
-            "material_id": {"label": "Käyt. Mat ID", "type": "string"},
-            "x": {"label": "Leveys", "type": "long"},
-            "y": {"label": "Pituus", "type": "long"},
-            "thck": {"label": "Paksuus", "type": "long"},
-            "cost": {"label": "Hinta", "type": "double:6,2"}
-        },
-        "display": [
-            "code",
-            "desc",
-            "use_predef",
-            "default_material",
-            "material_in_use",
-            "thck",
-            "x",
-            "y",
-            "cost",
-            "code_x",
-            "code_y"
-        ]
+    "display": {
+        "client": {
+            "label": "Asiakas",
+            "table": "offers",
+            "pk": ["id"],
+            "read_only": [],
+            "unique": [],
+            "columns": [
+                "firstname",
+                "lastname",
+                "company",
+                "phone",
+                "email",
+                "address",
+                "postcode",
+                "postarea",
+                "info"
+            ]
+        }
     }
 }
