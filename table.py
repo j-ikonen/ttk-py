@@ -47,6 +47,43 @@ def type2str(value):
         return strvalue.replace('.', ',')
     return strvalue
 
+TABLE_COLUMNS_FCMULTS = {
+    "unit": {"label": "Asennusyksikkö", "width": 80},
+    "mult": {"label": "Kerroin", "width": 80}
+}
+TABLE_COLUMNS_MATERIALS = {
+    "code": {"label": "Koodi", "type": "string", "width": 55},
+    "desc": {"label": "Kuvaus", "type": "string", "width": 55},
+    "prod": {"label": "Valmistaja", "type": "string", "width": 55},
+    "thck": {"label": "Paksuus", "type": "long", "width": 55},
+    "unit": {"label": "Hintayksikkö", "type": "string", "width": 55},
+    "loss": {"label": "Hukka", "type": "double:6,2", "width": 55},
+    "cost": {"label": "Mat. Hinta", "type": "double:6,2", "width": 55},
+    "edg_cost": {"label": "R.Nauhan hinta", "type": "double:6,2", "width": 55},
+    "add_cost": {"label": "Lisähinta", "type": "double:6,2", "width": 55},
+    "discount": {"label": "Alennus", "type": "double:6,2", "width": 55}
+}
+TABLE_COLUMNS_PRODUCTS = {
+    "code": {"label": "Koodi", "type": "string", "width": 55},
+    "desc": {"label": "Kuvaus", "type": "string", "width": 55},
+    "prod": {"label": "Valmistaja", "type": "string", "width": 55},
+    "inst_unit": {"label": "Asennusyksikkö", "type": "string", "width": 55},
+    "width": {"label": "Leveys", "type": "string", "width": 55},
+    "height": {"label": "Korkeus", "type": "string", "width": 55},
+    "depth": {"label": "Syvyys", "type": "string", "width": 55},
+    "work_time": {"label": "Työaika", "type": "string", "width": 55},
+    "work_cost": {"label": "Työn hinta", "type": "string", "width": 55}
+}
+TABLE_COLUMNS = {
+    "fcmults": TABLE_COLUMNS_FCMULTS,
+    "materials": TABLE_COLUMNS_MATERIALS,
+    "products": TABLE_COLUMNS_PRODUCTS
+}
+TABLE_LABELS = {
+    "fcmults": "Asennusyksikkökertoimet",
+    "materials": "Materiaalit",
+    "products": "Tuotteet"
+}
 sql_create_table_fcmults = """
     CREATE TABLE IF NOT EXISTS fcmults (
         unit    TEXT PRIMARY KEY,
@@ -237,7 +274,8 @@ sql_insert_default = {
     "parts": sql_insert_default_parts
 }
 
-sql_select_general = """SELECT {columns} FROM {table} WHERE {match}={qm}"""
+sql_select_general = """SELECT {columns} FROM {table} WHERE {match}{op}{qm}"""
+sql_update_general = """UPDATE {table} SET {column} = ? WHERE {pk} = ({qm})"""
 
 # select_parts = """
 #     SELECT
@@ -262,23 +300,6 @@ sql_select_general = """SELECT {columns} FROM {table} WHERE {match}={qm}"""
 #         LEFT JOIN offer_materials m ON p.used_mat=m.code
 #         LEFT JOIN offer_products t ON opr.product_id=t.id
 #     WHERE id=?
-# """
-# sql_select_materials_grid = """
-#     SELECT
-#         id,
-#         code,
-#         desc,
-#         prod,
-#         unit,
-#         thck,
-#         loss,
-#         cost,
-#         edg_cost,
-#         add_cost,
-#         discount,
-#         ((cost + edg_cost + add_cost) * (1 + loss) * (1 - discount)) tot_cost
-#     FROM materials
-#     WHERE group_id=?
 # """
 # sql_insert_materials = """
 #     INSERT INTO materials (
@@ -399,8 +420,8 @@ sql_select_general = """SELECT {columns} FROM {table} WHERE {match}={qm}"""
 # }
 
 # sql_upsert = {
-#     "materials": """
-#         INSERT INTO materials (id, group_id, {column})
+#     "offer_materials": """
+#         INSERT INTO offer_materials (id, group_id, {column})
 #         VALUES (?, ?, ?)
 #         ON CONFLICT (id) DO UPDATE SET {column}=excluded.{column}
 #     """
@@ -408,25 +429,105 @@ sql_select_general = """SELECT {columns} FROM {table} WHERE {match}={qm}"""
 # sql_select_ids = {
 #     "materials": """SELECT id FROM materials WHERE group_id=?"""
 # }
-# sql_select_grid = {
-#     "materials": sql_select_materials_grid
-# }
+
+sql_select_offer_materials_grid = """
+    SELECT
+        id,
+        code,
+        desc,
+        prod,
+        unit,
+        thck,
+        loss,
+        cost,
+        edg_cost,
+        add_cost,
+        discount,
+        ((cost + edg_cost + add_cost) * (1 + loss) * (1 - discount)) tot_cost
+    FROM offer_materials
+    WHERE group_id=?
+"""
+sql_select_grid = {
+    "offer_materials": sql_select_offer_materials_grid
+}
+
+
 
 class OfferTables:
     con = None
     cur = None
+    keys = {
+        "offer_materials": [
+            "code",
+            "desc",
+            "prod",
+            "unit",
+            "thck",
+            "loss",
+            "cost",
+            "edg_cost",
+            "add_cost",
+            "discount",
+            "tot_cost"
+        ]
+    }
+    labels = {
+        "offer_materials": [
+            "Koodi",
+            "Kuvaus",
+            "Valmistaja",
+            "Yksikkö",
+            "Paksuus",
+            "Hukka",
+            "Materiaalin hinta",
+            "RNauhan hinta",
+            "Lisähinta",
+            "Alennus",
+            "Kokonaishinta"
+        ]
+    }
+    label_sizes = {
+        "offer_materials": [
+            60,
+            100,
+            80,
+            55,
+            45,
+            45,
+            45,
+            45,
+            45,
+            45,
+            45
+        ]
+    }
+    read_only = {
+        "offer_materials": [10]
+    }
+    types = {
+        "offer_materials": [
+            "string",
+            "string",
+            "string",
+            "choice:€/m2,€/kpl",
+            "long",
+            "double:6,2",
+            "double:6,2",
+            "double:6,2",
+            "double:6,2",
+            "double:6,2",
+            "double:6,2"
+        ]
+    }
+    unique = {
+        "offer_materials": [0]
+    }
+
+    table_columns = TABLE_COLUMNS
 
     def __init__(self) -> None:
         """."""
         cur = self.create_connection("ttk.db")
-
-        # cur.execute("""DROP TABLE IF EXISTS offers;""")
-        # cur.execute("""DROP TABLE IF EXISTS groups;""")
-        # cur.execute("""DROP TABLE IF EXISTS fcmults;""")
-        # cur.execute("""DROP TABLE IF EXISTS clients;""")
-        # cur.execute("""DROP TABLE IF EXISTS predefs;""")
-        # cur.execute("""DROP TABLE IF EXISTS materials;""")
-        # self.con.commit()
 
         for table, sql in sql_create_table.items():
             cur.execute("""DROP TABLE IF EXISTS {};""".format(table))
@@ -457,7 +558,7 @@ class OfferTables:
         except sqlite3.Error as e:
             print(e)
 
-    def insert(self, table: str, columns: Iterable, values: Iterable):
+    def insert(self, table: str, columns: Iterable, values: Iterable, many: bool=False):
         """Insert values into a table.
 
         Parameters
@@ -468,6 +569,8 @@ class OfferTables:
             The column names where values are inserted.
         values : Iterable
             Values for insertion matching the column names.
+        many : bool
+            True if inserting multiple rows.
 
         Returns
         -------
@@ -478,7 +581,10 @@ class OfferTables:
         qms = ','.join(['?'] * len(columns))
         sql = sql_insert_general.format(table=table, columns=cols, qm=qms)
         try:
-            self.cur.execute(sql, values)
+            if many:
+                self.cur.executemany(sql, values)
+            else:
+                self.cur.execute(sql, values)
             self.con.commit()
         except sqlite3.Error as e:
             print(e)
@@ -513,26 +619,138 @@ class OfferTables:
             return False
         return True
 
-    def get(self, table: str, columns: Iterable, match_columns: Iterable, values: Iterable, many=False):
+    def get(self, table: str, columns: Iterable,
+            match_columns: Iterable, values: Iterable, many=False, operator='='):
+        """Get a row of values.
+
+        Parameters
+        ----------
+        table : str
+            Name of the table.
+        columns : Iterable
+            List of columns to get.
+        match_columns : Iterable
+            List of columns used to find results.
+        values : Iterable
+            Values matching columns used to find results.
+        many : bool, optional
+            True if returing multiple rows, by default False
+
+        Returns
+        -------
+        List or Tuple
+            Row or multiple rows of search results.
+        """
         cols = ','.join(columns)
         mcols = ','.join(match_columns)
         qms = ','.join(['?'] * len(match_columns))
+        op = operator
         sql = sql_select_general.format(
             table=table,
             columns=cols,
             match=mcols,
+            op=op,
             qm=qms
         )
+        print(sql)
         try:
             self.cur.execute(sql, values)
             self.con.commit()
         except sqlite3.Error as e:
             print(e)
-            return None
+            return []
         if many:
-            return self.cur.fetchmany()
+            return self.cur.fetchall()
         else:
             return self.cur.fetchone()
+
+    def get_grid(self, key, parent_id):
+        """Return list of columns by foreign key id.
+
+        [row][0] = id"""
+        sql = sql_select_grid[key]
+        try:
+            self.cur.execute(sql, (parent_id,))
+        except sqlite3.Error as e:
+            print(e)
+            return []
+        return self.cur.fetchall()
+
+    def get_column_setup(self, key):
+        # cols = self.table_columns[key]
+        column_setup = {
+            "dbpanel.materials": self.table_columns["materials"],
+            "dbpanel.products": self.table_columns["products"],
+            "objectgrid.materials": self.table_columns["materials"],
+            "objectgrid.products": self.table_columns["products"]
+        }
+        # column_setup_materials = [key for key in cols[key].keys()] + ["((cost + edg_cost + add_cost) * (1 + loss) * (1 - discount)) tot_cost"]
+        return column_setup[key]
+
+    def get_panel_setup(self, panel):
+        panel_setup = {
+            "dbpanel": {
+                "materials": {"label": TABLE_LABELS["materials"], "pk": "code"},
+                "products": {"label": TABLE_LABELS["products"], "pk": "code"}
+            },
+            "objectgrid": {
+                "materials": {"label": TABLE_LABELS["materials"], "pk": "code"},
+                "products": {"label": TABLE_LABELS["products"], "pk": "code"}
+            }
+        }
+        return panel_setup[panel]
+
+    def update_one(self, table: str, column_key: str, pk: str, values: Iterable):
+        """Update a single column with values.
+
+        Parameters
+        ----------
+        table : str
+            Name of the table.
+        column_key : str
+            Column to update.
+        pk : str
+            Private key to find the row to update.
+        values : Iterable
+            (NewValue, private_key, pk_if_multi_part_pk).
+
+        Returns
+        -------
+        bool
+            True if successful.
+        """
+        qm = '?' if isinstance(pk, str) else ','.join(['?'] * len(pk))
+        sql = sql_update_general.format(
+            table=table,
+            column=column_key,
+            pk=pk,
+            qm=qm)
+        print(sql)
+        try:
+            if isinstance(values[0], Iterable):
+                self.cur.executemany(sql, values)
+            else:
+                self.cur.execute(sql, values)
+            self.con.commit()
+        except sqlite3.Error as e:
+            print(e)
+            return False
+        return True
+
+    # def upsert(self, key, column_key, values):
+    #     """
+    #     INSERT INTO materials (id, group_id, {column})
+    #     VALUES (?, ?, ?)
+    #     ON CONFLICT (id) DO UPDATE SET {column}=excluded.{column}
+    #     """
+    #     sql = sql_upsert[key].format(column=column_key)
+        
+    #     try:
+    #         self.cur.execute(sql, values)
+    #     except sqlite3.Error as e:
+    #         print(e)
+    #         return False
+    #     return True
 
     # def delete(self, key, id):
     #     """Delete a row with id. Return True on success."""
@@ -563,15 +781,6 @@ class OfferTables:
     #         return self.cur.fetchall()
     #     return []
 
-    # def get_grid(self, key, parent_id):
-    #     """Return list of columns by foreign key id.
-        
-    #     [row][0] = id"""
-    #     sql = sql_select_grid[key]
-    #     res = self.execute(sql, (parent_id,))
-    #     if res:
-    #         return self.cur.fetchall()
-    #     return []
 
     # def get_by_ids(self, key, ids):
     #     """Return rows where id"""
@@ -622,19 +831,6 @@ class OfferTables:
     #     """
     #     self.execute(sql_count_units)
 
-    # def update_one(self, table, primary_key, name, col, value):
-    #     """Update a value at given table.
-        
-    #     Args:
-    #     - table (str): Name of the table.
-    #     - primary_key (tuple): Tuple to match with tables primary key.
-    #     - name (str): Name to match col to key.
-    #     - col (int): Column index or None.
-    #     - value (Any): New value.
-    #     """
-    #     key = table_keys[name] if col is None else table_keys[name][col]
-    #     sql = sql_update_one[table].format(col=key)
-    #     self.execute(sql, (value,) + primary_key)
 
     # def update_one_offers(self, offer_id, name, col, value):
     #     """Update a value in offers table."""
@@ -647,14 +843,6 @@ class OfferTables:
     #     (offer_id, group_id) = ids
     #     pass
     
-    # def upsert(self, key, column_key, values):
-    #     """
-    #     INSERT INTO materials (id, group_id, {column})
-    #     VALUES (?, ?, ?)
-    #     ON CONFLICT (id) DO UPDATE SET {column}=excluded.{column}
-    #     """
-    #     sql = sql_upsert[key].format(column=column_key)
-    #     return self.execute(sql, values)
 
     # def insert(self, name, ids):
     #     """."""

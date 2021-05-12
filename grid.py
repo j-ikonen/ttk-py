@@ -12,6 +12,9 @@ class GridPanel(wx.Panel):
     def __init__(self, parent, tables, key):
         super().__init__(parent)
 
+        # self.SetBackgroundColour((255, 150, 100))
+        self.SetBackgroundColour((255, 200, 120))
+
         label = wx.StaticText(self, label=key)
         btn_del = wx.Button(self, label="-")
         self.grid = TheGrid(self, tables, key)
@@ -33,84 +36,19 @@ class GridPanel(wx.Panel):
 
 
 class TheGrid(wxg.Grid):
-    keys = {
-        "materials": [
-            "code",
-            "desc",
-            "prod",
-            "unit",
-            "thck",
-            "loss",
-            "cost",
-            "edg_cost",
-            "add_cost",
-            "discount",
-            "tot_cost"
-        ]
-    }
-    labels = {
-        "materials": [
-            "Koodi",
-            "Kuvaus",
-            "Valmistaja",
-            "Yksikkö",
-            "Paksuus",
-            "Hukka",
-            "Materiaalin hinta",
-            "RNauhan hinta",
-            "Lisähinta",
-            "Alennus",
-            "Kokonaishinta"
-        ]
-    }
-    label_sizes = {
-        "materials": [
-            60,
-            100,
-            80,
-            55,
-            45,
-            45,
-            45,
-            45,
-            45,
-            45,
-            45
-        ]
-    }
-    read_only = {
-        "materials": [10]
-    }
-    types = {
-        "materials": [
-            "string",
-            "string",
-            "string",
-            "choice:€/m2,€/kpl",
-            "long",
-            "double:6,2",
-            "double:6,2",
-            "double:6,2",
-            "double:6,2",
-            "double:6,2",
-            "double:6,2"
-        ]
-    }
-    unique = {
-        "materials": [0]
-    }
+
     def __init__(self, parent, tables, key):
         super().__init__(parent)
 
-        self.tables = tables
+        self.tables: OfferTables = tables
 
         self.key = key
-        self.keys = TheGrid.keys[key]
-        self.labels = TheGrid.labels[key]
-        self.label_sizes = TheGrid.label_sizes[key]
-        self.read_only = TheGrid.read_only[key]
-        self.types = TheGrid.types[key]
-        self.unique = TheGrid.unique[key]
+        self.keys = OfferTables.keys[key]
+        self.labels = OfferTables.labels[key]
+        self.label_sizes = OfferTables.label_sizes[key]
+        self.read_only = OfferTables.read_only[key]
+        self.types = OfferTables.types[key]
+        self.unique = OfferTables.unique[key]
 
         self.n_columns = len(self.labels)
         self.ids = []
@@ -164,7 +102,7 @@ class TheGrid(wxg.Grid):
         values = (self.ids[row], self.parent_id, str2type(self.types[col], value))
         if not self.tables.upsert(self.key, self.keys[col], values):
             evt.Veto()
-        
+
         self.update_data()
         evt.Skip()
 
@@ -242,12 +180,32 @@ class TheGrid(wxg.Grid):
 if __name__ == '__main__':
     app = wx.App(useBestVisual=True)
     tables = OfferTables()
-    offer_id = tables.insert_offer()
-    group_id = tables.insert_group(offer_id)
+
+    offer_keys = ["id", "name"]
+    offer_data = [
+        (str(ObjectId()), "Tarjous 1"),
+        (str(ObjectId()), "Tarjous 2"),
+        (str(ObjectId()), "Testi tarjous"),
+        (str(ObjectId()), "Uusi tarjous")
+    ]
+    group_keys = ["id", "offer_id", "name"]
+    group_data = [
+        (str(ObjectId()), offer_data[0][0], "Keittiö"),
+        (str(ObjectId()), offer_data[0][0], "Kylpyhuone"),
+        (str(ObjectId()), offer_data[1][0], "Keittiö"),
+        (str(ObjectId()), offer_data[2][0], "Keittiö"),
+        (str(ObjectId()), offer_data[3][0], "Keittiö"),
+        (str(ObjectId()), offer_data[3][0], "...")
+    ]
+
+    tables.insert("offers", offer_keys, offer_data[0])
+    tables.insert("offers", offer_keys, offer_data[1:], True)
+
+    # tables.insert("offer_materials", )
 
     frame = wx.Frame(None, size=(1200, 500))
-    panel = GridPanel(frame, tables, "materials")
-    panel.grid.set_parent_id(group_id)
+    panel = GridPanel(frame, tables, "offer_materials")
+    panel.grid.set_parent_id(group_data[0][0])
 
     frame.Show()
     frame.Layout()

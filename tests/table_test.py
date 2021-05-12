@@ -43,6 +43,7 @@ class TestTables(unittest.TestCase):
     product_keys = ["code", "width", "height", "depth"]
     product_data = ("kaappi", 1200, 2300, 620)
     product_data2 = ("tuote", 650, 300, 420)
+    product_data3 = [("tuote1", 650, 300, 420), ("tuote2", 640, 310, 410)]
 
     part_keys = ["code", "product_code"]
     part_data = [
@@ -56,11 +57,11 @@ class TestTables(unittest.TestCase):
         self.assertEqual(res, True)
 
     def test_insert_many_offers(self):
-        res = self.tables.insert_many("offers", self.offer_keys, self.offer_data[1:])
+        res = self.tables.insert("offers", self.offer_keys, self.offer_data[1:], True)
         self.assertEqual(res, True)
 
     def test_insert_many_groups(self):
-        res = self.tables.insert_many("offer_groups", self.group_keys, self.group_data)
+        res = self.tables.insert("offer_groups", self.group_keys, self.group_data, True)
         self.assertEqual(res, True)
 
     def test_insert_offer_predefs(self):
@@ -88,7 +89,7 @@ class TestTables(unittest.TestCase):
         self.assertEqual(res, True)
 
     def test_insert_parts(self):
-        res = self.tables.insert_many("parts", self.part_keys, self.part_data)
+        res = self.tables.insert("parts", self.part_keys, self.part_data, True)
         self.assertEqual(res, True)
 
     def test_get(self):
@@ -102,7 +103,7 @@ class TestTables(unittest.TestCase):
         self.assertEqual(res[0], self.product_data2[2])
 
     def test_get(self):
-        res = self.tables.insert("products", self.product_keys, self.product_data2)
+        self.tables.insert("products", self.product_keys, self.product_data2)
         res = self.tables.get(
             "products",
             [self.product_keys[2]],
@@ -110,3 +111,13 @@ class TestTables(unittest.TestCase):
             [self.product_data2[0]]
         )
         self.assertEqual(res[0], self.product_data2[2])
+
+    def test_get_many(self):
+        self.tables.insert("products", self.product_keys, self.product_data3, True)
+        res = self.tables.get(
+            "products",
+            [self.product_keys[2]],
+            [self.product_keys[0]],
+            [self.product_data3[1][0]], True
+        )
+        self.assertEqual(res[0][0], self.product_data3[1][2])
