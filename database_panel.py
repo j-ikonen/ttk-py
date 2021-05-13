@@ -45,6 +45,8 @@ MENU_SHOW_SEARCH_HELP = "Näytä tietokanta haku."
 MENU_SHOW_ADD = "Näytä lisäys"
 MENU_SHOW_ADD_HELP = "Näytä tietokantaan lisättävien taulukot."
 
+TO_OFFER_TITLE = "Tarjoukseen siirrettävät {}"
+
 
 class AddToDatabasePanel(wx.Panel):
     def __init__(self, parent, table_keys, table_labels, column_setup):
@@ -88,6 +90,55 @@ class AddToDatabasePanel(wx.Panel):
                 self.Layout()
 
 
+class ToOfferPanel(wx.Panel):
+    def __init__(self, parent, title, column_setup):
+        super().__init__(parent)
+
+        self.column_setup = column_setup
+        self.title = wx.StaticText(self, label=TO_OFFER_TITLE.format(title))
+        self.listctrl = dv.DataViewListCtrl(self, style=dv.DV_ROW_LINES|dv.DV_MULTIPLE)
+
+        self.set_columns(title, column_setup)
+
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer_label = wx.BoxSizer(wx.HORIZONTAL)
+
+        sizer_label.Add(self.title, 0, wx.EXPAND)
+
+        sizer.Add(sizer_label, 0, wx.EXPAND|wx.ALL, BORDER)
+        sizer.Add(self.listctrl, 1, wx.EXPAND)
+
+        self.SetSizer(sizer)
+    
+    def set_columns(self, title, column_setup):
+        self.column_setup = column_setup
+        self.title.SetLabel(TO_OFFER_TITLE.format(title))
+        self.listctrl.DeleteAllItems()
+        self.listctrl.ClearColumns()
+        for value in column_setup.values():
+            self.listctrl.AppendTextColumn(value["label"], width=value["width"])
+
+    def delete_selected(self):
+        """Delete selected rows and return list of deleted row indexes."""
+        del_rows = []
+        for item in self.listctrl.GetSelections():
+            del_rows.append(self.listctrl.ItemToRow(item))
+            self.listctrl.DeleteItem(item)
+        del_rows.sort(reverse=True)
+        return del_rows
+
+    def append_content(self, data):
+        for item in data:
+            self.append_row(item)
+
+    def append_row(self, rowdata):
+        rowstrings = [db.type2str(value) for value in rowdata]
+        self.listctrl.AppendItem(rowstrings)
+
+    def clear(self):
+        self.listctrl.DeleteAllItems()
+
+
 class DatabasePanel(wx.Panel):
     def __init__(self, parent, tables, selection=0):
         super().__init__(parent)
@@ -129,8 +180,13 @@ class DatabasePanel(wx.Panel):
         # self.btn_add_to_db.SetToolTip(BTN_ADD_TO_DB_TT)
         # self.btn_del_from_db = wx.Button(self, label=BTN_DEL_FROM_DB)
         self.list_search = dv.DataViewListCtrl(self, style=dv.DV_ROW_LINES|dv.DV_MULTIPLE)
-        self.list_2offer = dv.DataViewListCtrl(self, style=dv.DV_ROW_LINES|dv.DV_MULTIPLE)
-
+        # self.list_2offer = dv.DataViewListCtrl(self, style=dv.DV_ROW_LINES|dv.DV_MULTIPLE)
+        
+        self.to_offer_panel = ToOfferPanel(
+            self,
+            self.table_labels[selection],
+            self.column_setup[selection]
+        )
         self.add_to_db_panel = AddToDatabasePanel(
             self,
             self.table_keys,
@@ -154,8 +210,8 @@ class DatabasePanel(wx.Panel):
         sizer_choices = wx.BoxSizer(wx.HORIZONTAL)
         # sizer_2db = wx.BoxSizer(wx.HORIZONTAL)
         sizer_div = wx.BoxSizer(wx.HORIZONTAL)
-        sizer_right = wx.BoxSizer(wx.VERTICAL)
-        sizer_left = wx.BoxSizer(wx.VERTICAL)
+        self.sizer_right = wx.BoxSizer(wx.VERTICAL)
+        self.sizer_left = wx.BoxSizer(wx.VERTICAL)
 
         sizer_choices.Add(self.choice_dbs, 0, wx.EXPAND|wx.RIGHT, BORDER)
         sizer_choices.Add(self.choice_col, 0, wx.EXPAND|wx.RIGHT, BORDER)
@@ -163,19 +219,19 @@ class DatabasePanel(wx.Panel):
         # sizer_choices.Add(self.btn_del_from_db, 0, wx.EXPAND|wx.RIGHT, BORDER)
         # sizer_choices.Add(self.btn_add_to_db, 0, wx.EXPAND|wx.RIGHT, BORDER)
 
-        sizer_left.Add(sizer_choices, 0, wx.EXPAND|wx.ALL, BORDER)
-        sizer_left.Add(self.list_search, 1, wx.EXPAND)
+        self.sizer_left.Add(sizer_choices, 0, wx.EXPAND|wx.ALL, BORDER)
+        self.sizer_left.Add(self.list_search, 1, wx.EXPAND)
 
         # sizer_2db.Add(self.btn_add, 0, wx.EXPAND|wx.RIGHT, BORDER)
         # sizer_2db.Add(self.btn_del, 0, wx.EXPAND|wx.RIGHT, BORDER)
 
         # sizer_left.Add(sizer_2db, 0, wx.EXPAND|wx.ALL, BORDER)
-        sizer_left.Add(self.list_2offer, 1, wx.EXPAND)
+        self.sizer_left.Add(self.to_offer_panel, 1, wx.EXPAND)
 
-        sizer_right.Add(self.add_to_db_panel, 1, wx.EXPAND)
+        self.sizer_right.Add(self.add_to_db_panel, 1, wx.EXPAND)
 
-        sizer_div.Add(sizer_left, 1, wx.EXPAND)
-        sizer_div.Add(sizer_right, 1, wx.EXPAND|wx.LEFT, BORDER)
+        sizer_div.Add(self.sizer_left, 1, wx.EXPAND)
+        sizer_div.Add(self.sizer_right, 1, wx.EXPAND|wx.LEFT, BORDER)
         sizer.Add(sizer_div, 1, wx.EXPAND)
 
         self.SetSizer(sizer)
@@ -250,7 +306,7 @@ class DatabasePanel(wx.Panel):
             self.show_to_offer = True
         else:
             self.show_to_offer = False
-        self.list_2offer.Show(self.show_to_offer)
+        self.to_offer_panel.Show(self.show_to_offer)
         self.Layout()
 
     def on_show_search(self, evt):
@@ -267,10 +323,7 @@ class DatabasePanel(wx.Panel):
         self.add_to_db_panel.Show(self.show_add)
         self.Layout()
 
-
-
-
-    def on_btn_add(self, evt):
+    def add_to_offer(self):
         sel_items = self.list_search.GetSelections()
         sel_rows = [self.list_search.ItemToRow(item) for item in sel_items]
         # for parts pk_key = ["code", "product_code"]
@@ -288,27 +341,16 @@ class DatabasePanel(wx.Panel):
                 pk_value,
             )
             self.to_offer[table_key].append(row_data)
-            self.list_2offer.AppendItem([db.type2str(val) for val in row_data])
+            self.to_offer_panel.append_row(row_data)
 
-    def on_btn_del(self, evt):
+    def del_to_offer(self):
         table_key = self.table_keys[self.choice_dbs.GetSelection()]
-        sel_items = self.list_2offer.GetSelections()
-        sel_rows = [self.list_2offer.ItemToRow(item) for item in sel_items]
-        sel_rows.sort(reverse=True)
-        for row in sel_rows:
+        del_rows = self.add_to_db_panel.delete_selected()
+        for row in del_rows:
             del self.to_offer[table_key][row]
-            self.list_2offer.DeleteItem(row)
-
-    def on_btn_add_to_db(self, evt):
-        self.add_to_db_panel.Show(not self.add_to_db_panel.IsShown())
-        self.Layout()
-
-    def on_btn_del_from_db(self, evt):
-        pass
-
 
     def on_choice_db(self, evt):
-        """."""
+        """Change the column setups on database table choice."""
         selection = self.choice_dbs.GetSelection()
         self.set_column_setup(selection)
         self.reset_setup()
@@ -340,11 +382,6 @@ class DatabasePanel(wx.Panel):
             row_str = [db.type2str(value) for value in row_data]
             self.list_search.AppendItem(row_str)
 
-    def reset_list_2offer(self):
-        self.list_2offer.DeleteAllItems()
-        for item in self.to_offer[self.table_keys[self.choice_dbs.GetSelection()]]:
-            self.list_2offer.AppendItem([db.type2str(val) for val in item])
-
     def reset_setup(self):
         self.search.SetValue("")
 
@@ -355,19 +392,16 @@ class DatabasePanel(wx.Panel):
         self.list_search.DeleteAllItems()
         self.list_search.ClearColumns()
 
-        self.list_2offer.DeleteAllItems()
-        self.list_2offer.ClearColumns()
-
         for n, label in enumerate(self.column_labels):
             self.list_search.AppendTextColumn(
                 label,
                 width=self.column_widths[n]
             )
-            self.list_2offer.AppendTextColumn(
-                label,
-                width=self.column_widths[n]
-            )
-        self.reset_list_2offer()
+        selection = self.choice_dbs.GetSelection()
+        setup = self.column_setup[selection]
+
+        self.to_offer_panel.set_columns(self.table_labels[selection], setup)
+        self.to_offer_panel.append_content(self.to_offer[self.table_keys[selection]])
 
 
 
