@@ -8,16 +8,20 @@ from table import OfferTables, str2type, type2str
 
 class GridPanel(wx.Panel):
     BORDER = 5
+    BTN_DEL = "Poista valitut"
 
-    def __init__(self, parent, tables, key):
+    def __init__(self, parent, tables: OfferTables, key):
         super().__init__(parent)
 
         # self.SetBackgroundColour((255, 150, 100))
         self.SetBackgroundColour((255, 200, 120))
 
         label = wx.StaticText(self, label=key)
-        btn_del = wx.Button(self, label="-")
-        self.grid = TheGrid(self, tables, key)
+        btn_del = wx.Button(self, label=self.BTN_DEL)
+        # self.grid = TheGrid(self, tables, key)
+        dsp = tables.get_display_setup("database_add_products")
+        setup = tables.get_column_setup(dsp.get("table"), dsp.get("columns"))
+        self.grid = BaseGrid(self, setup)
 
         self.Bind(wx.EVT_BUTTON, self.on_btn_del, btn_del)
 
@@ -35,100 +39,127 @@ class GridPanel(wx.Panel):
         self.grid.delete_selected()
 
 
-class TheGrid(wxg.Grid):
-
-    def __init__(self, parent, tables, key):
+class BaseGrid(wxg.Grid):
+    def __init__(self, parent, setup, n_rows=None):
         super().__init__(parent)
 
-        self.tables: OfferTables = tables
-
-        self.key = key
-
+        self.setup = {}
         self.keys = []
-        self.labels = []
-        self.widths = []
-
         self.read_only = []
-        self.types = []
         self.unique = []
 
-        self.column_setup()
+        self.set_setup(setup)
+        self.n_columns = len(self.keys)
+        self.static_rows = True
 
-        self.n_columns = len(self.labels)
-        self.ids = []
-        self.parent_id = None
+        if n_rows is None:
+            self.static_rows = False
+            self.CreateGrid(1, self.n_columns)
+        else:
+            self.CreateGrid(n_rows, self.n_columns)
 
-        self.CreateGrid(1, self.n_columns)
         self.SetRowLabelSize(35)
 
-        for n in range(self.n_columns):
-            self.SetColLabelValue(n, self.labels[n])
-            self.SetColSize(n, self.label_sizes[n])
-            self.set_col_format(n)
-
+        for col in range(self.n_columns):
+            self.SetColLabelValue(col, self.get_label(col))
+            self.SetColSize(col, self.get_width(col))
+            self.set_col_format(col)
+            
         self.Bind(wxg.EVT_GRID_EDITOR_SHOWN, self.on_show_editor)
         self.Bind(wxg.EVT_GRID_CELL_CHANGING, self.on_cell_changing)
-
-    def column_setup(self, evt):
-        self.keys = []
-        self.labels = []
-        self.widths = []
-
-        self.read_only = []
-        self.types = []
-        self.unique = []
-
-    def on_cell_changing(self, evt):
-        """Save changed value to table.
-
-        Veto changing of the cell if:
-            Column is unique.
-            Parent ID is None.
-            Insert or Update to database failed and returned False.
-        """
-        value = evt.GetString()
-        col = evt.GetCol()
-        row = evt.GetRow()
-        print(value)
-
-        # Veto if no parent id is not defined.
-        if self.parent_id is None:
-            print("TheGrid.on_cell_changing - " +
-                f"No parent ID defined.")
-            evt.Veto()
-
-        # Veto if the value exists in unique column.
-        if col in self.unique:
-            for test_row in range(self.GetNumberRows()):
-                if value == self.GetCellValue(test_row, col):
-                    print("TheGrid.on_cell_changing - " +
-                        f"Column '{self.labels[col]}' is unique. " +
-                        f"Value '{value}' already exists.")
-                    evt.Veto()
-
-        # Init uninitiated row.
-        if row >= len(self.ids):
-            oid = str(ObjectId())
-            self.ids.append(oid)
-            self.AppendRows()
-
-        values = (self.ids[row], self.parent_id, str2type(self.types[col], value))
-        if not self.tables.upsert(self.key, self.keys[col], values):
-            evt.Veto()
-
-        self.update_data()
-        evt.Skip()
 
     def on_show_editor(self, evt):
         """Veto showing of editor on read only columns."""
         if evt.GetCol() in self.read_only:
-            print("TheGrid.on_show_editor - " +
+            print("BaseGrid.on_show_editor - " +
                   f"Column '{self.labels[evt.GetCol()]}' is read only.")
             evt.Veto()
 
+    def on_cell_changing(self, evt):
+        """."""
+        value = evt.GetString()
+        col = evt.GetCol()
+        row = evt.GetRow()
+
+        # Veto if the value exists in unique column.
+        if col in self.unique and self.value_exists(col, value):
+            evt.Veto()
+
+        # Init uninitiated row.
+        if not self.static_rows and row >= self.GetNumberRows() - 1:
+            self.edit_in_last_row()
+
+        evt.Skip()
+
+    def value_exists(self, col, value):
+        """Return True if the value already exists in the column."""
+        for test_row in range(self.GetNumberRows()):
+            if value == self.GetCellValue(test_row, col):
+                print("TheGrid.on_cell_changing - " +
+                    f"Column '{self.get_label(col)}' is unique. " +
+                    f"Value '{value}' already exists.")
+                return True
+        return False
+
+    def edit_in_last_row(self):
+        self.AppendRows(1)
+    
+    def get_content(self):
+        content = []
+        for row in range(self.GetNumberRows()):
+            row_data = []
+            for col in range(self.GetNumberCols()):
+                value = str2type(self.get_type(col), self.GetCellValue(row, col))
+                row_data.append(value)
+            content.append(value)
+        return content
+
+    def delete_selected(self):
+        selected = self.GetSelectedRows()
+        selected.sort(reverse=True)
+        for row in selected:
+            self.delete_row(row)
+
+    def delete_row(self, row):
+        self.DeleteRows(row)
+
+    def set_setup(self, setup):
+        self.keys = [k for k in setup.keys()]
+        self.setup = setup
+        for col, v in enumerate(self.setup.values()):
+            if v["ro"]:
+                self.read_only.append(col)
+            
+            if v["unique"]:
+                self.unique.append(col)
+
+    def get_label(self, col):
+        """Return the label of column."""
+        return self.setup[self.keys[col]]["label"]
+
+    def get_type(self, col):
+        """Return the type of column."""
+        return self.setup[self.keys[col]]["type"]
+
+    def get_width(self, col):
+        """Return the width of column."""
+        return self.setup[self.keys[col]]["width"]
+
+    def get_read_only(self, col):
+        """Return the read_only of column."""
+        return self.setup[self.keys[col]]["read_only"]
+
+    def get_unique(self, col):
+        """Return the unique of column."""
+        return self.setup[self.keys[col]]["unique"]
+
+    def set_width(self, col, width):
+        """Set the width of a column setup."""
+        self.setup[self.keys[col]]["width"] = width
+
     def set_col_format(self, col):
         """Set the column format by typestring."""
-        typestring = self.types[col]
+        typestring = self.get_type(col)
         typesplit = typestring.split(':')
         t = typesplit[0]
         if len(typesplit) == 2:
@@ -147,6 +178,127 @@ class TheGrid(wxg.Grid):
         elif t == "bool":
             self.SetColFormatBool(col)
 
+
+class TheGrid(wxg.Grid):
+
+    def __init__(self, parent, tables, key):
+        super().__init__(parent)
+
+        self.tables: OfferTables = tables
+
+        self.key = key
+        self.label = ""
+        self.table_name = ""
+        self.keys = []
+        self.labels = []
+        self.widths = []
+
+        self.read_only = []
+        self.types = []
+        self.unique = []
+        self.pk = []
+        self.ids = []
+        self.parent_key_values = None
+        self.parent_keys = None
+
+        self.column_setup()
+
+        self.n_columns = len(self.labels)
+
+        self.CreateGrid(1, self.n_columns)
+        self.SetRowLabelSize(35)
+
+        for n in range(self.n_columns):
+            self.SetColLabelValue(n, self.labels[n])
+            self.SetColSize(n, self.widths[n])
+            self.set_col_format(n)
+
+        self.Bind(wxg.EVT_GRID_EDITOR_SHOWN, self.on_show_editor)
+        self.Bind(wxg.EVT_GRID_CELL_CHANGING, self.on_cell_changing)
+
+    def column_setup(self):
+        display = self.tables.get_display_setup(self.key)
+        self.keys = display["columns"]
+        self.table_name = display["table"]
+        self.pk = display["pk"]
+        self.label = display["label"]
+        if "parent_keys" in display:
+            self.parent_keys = display["parent_keys"]
+            self.parent_key_values = []
+
+        setup = self.tables.get_column_setup(self.table_name, self.keys)
+        for col, value in enumerate(setup.values()):
+            self.labels.append(value["label"])
+            self.widths.append(value["width"])
+            self.types.append(value["type"])
+            if value["ro"]:
+                self.read_only.append(col)
+            if value["unique"]:
+                self.unique.append(col)
+
+    def on_cell_changing(self, evt):
+        """Save changed value to table.
+
+        Veto changing of the cell if:
+            Column is unique.
+            Parent ID is None.
+            Insert or Update to database failed and returned False.
+        """
+        value = evt.GetString()
+        col = evt.GetCol()
+        row = evt.GetRow()
+        print(value)
+
+        # Veto if no parent id is not defined.
+        if self.parent_keys is None:
+            print("TheGrid.on_cell_changing - " +
+                f"No parent ID defined.")
+            evt.Veto()
+
+        # Veto if the value exists in unique column.
+        if col in self.unique:
+            for test_row in range(self.GetNumberRows()):
+                if value == self.GetCellValue(test_row, col):
+                    print("TheGrid.on_cell_changing - " +
+                        f"Column '{self.labels[col]}' is unique. " +
+                        f"Value '{value}' already exists.")
+                    evt.Veto()
+
+        # Init uninitiated row.
+        if row >= len(self.ids):
+            pk_values = []
+            for k in self.pk:
+                if k in self.keys:
+                    pk_values.append(value) # Unique test done already
+                elif k in self.parent_keys:
+                    pk_values.append(self.parent_keys[self.parent_key_values.index(k)])
+                else:
+                    oid = str(ObjectId())
+                    pk_values.append(oid)
+
+            self.ids.append(pk_values)
+            self.AppendRows()
+            if not self.tables.insert(self.table_name, self.pk, pk_values):
+                evt.Veto()
+
+        if not self.tables.update_one(
+            self.table_name,
+            self.keys[col],
+            self.pk,
+            [str2type(self.types[col], value)] + self.ids[col]
+        ):
+            evt.Veto()
+
+        self.update_data()
+        evt.Skip()
+
+    def on_show_editor(self, evt):
+        """Veto showing of editor on read only columns."""
+        if evt.GetCol() in self.read_only:
+            print("TheGrid.on_show_editor - " +
+                  f"Column '{self.labels[evt.GetCol()]}' is read only.")
+            evt.Veto()
+
     # def set_new_rows(self, key, data):
     #     # data = self.tables.get_by_ids(key, ids)
     #     self.tables.insert()
@@ -159,14 +311,18 @@ class TheGrid(wxg.Grid):
     #         row += 1
     #     self.EndBatch()
 
-    def set_parent_id(self, id: str):
-        if self.parent_id != id:
-            self.parent_id = id
+    def set_parent_id(self, parent):
+        if self.parent_key_values != parent:
+            self.parent_key_values = parent
             self.update_data()
 
     def update_data(self):
         self.ids.clear()
-        data = self.tables.get_grid(self.key, self.parent_id)
+        data = self.tables.get(
+            self.table_name,
+            self.keys,
+
+        )
         self.BeginBatch()
         self.DeleteRows(0, self.GetNumberRows())
         self.AppendRows(len(data) + 1)
@@ -217,8 +373,8 @@ if __name__ == '__main__':
     # tables.insert("offer_materials", )
 
     frame = wx.Frame(None, size=(1200, 500))
-    panel = GridPanel(frame, tables, "offer_materials")
-    panel.grid.set_parent_id(group_data[0][0])
+    panel = GridPanel(frame, tables, "database_add_materials")
+    # panel.grid.set_parent_id(group_data[0][0])
 
     frame.Show()
     frame.Layout()

@@ -78,6 +78,538 @@
                 "ro": false,
                 "unique": false
             }
+        },
+        "offer_groups": {
+            "id": {
+                "label": "ID",
+                "type": "string",
+                "width": 80,
+                "ro": false,
+                "unique": true
+            },
+            "offer_id": {
+                "label": "Tarjous ID",
+                "type": "string",
+                "width": 80,
+                "ro": false,
+                "unique": false
+            },
+            "name": {
+                "label": "Nimi",
+                "type": "string",
+                "width": 80,
+                "ro": false,
+                "unique": true
+            }
+        },
+        "offer_predefs": {
+            "id": {
+                "label": "ID",
+                "type": "string",
+                "width": 30,
+                "ro": false,
+                "unique": true
+            },
+            "group_id": {
+                "label": "Ryhmä ID",
+                "type": "string",
+                "width": 30,
+                "ro": false,
+                "unique": false
+            },
+            "part": {
+                "label": "Osa",
+                "type": "string",
+                "width": 65,
+                "ro": false,
+                "unique": true
+            },
+            "material": {
+                "label": "Materiaali",
+                "type": "string",
+                "width": 65,
+                "ro": false,
+                "unique": false
+            }
+        },
+        "offer_materials": {
+            "id": {
+                "label": "ID",
+                "type": "string",
+                "width": 30,
+                "ro": false,
+                "unique": true
+            },
+            "group_id": {
+                "label": "Ryhmä ID",
+                "type": "string",
+                "width": 30,
+                "ro": false,
+                "unique": false
+            },
+            "code": {
+                "label": "Koodi",
+                "type": "string",
+                "width": 65,
+                "ro": false,
+                "unique": false
+            },
+            "desc": {
+                "label": "Kuvaus",
+                "type": "string",
+                "width": 80,
+                "ro": false,
+                "unique": false
+            },
+            "prod": {
+                "label": "Valmistaja",
+                "type": "string",
+                "width": 80,
+                "ro": false,
+                "unique": false
+            },
+            "unit": {
+                "label": "Hintayksikkö",
+                "type": "string",
+                "width": 45,
+                "ro": false,
+                "unique": false
+            },
+            "thickness": {
+                "label": "Paksuus",
+                "type": "long",
+                "width": 45,
+                "ro": false,
+                "unique": false
+            },
+            "loss": {
+                "label": "Hukka",
+                "type": "double:6,2",
+                "width": 45,
+                "ro": false,
+                "unique": false
+            },
+            "cost": {
+                "label": "Mat. Hinta",
+                "type": "double:6,2",
+                "width": 45,
+                "ro": false,
+                "unique": false
+            },
+            "edg_cost": {
+                "label": "R.Nauhan hinta",
+                "type": "double:6,2",
+                "width": 45,
+                "ro": false,
+                "unique": false
+            },
+            "add_cost": {
+                "label": "Lisähinta",
+                "type": "double:6,2",
+                "width": 45,
+                "ro": false,
+                "unique": false
+            },
+            "discount": {
+                "label": "Alennus",
+                "type": "double:6,2",
+                "width": 45,
+                "ro": false,
+                "unique": false
+            },
+            "((cost + edg_cost + add_cost) * (1 + loss) * (1 - discount)) tot_cost": {
+                "label": "Kokonaishinta",
+                "type": "double:6,2",
+                "width": 45,
+                "ro": true,
+                "unique": false
+            }
+        },
+        "offer_products": {
+            "id": {
+                "label": "ID",
+                "type": "string",
+                "width": 45,
+                "ro": false,
+                "unique": true
+            },
+            "group_id": {
+                "label": "Ryhmä ID",
+                "type": "string",
+                "width": 45,
+                "ro": false,
+                "unique": false
+            },
+            "code": {
+                "label": "Koodi",
+                "type": "string",
+                "width": 65,
+                "ro": false,
+                "unique": false
+            },
+            "count": {
+                "label": "Määrä",
+                "type": "long",
+                "width": 45,
+                "ro": false,
+                "unique": false
+            },
+            "desc": {
+                "label": "Kuvaus",
+                "type": "string",
+                "width": 80,
+                "ro": false,
+                "unique": false
+            },
+            "prod": {
+                "label": "Valmistaja",
+                "type": "string",
+                "width": 80,
+                "ro": false,
+                "unique": false
+            },
+            "inst_unit": {
+                "label": "Asennusyksikkö",
+                "type": "string",
+                "width": 65,
+                "ro": false,
+                "unique": false
+            },
+            "width": {
+                "label": "Leveys",
+                "type": "long",
+                "width": 45,
+                "ro": false,
+                "unique": false
+            },
+            "height": {
+                "label": "Korkeus",
+                "type": "long",
+                "width": 45,
+                "ro": false,
+                "unique": false
+            },
+            "depth": {
+                "label": "Syvyys",
+                "type": "long",
+                "width": 45,
+                "ro": false,
+                "unique": false
+            },
+            "work_time": {
+                "label": "Työaika",
+                "type": "double:6,2",
+                "width": 45,
+                "ro": false,
+                "unique": false
+            },
+            "work_cost": {
+                "label": "Työn hinta",
+                "type": "double:6,2",
+                "width": 45,
+                "ro": false,
+                "unique": false
+            },
+            "(SUM(part.cost)) part_cost": {
+                "label": "Osien Hinta",
+                "type": "double:6,2",
+                "width": 45,
+                "ro": true,
+                "unique": false
+            },
+            "(work_cost * work_time + part_cost) tot_cost": {
+                "label": "Kokonais Hinta",
+                "type": "double:6,2",
+                "width": 45,
+                "ro": true,
+                "unique": false
+            }
+
+        },
+        "offer_parts": {
+            "id": {
+                "label": "ID",
+                "type": "string",
+                "width": 45,
+                "ro": false,
+                "unique": true
+            },
+            "product_id": {
+                "label": "Tuotteen ID",
+                "type": "string",
+                "width": 45,
+                "ro": false,
+                "unique": false
+            },
+            "code": {
+                "label": "Koodi",
+                "type": "string",
+                "width": 80,
+                "ro": false,
+                "unique": false
+            },
+            "desc": {
+                "label": "Kuvaus",
+                "type": "string",
+                "width": 80,
+                "ro": false,
+                "unique": false
+            },
+            "use_predef": {
+                "label": "Käyt. Esimääritystä",
+                "type": "bool",
+                "width": 45,
+                "ro": false,
+                "unique": false
+            },
+            "default_mat": {
+                "label": "Oletus Materiaali",
+                "type": "string",
+                "width": 65,
+                "ro": false,
+                "unique": false
+            },
+            "used_mat": {
+                "label": "Käytettävä Materiaali",
+                "type": "string",
+                "width": 65,
+                "ro": false,
+                "unique": false
+            },
+            "code_width": {
+                "label": "Leveys Koodi",
+                "type": "string",
+                "width": 120,
+                "ro": false,
+                "unique": false
+            },
+            "code_height": {
+                "label": "Pituus Koodi",
+                "type": "string",
+                "width": 120,
+                "ro": false,
+                "unique": false
+            },
+            "cost": {
+                "label": "Paksuus",
+                "type": "long",
+                "width": 45,
+                "ro": true,
+                "unique": false
+            }
+
+        },
+        "fcmults": {
+            "unit": {
+                "label": "Asennusyksikkö",
+                "type": "string",
+                "width": 80,
+                "ro": false,
+                "unique": true
+            },
+            "mult": {
+                "label": "Kerroin",
+                "type": "double:6,2",
+                "width": 45,
+                "ro": false,
+                "unique": true
+            }
+        },
+        "materials": {
+            "code": {
+                "label": "Koodi",
+                "type": "string",
+                "width": 65,
+                "ro": false,
+                "unique": true
+            },
+            "desc": {
+                "label": "Kuvaus",
+                "type": "string",
+                "width": 80,
+                "ro": false,
+                "unique": false
+            },
+            "prod": {
+                "label": "Valmistaja",
+                "type": "string",
+                "width": 80,
+                "ro": false,
+                "unique": false
+            },
+            "unit": {
+                "label": "Hintayksikkö",
+                "type": "string",
+                "width": 45,
+                "ro": false,
+                "unique": false
+            },
+            "thickness": {
+                "label": "Paksuus",
+                "type": "long",
+                "width": 45,
+                "ro": false,
+                "unique": false
+            },
+            "loss": {
+                "label": "Hukka",
+                "type": "double:6,2",
+                "width": 45,
+                "ro": false,
+                "unique": false
+            },
+            "cost": {
+                "label": "Mat. Hinta",
+                "type": "double:6,2",
+                "width": 45,
+                "ro": false,
+                "unique": false
+            },
+            "edg_cost": {
+                "label": "R.Nauhan hinta",
+                "type": "double:6,2",
+                "width": 45,
+                "ro": false,
+                "unique": false
+            },
+            "add_cost": {
+                "label": "Lisähinta",
+                "type": "double:6,2",
+                "width": 45,
+                "ro": false,
+                "unique": false
+            },
+            "discount": {
+                "label": "Alennus",
+                "type": "double:6,2",
+                "width": 45,
+                "ro": false,
+                "unique": false
+            },
+            "((cost + edg_cost + add_cost) * (1 + loss) * (1 - discount)) tot_cost": {
+                "label": "Kokonaishinta",
+                "type": "double:6,2",
+                "width": 45,
+                "ro": true,
+                "unique": false
+            }
+
+        },
+        "products": {
+            "code": {
+                "label": "Koodi",
+                "type": "string",
+                "width": 65,
+                "ro": false,
+                "unique": true
+            },
+            "count": {
+                "label": "Määrä",
+                "type": "long",
+                "width": 45,
+                "ro": false,
+                "unique": false
+            },
+            "desc": {
+                "label": "Kuvaus",
+                "type": "string",
+                "width": 80,
+                "ro": false,
+                "unique": false
+            },
+            "prod": {
+                "label": "Valmistaja",
+                "type": "string",
+                "width": 80,
+                "ro": false,
+                "unique": false
+            },
+            "inst_unit": {
+                "label": "Asennusyksikkö",
+                "type": "string",
+                "width": 65,
+                "ro": false,
+                "unique": false
+            },
+            "width": {
+                "label": "Leveys",
+                "type": "long",
+                "width": 45,
+                "ro": false,
+                "unique": false
+            },
+            "height": {
+                "label": "Korkeus",
+                "type": "long",
+                "width": 45,
+                "ro": false,
+                "unique": false
+            },
+            "depth": {
+                "label": "Syvyys",
+                "type": "long",
+                "width": 45,
+                "ro": false,
+                "unique": false
+            },
+            "work_time": {
+                "label": "Työaika",
+                "type": "double:6,2",
+                "width": 45,
+                "ro": false,
+                "unique": false
+            },
+            "work_cost": {
+                "label": "Työn hinta",
+                "type": "double:6,2",
+                "width": 45,
+                "ro": false,
+                "unique": false
+            }
+        },
+        "parts": {
+            "code": {
+                "label": "Koodi",
+                "type": "string",
+                "width": 65,
+                "ro": false,
+                "unique": false
+            },
+            "product_code": {
+                "label": "Tuotekoodi",
+                "type": "string",
+                "width": 65,
+                "ro": false,
+                "unique": false
+            },
+            "desc": {
+                "label": "Kuvaus",
+                "type": "string",
+                "width": 80,
+                "ro": false,
+                "unique": false
+            },
+            "default_mat": {
+                "label": "Oletusmateriaali",
+                "type": "string",
+                "width": 65,
+                "ro": false,
+                "unique": false
+            },
+            "code_width": {
+                "label": "Leveys koodi",
+                "type": "string",
+                "width": 80,
+                "ro": false,
+                "unique": false
+            },
+            "code_length": {
+                "label": "Pituus koodi",
+                "type": "string",
+                "width": 80,
+                "ro": false,
+                "unique": false
+            }
         }
     },
     "columns_table": {
@@ -93,6 +625,87 @@
             "postcode",
             "postarea",
             "info"
+        ],
+        "offer_groups": [
+            "id",
+            "offer_id",
+            "name"
+        ],
+        "offer_predefs": [
+            "id",
+            "group_id",
+            "part",
+            "material"
+        ],
+        "offer_materials": [
+            "id",      
+            "group_id",
+            "code",    
+            "desc",    
+            "prod",    
+            "unit",    
+            "thck",    
+            "loss",    
+            "cost",    
+            "edg_cost",
+            "add_cost",
+            "discount"
+        ],
+        "offer_products": [
+            "id",       
+            "group_id", 
+            "code",     
+            "count",    
+            "desc",     
+            "prod",     
+            "inst_unit",
+            "width",    
+            "height",   
+            "depth",    
+            "work_time",
+            "work_cost"
+        ],
+        "offer_parts": [
+            "id",         
+            "product_id", 
+            "code",       
+            "desc",       
+            "use_predef", 
+            "default_mat",
+            "code_width", 
+            "code_height"
+        ],
+        "fcmults": ["unit", "mult"],
+        "materials": [
+            "code",     
+            "desc",     
+            "prod",     
+            "unit",     
+            "thickness",
+            "loss",     
+            "cost",     
+            "edg_cost", 
+            "add_cost", 
+            "discount"
+        ],
+        "products": [
+            "code",     
+            "desc",     
+            "prod",     
+            "inst_unit",
+            "width",    
+            "height",   
+            "depth",    
+            "work_time",
+            "work_cost"
+        ],
+        "parts": [
+            "code",        
+            "product_code",
+            "desc",        
+            "default_mat", 
+            "code_width",  
+            "code_length"
         ]
     },
     "display": {
@@ -100,8 +713,6 @@
             "label": "Asiakas",
             "table": "offers",
             "pk": ["id"],
-            "read_only": [],
-            "unique": [],
             "columns": [
                 "firstname",
                 "lastname",
@@ -112,6 +723,92 @@
                 "postcode",
                 "postarea",
                 "info"
+            ]
+        },
+        "database": {
+            "label": "Tietokanta",
+            "table": ["materials", "products", "parts"],
+            "table_label": ["Materiaalit", "Tuotteet", "Osat"],
+            "pk": [["code"], ["code"], ["code", "product_code"]],
+            "columns": [
+                [
+                    "code",     
+                    "desc",     
+                    "prod",     
+                    "unit",     
+                    "thickness",
+                    "loss",     
+                    "cost",     
+                    "edg_cost", 
+                    "add_cost", 
+                    "discount"
+                ],
+                [
+                    "code",     
+                    "desc",     
+                    "prod",     
+                    "inst_unit",
+                    "width",    
+                    "height",   
+                    "depth",    
+                    "work_time",
+                    "work_cost"
+                ],
+                [
+                    "code",        
+                    "product_code",
+                    "desc",        
+                    "default_mat", 
+                    "code_width",  
+                    "code_length"
+                ]
+            ]
+        },
+        "database_add_materials": {
+            "label": "Lisää Materiaalit tietokantaan",
+            "table": "materials",
+            "pk": ["code"],
+            "columns": [
+                "code",     
+                "desc",     
+                "prod",     
+                "unit",     
+                "thickness",
+                "loss",     
+                "cost",     
+                "edg_cost", 
+                "add_cost", 
+                "discount"
+            ]
+        },
+        "database_add_products": {
+            "label": "Lisää Tuotteet tietokantaan",
+            "table": "products",
+            "pk": ["code"],
+            "columns": [
+                "code",     
+                "desc",     
+                "prod",     
+                "inst_unit",
+                "width",    
+                "height",   
+                "depth",    
+                "work_time",
+                "work_cost"
+            ]
+        },
+        "database_add_parts": {
+            "label": "Lisää Osia tietokantaan",
+            "table": "parts",
+            "pk": ["code"],
+            "parent_keys": [],
+            "columns": [
+                "code",        
+                "product_code",
+                "desc",        
+                "default_mat", 
+                "code_width",  
+                "code_length"
             ]
         }
     }

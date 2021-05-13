@@ -2,13 +2,9 @@
 
 TODO
 ----
-    Unittest for get many.
-    Add operator format for get.
-    Add delete method.
-    Add update method.
-
 """
 
+import json
 import sqlite3
 from typing import Iterable
 
@@ -26,6 +22,16 @@ TYPES = {
     'oid': ObjectId
 }
 
+def read_json(file):
+    try:
+        with open(file, 'r', encoding='utf-8') as fh:
+            return json.load(fh)
+    except FileNotFoundError as e:
+        print(f"{e}")
+        return None
+    except json.decoder.JSONDecodeError as e:
+        print(f"{file}\n\tFile is not a valid json.")
+        return None
 
 def type2default(typestring: str):
     """Return the default value for the typestring."""
@@ -196,9 +202,8 @@ sql_create_table_offer_parts = """
         desc        TEXT,
         use_predef  INTEGER,
         default_mat TEXT,
-        code_x      TEXT,
-        code_y      TEXT,
-        code_z      TEXT,
+        code_width  TEXT,
+        code_height TEXT,
 
         FOREIGN KEY (product_id)
             REFERENCES offer_products (id)
@@ -206,13 +211,14 @@ sql_create_table_offer_parts = """
             ON UPDATE CASCADE
     )
 """
+
 sql_create_table_materials = """
     CREATE TABLE IF NOT EXISTS materials (
         code        TEXT PRIMARY KEY,
         desc        TEXT,
         prod        TEXT,
         unit        TEXT,
-        thck        INTEGER,
+        thickness   INTEGER,
         loss        REAL,
         cost        REAL,
         edg_cost    REAL,
@@ -235,14 +241,14 @@ sql_create_table_products = """
 """
 sql_create_table_parts = """
     CREATE TABLE IF NOT EXISTS parts (
-        code            TEXT PRIMARY KEY,
+        code            TEXT NOT NULL,
         product_code    TEXT NOT NULL,
         desc            TEXT,
         default_mat     TEXT,
-        code_x          TEXT,
-        code_y          TEXT,
-        code_z          TEXT,
+        code_width      TEXT,
+        code_length     TEXT,
 
+        PRIMARY KEY (code, product_code),
         FOREIGN KEY (product_code)
             REFERENCES offer_products (code)
             ON DELETE CASCADE
@@ -287,37 +293,37 @@ sql_insert_default = {
     "parts": sql_insert_default_parts
 }
 
-sql_select_general = """SELECT {columns} FROM {table} WHERE {match}{op}{qm}"""
+sql_select_general = """SELECT {columns} FROM {table} WHERE {cond}"""
 sql_update_general = """UPDATE {table} SET {column} = ? WHERE {pk} = ({qm})"""
 
 
-sql_select_offer_materials_grid = """
-    SELECT
-        id,
-        code,
-        desc,
-        prod,
-        unit,
-        thck,
-        loss,
-        cost,
-        edg_cost,
-        add_cost,
-        discount,
-        ((cost + edg_cost + add_cost) * (1 + loss) * (1 - discount)) tot_cost
-    FROM offer_materials
-    WHERE group_id=?
-"""
-sql_select_grid = {
-    "offer_materials": sql_select_offer_materials_grid
-}
+# sql_select_offer_materials_grid = """
+    # SELECT
+        # id,
+        # code,
+        # desc,
+        # prod,
+        # unit,
+        # thck,
+        # loss,
+        # cost,
+        # edg_cost,
+        # add_cost,
+        # discount,
+        # ((cost + edg_cost + add_cost) * (1 + loss) * (1 - discount)) tot_cost
+    # FROM offer_materials
+    # WHERE group_id=?
+# """
+# sql_select_grid = {
+    # "offer_materials": sql_select_offer_materials_grid
+# }
 
 
 class OfferTables:
     con = None
     cur = None
 
-    table_columns = TABLE_COLUMNS
+    table_setup = read_json("table.json")
 
     def __init__(self) -> None:
         """."""
@@ -436,15 +442,16 @@ class OfferTables:
             Row or multiple rows of search results.
         """
         cols = ','.join(columns)
-        mcols = ','.join(match_columns)
-        qms = ','.join(['?'] * len(match_columns))
-        op = operator
+        conditions = ""
+        for col in match_columns:
+            conditions += col + operator + "?"
+            if col != match_columns[-1]:
+                conditions += " AND "
+
         sql = sql_select_general.format(
             table=table,
             columns=cols,
-            match=mcols,
-            op=op,
-            qm=qms
+            cond=conditions
         )
         print(sql)
         try:
@@ -458,47 +465,26 @@ class OfferTables:
         else:
             return self.cur.fetchone()
 
-    def get_grid(self, key, parent_id):
-        """Return list of columns by foreign key id.
+    # def get_grid(self, key, parent_id):
+    #     """Return list of columns by foreign key id.
 
-        [row][0] = id"""
-        sql = sql_select_grid[key]
-        try:
-            self.cur.execute(sql, (parent_id,))
-        except sqlite3.Error as e:
-            print(e)
-            return []
-        return self.cur.fetchall()
+    #     [row][0] = id"""
+    #     sql = sql_select_grid[key]
+    #     try:
+    #         self.cur.execute(sql, (parent_id,))
+    #     except sqlite3.Error as e:
+    #         print(e)
+    #         return []
+    #     return self.cur.fetchall()
 
-    def get_column_setup(self, key):
-        # cols = self.table_columns[key]
-        column_setup = {
-            "dbpanel.materials": self.table_columns["materials"],
-            "dbpanel.products": self.table_columns["products"],
-            "objectgrid.materials": self.table_columns["materials"],
-            "objectgrid.products": self.table_columns["products"]
-        }
-        # column_setup_materials = [key for key in cols[key].keys()] + ["((cost + edg_cost + add_cost) * (1 + loss) * (1 - discount)) tot_cost"]
-        return column_setup[key]
+    def get_column_setup(self, table, keys):
+        """Return a dictionary with column setup for keys from table."""
+        cols = self.table_setup["columns"][table]
+        return {k: cols[k] for k in keys}
 
-    def get_panel_setup(self, panel):
-        panel_setup = {
-            "dbpanel": {
-                "materials": {"label": TABLE_LABELS["materials"], "pk": "code"},
-                "products": {"label": TABLE_LABELS["products"], "pk": "code"}
-            },
-            "objectgrid": {
-                "materials": {"label": TABLE_LABELS["materials"], "pk": "code"},
-                "products": {"label": TABLE_LABELS["products"], "pk": "code"}
-            },
-            "grouppagegrid": {
-                "offer_materials": {
-                    "label": TABLE_LABELS["offer_materials"],
-                    "pk": "id",
-                    "read_only": [10]}
-            }
-        }
-        return panel_setup[panel]
+    def get_display_setup(self, display_key):
+        """Return the display setup."""
+        return self.table_setup["display"][display_key]
 
     def update_one(self, table: str, column_key: str, pk: str, values: Iterable):
         """Update a single column with values.
