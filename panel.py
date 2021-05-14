@@ -16,7 +16,7 @@ BORDER = 5
 
 
 class Panel(wx.Panel):
-    def __init__(self, parent, tables, data, setup):
+    def __init__(self, parent, tables):
         """Handle MainPanel windows.
         
         Args:
@@ -26,10 +26,17 @@ class Panel(wx.Panel):
         """
         super().__init__(parent)
 
-        self.treedata: ttk.Data = data
-        self.setup: Setup = setup
+        # self.treedata: ttk.Data = data
+        # self.setup: Setup = setup
         self.tables: OfferTables = tables
-        self.offers = []
+        self.open_offers = [
+            self.tables.offer_data[0][0],
+            self.tables.offer_data[1][0],
+            self.tables.offer_data[2][0],
+            self.tables.offer_data[3][0]
+        ]
+        self.active_offer = None
+        self.active_group = None
 
         winids = []
         self.left_win = self.create_left_window(winids)
@@ -38,7 +45,8 @@ class Panel(wx.Panel):
 
         self.treepanel = TreePanel(self.left_win)
         self.refresh_tree()
-        self.book = wx.Simplebook(self.main_win)
+        # self.book = wx.Simplebook(self.main_win)
+        self.book = wx.Notebook(self.main_win, style=wx.BK_DEFAULT)
 
         self.Bind(
             wx.adv.EVT_SASH_DRAGGED_RANGE,
@@ -48,54 +56,65 @@ class Panel(wx.Panel):
 
         self.Bind(wx.EVT_SIZE, self.on_size)
         self.Bind(dv.EVT_DATAVIEW_SELECTION_CHANGED, self.on_tree_select)
-        self.Bind(wx.EVT_BUTTON, self.on_btn_add_group, self.treepanel.btn_add_group())
-        self.Bind(wx.EVT_BUTTON, self.on_btn_add_offer, self.treepanel.btn_add_offer())
+        # self.Bind(wx.EVT_BUTTON, self.on_btn_add_group, self.treepanel.btn_add_group())
+        # self.Bind(wx.EVT_BUTTON, self.on_btn_add_offer, self.treepanel.btn_add_offer())
 
-        fcmult = self.treedata.get([0]).get_data('fieldcount_multiplier')
-        page = Page(self.book, self.setup.get_child("app"))
+        # fcmult = self.treedata.get([0]).get_data('fieldcount_multiplier')
+        # page = Page(self.book, self.setup.get_child("app"))
 
-        rootpage = RootPage(
-            self.book, self.tables, self.setup.get_child("root"),
-            self.refresh_tree)
+        # rootpage = RootPage(
+        #     self.book, self.tables, self.setup.get_child("root"),
+        #     self.refresh_tree)
 
-        itempage = ItemPage(
-            self.book, self.tables, self.setup.get_child("item"),
-            fcmult, self.refresh_tree)
+        # itempage = ItemPage(
+        #     self.book, self.tables, self.setup.get_child("item"),
+        #     fcmult, self.refresh_tree)
 
-        childpage = ChildPage(
-            self.book, self.tables, self.setup.get_child("child"),
-            self.refresh_tree)
+        # childpage = ChildPage(
+        #     self.book, self.tables, self.setup.get_child("child"),
+        #     self.refresh_tree)
 
-        self.book.AddPage(page, "page", True)
-        self.book.AddPage(rootpage, "rootpage")
-        self.book.AddPage(itempage, "itempage")
-        self.book.AddPage(childpage, "childpage")
+        self.page_offer = wx.Panel(self.book)
+        self.page_group = wx.Panel(self.book)
+        self.page_db = wx.Panel(self.book)
+
+        self.page_offer.SetBackgroundColour((255, 220, 220))
+        self.page_group.SetBackgroundColour((255, 200, 255))
+        self.page_db.SetBackgroundColour((220, 220, 255))
+
+        PAGE_TITLE_OFFER = "Tarjous"
+        PAGE_TITLE_GROUP = "Ryhmä"
+        PAGE_TITLE_DB = "Tietokanta"
+
+        self.book.AddPage(self.page_offer, PAGE_TITLE_OFFER)
+        self.book.AddPage(self.page_group, PAGE_TITLE_GROUP)
+        self.book.AddPage(self.page_db, PAGE_TITLE_DB)
 
         # self.Bind(wx.EVT_BOOKCTRL_PAGE_CHANGING, self.on_book_pagechanged, self.book)
         sizer_book = wx.BoxSizer(wx.HORIZONTAL)
         sizer_book.Add(self.book, 1, wx.EXPAND)
         self.main_win.SetSizer(sizer_book)
 
-    def on_btn_add_group(self, evt):
-        selected_link = self.treepanel.get_selected_link()
-        if selected_link is None:
-            return
+    # def on_btn_add_group(self, evt):
+    #     selected_link = self.treepanel.get_selected_link()
+    #     if selected_link is None:
+    #         return
 
-        print(selected_link)
-        offer_id = selected_link[0]
-        group_id = self.tables.insert_group(offer_id)
-        if group_id is not None:
-            self.refresh_tree()
-        else:
-            print("panel.on_btn_add_offer - failed to add offer")
+    #     print(selected_link)
+    #     offer_id = selected_link[0]
+    #     group_id = self.tables.insert_group(offer_id)
+    #     if group_id is not None:
+    #         self.refresh_tree()
+    #     else:
+    #         print("panel.on_btn_add_offer - failed to add offer")
 
-    def on_btn_add_offer(self, evt):
-        offer_id = self.tables.insert_offer()
-        if offer_id is not None:
-            self.offers.append(offer_id)
-            self.refresh_tree()
-        else:
-            print("panel.on_btn_add_offer - failed to add offer")
+    # def on_btn_add_offer(self, evt):
+    #     offer_id = self.tables.insert_offer()
+    #     if offer_id is not None:
+    #         self.offers.append(offer_id)
+    #         self.refresh_tree()
+    #     else:
+    #         print("panel.on_btn_add_offer - failed to add offer")
 
     def create_left_window(self, winids):
         leftwin = wx.adv.SashLayoutWindow(
@@ -141,16 +160,13 @@ class Panel(wx.Panel):
 
     def on_tree_select(self, evt):
         """Change and update page on tree selection."""
-        link = evt.GetEventObject().GetItemData(evt.GetItem())  # tree.get_link(treeitem)
+        data = evt.GetEventObject().GetItemData(evt.GetItem())  # tree.get_link(treeitem)
         selection_old = self.book.GetSelection()
-        if link is None:
-            self.book.SetSelection(1)
+        if data is None:
+            # self.book.SetSelection(1)
             evt.Skip()
         else:
-            selection_new = len(link)
-            print(f"Panel.on_tree_select - Selected link: {link}")
-
-            # self.treedata.set_active(link)
+            selection_new = len(data) - 1
 
             # Change page
             if selection_old != selection_new:
@@ -158,14 +174,10 @@ class Panel(wx.Panel):
 
             # Refresh page
             page = self.book.GetPage(selection_new)
-            # active_data = self.treedata.get_active()
-            page.change_data(link)
+            # page.change_data(data)
             evt.Skip()
 
     def refresh_tree(self):
         """Handle refreshing the tree."""
-        # datatree = self.treedata.get_tree()
-        # self.treepanel.fill(datatree)
-
-        treelist = self.tables.get_treelist(self.offers)
+        treelist = self.tables.get_treelist(self.open_offers)
         self.treepanel.refresh(treelist)

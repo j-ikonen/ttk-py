@@ -7,6 +7,7 @@ TODO
 import json
 import sqlite3
 from typing import Iterable
+from operator import itemgetter
 
 from bson.objectid import ObjectId
 
@@ -305,6 +306,18 @@ sql_insert_default = {
 sql_select_general = """SELECT {columns} FROM {table} WHERE {cond}"""
 sql_update_general = """UPDATE {table} SET {column} = ? WHERE {pk} = ({qm})"""
 
+# ****************************************************************
+#  Get Treelist Queries
+# ****************************************************************
+sql_select_offernames_sorted = """
+    SELECT name, id FROM offers
+    WHERE id=?
+"""
+sql_select_groupnames_sorted = """
+    SELECT name, offer_id, id FROM offer_groups
+    WHERE offer_id=?
+    ORDER BY name ASC
+"""
 
 # sql_select_offer_materials_grid = """
     # SELECT
@@ -346,6 +359,42 @@ class OfferTables:
         self.insert_from_csv("materials", "../../ttk-dbtestdata-materials.csv")
         self.insert_from_csv("products", "../../ttk-dbtestdata-products.csv")
         self.insert_from_csv("parts", "../../ttk-dbtestdata-parts.csv")
+
+        offer_keys = ["id", "name"]
+        self.offer_data = [
+            (str(ObjectId()), "Tarjous 1"),
+            (str(ObjectId()), "Tarjous 2"),
+            (str(ObjectId()), "Testi tarjous"),
+            (str(ObjectId()), "Uusi tarjous")
+        ]
+        group_keys = ["id", "offer_id", "name"]
+        group_data = [
+            (str(ObjectId()), self.offer_data[0][0], "Keittiö"),
+            (str(ObjectId()), self.offer_data[0][0], "Kylpyhuone"),
+            (str(ObjectId()), self.offer_data[1][0], "Keittiö"),
+            (str(ObjectId()), self.offer_data[2][0], "Keittiö"),
+            (str(ObjectId()), self.offer_data[3][0], "Keittiö"),
+            (str(ObjectId()), self.offer_data[3][0], "...")
+        ]
+        opredef_keys = ["id", "group_id"]
+        opredef_data = (str(ObjectId()), group_data[0][0])
+
+        omaterial_keys = ["id", "group_id"]
+        omaterial_data = (str(ObjectId()), group_data[0][0])
+
+        oproduct_keys = ["id", "group_id", "width", "height", "depth"]
+        oproduct_data = (str(ObjectId()), group_data[0][0], 1200, 2300, 620)
+
+        opart_keys = ["id", "product_id"]
+        opart_data = (str(ObjectId()), oproduct_data[0][0])
+
+        self.insert("offers", offer_keys, self.offer_data[0])
+        self.insert("offers", offer_keys, self.offer_data[1:], True)
+        self.insert("offer_groups", group_keys,  group_data, True)
+
+        self.insert("offer_materials", omaterial_keys, omaterial_data)
+        self.insert("offer_products", oproduct_keys, oproduct_data)
+        self.insert("offer_parts", opart_keys, opart_data)
 
         self.con.commit()
 
@@ -633,25 +682,44 @@ class OfferTables:
     #     """Return the list of types matching get_offer_page return tuple indexes."""
     #     return table_types[key]
 
-    # def get_treelist(self, offers: list):
-    #     """Return a list of offer group tuples.
+    def get_treelist(self, offer_ids: list):
+        """Return a list of offer and group names and ids.
 
-    #     offer: (offer_id, name), group: (offer_id, name, group_id) tuples in name order.
+        return listitem: (name, offer_id, group_id).
+        """
+        treelist = []
+        offers = []
 
-    #     Args:
-    #     - offers (list): List of open offer id's.
-    #     """
-    #     treelist = []
-    #     seq = ','.join(['?']*len(offers))
-    #     offers = self.cur.execute(sql_select_offers_by_list.format(seq), offers).fetchall()
-    #     for oid in offers:
-    #         # print(f"get_treelist - type: {type(oid)}")
-    #         groups = self.cur.execute(sql_select_groups, (oid[0],)).fetchall()
-    #         treelist += ([oid] + groups)
-        
-    #     for item in treelist:
-    #         print(item)
-    #     return treelist
+        for oid in offer_ids:
+            try:
+                self.cur.execute(sql_select_offernames_sorted, (oid,))
+            except sqlite3.Error as e:
+                print("ERROR in OfferTables.get_treelist\n\t{}".format(e))
+                return []
+
+            # self.con.commit()
+            res = self.cur.fetchone()
+            offers.append(res)
+
+        offers.sort(key=itemgetter(0))
+
+        for item in offers:
+            try:
+                self.cur.execute(sql_select_groupnames_sorted, (item[-1],))
+            except sqlite3.Error as e:
+                print("ERROR in OfferTables.get_treelist\n\t{}".format(e))
+                return []
+
+            # self.con.commit()
+            groups = self.cur.fetchall()
+
+            treelist.append(item)
+            for g in groups:
+                treelist.append(g)
+
+        # for item in treelist:
+        #     print(item)
+        return treelist
 
     # def get_unit_count(self, offer_id):
     #     """Return the install unit count of products in the offer.

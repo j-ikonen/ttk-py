@@ -354,25 +354,25 @@ if __name__ == '__main__':
     app = wx.App(useBestVisual=True)
     tables = OfferTables()
 
-    offer_keys = ["id", "name"]
-    offer_data = [
-        (str(ObjectId()), "Tarjous 1"),
-        (str(ObjectId()), "Tarjous 2"),
-        (str(ObjectId()), "Testi tarjous"),
-        (str(ObjectId()), "Uusi tarjous")
-    ]
-    group_keys = ["id", "offer_id", "name"]
-    group_data = [
-        (str(ObjectId()), offer_data[0][0], "Keittiö"),
-        (str(ObjectId()), offer_data[0][0], "Kylpyhuone"),
-        (str(ObjectId()), offer_data[1][0], "Keittiö"),
-        (str(ObjectId()), offer_data[2][0], "Keittiö"),
-        (str(ObjectId()), offer_data[3][0], "Keittiö"),
-        (str(ObjectId()), offer_data[3][0], "...")
-    ]
+    # offer_keys = ["id", "name"]
+    # offer_data = [
+    #     (str(ObjectId()), "Tarjous 1"),
+    #     (str(ObjectId()), "Tarjous 2"),
+    #     (str(ObjectId()), "Testi tarjous"),
+    #     (str(ObjectId()), "Uusi tarjous")
+    # ]
+    # group_keys = ["id", "offer_id", "name"]
+    # group_data = [
+    #     (str(ObjectId()), offer_data[0][0], "Keittiö"),
+    #     (str(ObjectId()), offer_data[0][0], "Kylpyhuone"),
+    #     (str(ObjectId()), offer_data[1][0], "Keittiö"),
+    #     (str(ObjectId()), offer_data[2][0], "Keittiö"),
+    #     (str(ObjectId()), offer_data[3][0], "Keittiö"),
+    #     (str(ObjectId()), offer_data[3][0], "...")
+    # ]
 
-    tables.insert("offers", offer_keys, offer_data[0])
-    tables.insert("offers", offer_keys, offer_data[1:], True)
+    # tables.insert("offers", offer_keys, offer_data[0])
+    # tables.insert("offers", offer_keys, offer_data[1:], True)
 
     # tables.insert("offer_materials", )
 

@@ -1,6 +1,5 @@
 """
 TODO:
-    Do part dimensions differ in a way that requires cost code for each part?
 
     Add coloring code cell based on database existance.
     Add part editing in database dialogs.
@@ -69,28 +68,28 @@ import wx
 import wx.grid
 
 from frame import AppFrame
-from database import Database
-from ttk_data import Data
-from setup import Setup
+# from database import Database
+# from ttk_data import Data
+# from setup import Setup
 from table import OfferTables
 
 def main():
     app = wx.App(useBestVisual=True)
 
-    setup = Setup(['pages'])
-    data = Data(setup)
-    data.push(setup)
+    # setup = Setup(['pages'])
+    # data = Data(setup)
+    # data.push(setup)
     tables = OfferTables()
 
-    indexes = Database('materials').get_indexes()
-    if 'code' not in indexes:
-        Database('materials').index('code', True)
+    # indexes = Database('materials').get_indexes()
+    # if 'code' not in indexes:
+    #     Database('materials').index('code', True)
 
-    indexes = Database('products').get_indexes()
-    if 'code' not in indexes:
-        Database('products').index('code', True)
+    # indexes = Database('products').get_indexes()
+    # if 'code' not in indexes:
+    #     Database('products').index('code', True)
 
-    frame = AppFrame(tables, data, setup)
+    frame = AppFrame(tables)
     frame.Show()
     frame.Layout()
 
