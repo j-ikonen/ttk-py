@@ -44,10 +44,15 @@ def str2type(typestring: str, value: str):
         mod_value = value.replace(',', '.')
     else:
         mod_value = value
-    return TYPES[split[0]](mod_value)
+    try:
+        return TYPES[split[0]](mod_value)
+    except ValueError:
+        return None
 
 def type2str(value):
     """Return the value as string."""
+    # if value is None:
+    #     return None
     strvalue = str(value)
     if isinstance(value, float):
         return strvalue.replace('.', ',')
@@ -157,7 +162,7 @@ sql_create_table_offer_materials = """
         desc        TEXT,
         prod        TEXT,
         unit        TEXT,
-        thck        INTEGER,
+        thickness   INTEGER,
         loss        REAL,
         cost        REAL,
         edg_cost    REAL,
@@ -202,8 +207,10 @@ sql_create_table_offer_parts = """
         desc        TEXT,
         use_predef  INTEGER,
         default_mat TEXT,
+        width       INTEGER,
+        length      INTEGER,
         code_width  TEXT,
-        code_height TEXT,
+        code_length TEXT,
 
         FOREIGN KEY (product_id)
             REFERENCES offer_products (id)
@@ -242,9 +249,11 @@ sql_create_table_products = """
 sql_create_table_parts = """
     CREATE TABLE IF NOT EXISTS parts (
         code            TEXT NOT NULL,
-        product_code    TEXT NOT NULL,
+        product_code    TEXT,
         desc            TEXT,
         default_mat     TEXT,
+        width           INTEGER,
+        length          INTEGER,
         code_width      TEXT,
         code_length     TEXT,
 
@@ -318,6 +327,7 @@ sql_update_general = """UPDATE {table} SET {column} = ? WHERE {pk} = ({qm})"""
     # "offer_materials": sql_select_offer_materials_grid
 # }
 
+import csv
 
 class OfferTables:
     con = None
@@ -333,7 +343,40 @@ class OfferTables:
             cur.execute("""DROP TABLE IF EXISTS {};""".format(table))
             self.create_table(sql)
 
+        self.insert_from_csv("materials", "../../ttk-dbtestdata-materials.csv")
+        self.insert_from_csv("products", "../../ttk-dbtestdata-products.csv")
+        self.insert_from_csv("parts", "../../ttk-dbtestdata-parts.csv")
+
         self.con.commit()
+
+    def insert_from_csv(self, table, file):
+        data_keys = None
+        data = []
+        with open(file, newline='', encoding="utf-8") as csvfile:
+            reader = csv.reader(csvfile, delimiter=",")
+            first = True
+            types = []
+            for row in reader:
+                if first:
+                    data_keys = row
+                    first = False
+                    for key in row:
+                        typestring = self.table_setup["columns"][table][key]["type"]
+                        types.append(typestring)
+                else:
+                    conv_row = [str2type(types[n], v) for n, v in enumerate(row)]
+                    data.append(conv_row)
+
+        # print(data_keys)
+        # for row in data:
+        #     print(row)
+
+        self.insert(
+            table,
+            data_keys,
+            data,
+            True
+        )
 
     def close(self):
         """Close the connection."""

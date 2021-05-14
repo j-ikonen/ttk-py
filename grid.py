@@ -103,16 +103,20 @@ class BaseGrid(wxg.Grid):
 
     def edit_in_last_row(self):
         self.AppendRows(1)
-    
+
     def get_content(self):
         content = []
-        for row in range(self.GetNumberRows()):
+        for row in range(self.GetNumberRows()-1):
             row_data = []
             for col in range(self.GetNumberCols()):
                 value = str2type(self.get_type(col), self.GetCellValue(row, col))
                 row_data.append(value)
-            content.append(value)
+            content.append(row_data)
         return content
+
+    def clear_content(self):
+        self.DeleteRows(0, self.GetNumberRows())
+        self.AppendRows(1)
 
     def delete_selected(self):
         selected = self.GetSelectedRows()

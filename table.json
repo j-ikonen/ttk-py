@@ -376,6 +376,20 @@
                 "ro": false,
                 "unique": false
             },
+            "width": {
+                "label": "Leveys",
+                "type": "long",
+                "width": 45,
+                "ro": true,
+                "unique": false
+            },
+            "length": {
+                "label": "Pituus",
+                "type": "long",
+                "width": 45,
+                "ro": true,
+                "unique": false
+            },
             "code_width": {
                 "label": "Leveys Koodi",
                 "type": "string",
@@ -383,7 +397,7 @@
                 "ro": false,
                 "unique": false
             },
-            "code_height": {
+            "code_length": {
                 "label": "Pituus Koodi",
                 "type": "string",
                 "width": 120,
@@ -391,7 +405,7 @@
                 "unique": false
             },
             "cost": {
-                "label": "Paksuus",
+                "label": "Hinta",
                 "type": "long",
                 "width": 45,
                 "ro": true,
@@ -596,6 +610,20 @@
                 "ro": false,
                 "unique": false
             },
+            "width": {
+                "label": "Leveys",
+                "type": "double:6,2",
+                "width": 55,
+                "ro": false,
+                "unique": false
+            },
+            "length": {
+                "label": "Pituus",
+                "type": "double:6,2",
+                "width": 55,
+                "ro": false,
+                "unique": false
+            },
             "code_width": {
                 "label": "Leveys koodi",
                 "type": "string",
@@ -672,8 +700,10 @@
             "desc",       
             "use_predef", 
             "default_mat",
+            "width", 
+            "length",
             "code_width", 
-            "code_height"
+            "code_length"
         ],
         "fcmults": ["unit", "mult"],
         "materials": [
@@ -704,6 +734,8 @@
             "product_code",
             "desc",        
             "default_mat", 
+            "width",  
+            "length", 
             "code_width",  
             "code_length"
         ]
@@ -729,6 +761,47 @@
             "label": "Tietokanta",
             "table": ["materials", "products", "parts"],
             "table_label": ["Materiaalit", "Tuotteet", "Osat"],
+            "move_to_table": ["offer_materials", "offer_products", "offer_parts"],
+            "move_to_columns": [
+                [
+                    "id",
+                    "group_id",
+                    "code",     
+                    "desc",     
+                    "prod",     
+                    "unit",     
+                    "thickness",
+                    "loss",     
+                    "cost",     
+                    "edg_cost", 
+                    "add_cost", 
+                    "discount"
+                ],
+                [
+                    "id",
+                    "group_id",
+                    "code",     
+                    "desc",     
+                    "prod",     
+                    "inst_unit",
+                    "width",    
+                    "height",   
+                    "depth",    
+                    "work_time",
+                    "work_cost"
+                ],
+                [
+                    "id",
+                    "product_id",
+                    "code",
+                    "desc",
+                    "default_mat", 
+                    "width",  
+                    "length", 
+                    "code_width",  
+                    "code_length"
+                ]
+            ],
             "pk": [["code"], ["code"], ["code", "product_code"]],
             "columns": [
                 [
@@ -759,56 +832,11 @@
                     "product_code",
                     "desc",        
                     "default_mat", 
+                    "width",  
+                    "length", 
                     "code_width",  
                     "code_length"
                 ]
-            ]
-        },
-        "database_add_materials": {
-            "label": "Lisää Materiaalit tietokantaan",
-            "table": "materials",
-            "pk": ["code"],
-            "columns": [
-                "code",     
-                "desc",     
-                "prod",     
-                "unit",     
-                "thickness",
-                "loss",     
-                "cost",     
-                "edg_cost", 
-                "add_cost", 
-                "discount"
-            ]
-        },
-        "database_add_products": {
-            "label": "Lisää Tuotteet tietokantaan",
-            "table": "products",
-            "pk": ["code"],
-            "columns": [
-                "code",     
-                "desc",     
-                "prod",     
-                "inst_unit",
-                "width",    
-                "height",   
-                "depth",    
-                "work_time",
-                "work_cost"
-            ]
-        },
-        "database_add_parts": {
-            "label": "Lisää Osia tietokantaan",
-            "table": "parts",
-            "pk": ["code"],
-            "parent_keys": [],
-            "columns": [
-                "code",        
-                "product_code",
-                "desc",        
-                "default_mat", 
-                "code_width",  
-                "code_length"
             ]
         }
     }
