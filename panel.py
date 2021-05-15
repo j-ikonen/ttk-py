@@ -1,12 +1,10 @@
-from table import OfferTables
-from setup import Setup
 import wx
 import wx.adv
 import wx.dataview as dv
 
-import ttk_data as ttk
+from table import OfferTables
 from tree_panel import TreePanel
-from pages import Page, RootPage, ItemPage, ChildPage
+from offerpage import OfferPage
 
 
 FRAME_SIZE = (1200, 750)
@@ -26,8 +24,6 @@ class Panel(wx.Panel):
         """
         super().__init__(parent)
 
-        # self.treedata: ttk.Data = data
-        # self.setup: Setup = setup
         self.tables: OfferTables = tables
         self.open_offers = [
             self.tables.offer_data[0][0],
@@ -45,7 +41,6 @@ class Panel(wx.Panel):
 
         self.treepanel = TreePanel(self.left_win)
         self.refresh_tree()
-        # self.book = wx.Simplebook(self.main_win)
         self.book = wx.Notebook(self.main_win, style=wx.BK_DEFAULT)
 
         self.Bind(
@@ -56,29 +51,11 @@ class Panel(wx.Panel):
 
         self.Bind(wx.EVT_SIZE, self.on_size)
         self.Bind(dv.EVT_DATAVIEW_SELECTION_CHANGED, self.on_tree_select)
-        # self.Bind(wx.EVT_BUTTON, self.on_btn_add_group, self.treepanel.btn_add_group())
-        # self.Bind(wx.EVT_BUTTON, self.on_btn_add_offer, self.treepanel.btn_add_offer())
 
-        # fcmult = self.treedata.get([0]).get_data('fieldcount_multiplier')
-        # page = Page(self.book, self.setup.get_child("app"))
-
-        # rootpage = RootPage(
-        #     self.book, self.tables, self.setup.get_child("root"),
-        #     self.refresh_tree)
-
-        # itempage = ItemPage(
-        #     self.book, self.tables, self.setup.get_child("item"),
-        #     fcmult, self.refresh_tree)
-
-        # childpage = ChildPage(
-        #     self.book, self.tables, self.setup.get_child("child"),
-        #     self.refresh_tree)
-
-        self.page_offer = wx.Panel(self.book)
+        self.page_offer = OfferPage(self.book, self.tables)
         self.page_group = wx.Panel(self.book)
         self.page_db = wx.Panel(self.book)
 
-        self.page_offer.SetBackgroundColour((255, 220, 220))
         self.page_group.SetBackgroundColour((255, 200, 255))
         self.page_db.SetBackgroundColour((220, 220, 255))
 
@@ -160,21 +137,23 @@ class Panel(wx.Panel):
 
     def on_tree_select(self, evt):
         """Change and update page on tree selection."""
-        data = evt.GetEventObject().GetItemData(evt.GetItem())  # tree.get_link(treeitem)
-        selection_old = self.book.GetSelection()
+        data = evt.GetEventObject().GetItemData(evt.GetItem())
+        # selection_old = self.book.GetSelection()
         if data is None:
-            # self.book.SetSelection(1)
             evt.Skip()
         else:
-            selection_new = len(data) - 1
+            # selection_new = len(data) - 1
 
-            # Change page
-            if selection_old != selection_new:
-                self.book.SetSelection(selection_new)
+            # # Change page
+            # if selection_old != selection_new:
+            #     self.book.SetSelection(selection_new)
 
             # Refresh page
-            page = self.book.GetPage(selection_new)
-            # page.change_data(data)
+            # page = self.book.GetPage(selection_new)
+            self.page_offer.set_pk(data[0])
+            # self.page_group.set_pk(data[1])
+            # self.page_db.set_pk(data)
+            # page.set_pk(data[-1])
             evt.Skip()
 
     def refresh_tree(self):

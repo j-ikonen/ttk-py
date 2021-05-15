@@ -304,7 +304,7 @@ sql_insert_default = {
 }
 
 sql_select_general = """SELECT {columns} FROM {table} WHERE {cond}"""
-sql_update_general = """UPDATE {table} SET {column} = ? WHERE {pk} = ({qm})"""
+sql_update_general = """UPDATE {table} SET {column} = ? WHERE {pk} = (?)"""
 
 # ****************************************************************
 #  Get Treelist Queries
@@ -550,7 +550,7 @@ class OfferTables:
             self.cur.execute(sql, values)
             self.con.commit()
         except sqlite3.Error as e:
-            print(e)
+            print("OfferTables.get - {}".format(e))
             return []
         if many:
             return self.cur.fetchall()
@@ -597,21 +597,20 @@ class OfferTables:
         bool
             True if successful.
         """
-        qm = '?' if isinstance(pk, str) else ','.join(['?'] * len(pk))
+        # qm = '?' if isinstance(pk, str) else ','.join(['?'] * len(pk))
         sql = sql_update_general.format(
             table=table,
             column=column_key,
-            pk=pk,
-            qm=qm)
+            pk=pk)
         print(sql)
+        # print(column_key)
+        # print(pk)
+        # print(values)
         try:
-            if isinstance(values[0], Iterable):
-                self.cur.executemany(sql, values)
-            else:
-                self.cur.execute(sql, values)
+            self.cur.execute(sql, values)
             self.con.commit()
         except sqlite3.Error as e:
-            print(e)
+            print("OfferTables.update_one - {}".format(e))
             return False
         return True
 

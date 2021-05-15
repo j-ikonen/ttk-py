@@ -646,6 +646,425 @@
                     "filename": "workspace.json"
                 }
             ]
+        },
+        {
+            "version": "0.2.7",
+            "counttime": "2021-05-14 18:22:30",
+            "filesum": 59,
+            "codesum": 6647,
+            "commentsum": 879,
+            "blanksum": 1457,
+            "statistics": {
+                ".py": {
+                    "code": 4525,
+                    "comment": 877,
+                    "blank": 1378
+                },
+                ".json": {
+                    "code": 1990,
+                    "comment": 0,
+                    "blank": 45
+                },
+                "": {
+                    "code": 105,
+                    "comment": 1,
+                    "blank": 26
+                },
+                ".md": {
+                    "code": 2,
+                    "comment": 0,
+                    "blank": 1
+                },
+                ".TAG": {
+                    "code": 4,
+                    "comment": 1,
+                    "blank": 0
+                },
+                ".txt": {
+                    "code": 21,
+                    "comment": 0,
+                    "blank": 7
+                }
+            },
+            "filelist": [
+                {
+                    "blank": 26,
+                    "code": 102,
+                    "comment": 1,
+                    "filename": ".gitignore"
+                },
+                {
+                    "blank": 0,
+                    "code": 2,
+                    "comment": 0,
+                    "filename": ".pytest_cache\\.gitignore"
+                },
+                {
+                    "blank": 0,
+                    "code": 4,
+                    "comment": 1,
+                    "filename": ".pytest_cache\\CACHEDIR.TAG"
+                },
+                {
+                    "blank": 1,
+                    "code": 2,
+                    "comment": 0,
+                    "filename": ".pytest_cache\\README.md"
+                },
+                {
+                    "blank": 0,
+                    "code": 1,
+                    "comment": 0,
+                    "filename": ".pytest_cache\\v\\cache\\stepwise"
+                },
+                {
+                    "filename": "__pycache__\\data.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\database.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\datagrid_dialog.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\dataobj_dialog.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\dialog.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\frame.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\grid.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\main.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\pages.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\panel.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\setup.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\setup_grid.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\setupgrid.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\table.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\tree_data.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\tree_panel.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\ttk_data.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\ttk_grid.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "blank": 25,
+                    "code": 63,
+                    "comment": 0,
+                    "filename": "database.py"
+                },
+                {
+                    "blank": 124,
+                    "code": 401,
+                    "comment": 50,
+                    "filename": "database_panel.py"
+                },
+                {
+                    "blank": 13,
+                    "code": 45,
+                    "comment": 2,
+                    "filename": "datagrid_dialog.py"
+                },
+                {
+                    "blank": 16,
+                    "code": 35,
+                    "comment": 4,
+                    "filename": "dataobj_dialog.py"
+                },
+                {
+                    "blank": 103,
+                    "code": 342,
+                    "comment": 31,
+                    "filename": "dialog.py"
+                },
+                {
+                    "blank": 7,
+                    "code": 21,
+                    "comment": 0,
+                    "filename": "docs\\setup.txt"
+                },
+                {
+                    "blank": 158,
+                    "code": 724,
+                    "comment": 163,
+                    "filename": "doodles\\data.py"
+                },
+                {
+                    "blank": 136,
+                    "code": 445,
+                    "comment": 61,
+                    "filename": "doodles\\grid.py"
+                },
+                {
+                    "blank": 5,
+                    "code": 21,
+                    "comment": 0,
+                    "filename": "doodles\\setupgrid.py"
+                },
+                {
+                    "blank": 44,
+                    "code": 149,
+                    "comment": 2,
+                    "filename": "doodles\\tree_data.py"
+                },
+                {
+                    "blank": 71,
+                    "code": 204,
+                    "comment": 35,
+                    "filename": "doodles\\tree_panel.py"
+                },
+                {
+                    "blank": 51,
+                    "code": 60,
+                    "comment": 124,
+                    "filename": "frame.py"
+                },
+                {
+                    "blank": 86,
+                    "code": 256,
+                    "comment": 39,
+                    "filename": "grid.py"
+                },
+                {
+                    "blank": 9,
+                    "code": 14,
+                    "comment": 12,
+                    "filename": "main.py"
+                },
+                {
+                    "blank": 29,
+                    "code": 102,
+                    "comment": 1,
+                    "filename": "objectgrid.py"
+                },
+                {
+                    "blank": 101,
+                    "code": 298,
+                    "comment": 76,
+                    "filename": "pages.py"
+                },
+                {
+                    "blank": 36,
+                    "code": 102,
+                    "comment": 40,
+                    "filename": "panel.py"
+                },
+                {
+                    "blank": 18,
+                    "code": 618,
+                    "comment": 0,
+                    "filename": "savedsetup.json"
+                },
+                {
+                    "blank": 42,
+                    "code": 146,
+                    "comment": 3,
+                    "filename": "setup.py"
+                },
+                {
+                    "blank": 21,
+                    "code": 82,
+                    "comment": 9,
+                    "filename": "setup_grid.py"
+                },
+                {
+                    "blank": 0,
+                    "code": 38,
+                    "comment": 0,
+                    "filename": "Suku_Nimi_Tarjous.json"
+                },
+                {
+                    "blank": 19,
+                    "code": 824,
+                    "comment": 0,
+                    "filename": "table.json"
+                },
+                {
+                    "blank": 92,
+                    "code": 322,
+                    "comment": 142,
+                    "filename": "table.py"
+                },
+                {
+                    "blank": 0,
+                    "code": 200,
+                    "comment": 0,
+                    "filename": "test.json"
+                },
+                {
+                    "blank": 8,
+                    "code": 310,
+                    "comment": 0,
+                    "filename": "test_setup.json"
+                },
+                {
+                    "blank": 1,
+                    "code": 2,
+                    "comment": 0,
+                    "filename": "tests\\__init__.py"
+                },
+                {
+                    "filename": "tests\\__pycache__\\__init__.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "tests\\__pycache__\\table_test.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "tests\\__pycache__\\test_ttkdata.cpython-38-pytest-6.1.1.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "tests\\__pycache__\\ttk_data_test.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "blank": 25,
+                    "code": 98,
+                    "comment": 0,
+                    "filename": "tests\\table_test.py"
+                },
+                {
+                    "blank": 17,
+                    "code": 102,
+                    "comment": 10,
+                    "filename": "tests\\ttk_data_test.py"
+                },
+                {
+                    "blank": 24,
+                    "code": 54,
+                    "comment": 19,
+                    "filename": "tree_panel.py"
+                },
+                {
+                    "filename": "ttk.db",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "blank": 65,
+                    "code": 180,
+                    "comment": 10,
+                    "filename": "ttk_data.py"
+                },
+                {
+                    "blank": 84,
+                    "code": 278,
+                    "comment": 44,
+                    "filename": "ttk_grid.py"
+                }
+            ]
         }
     ]
 }

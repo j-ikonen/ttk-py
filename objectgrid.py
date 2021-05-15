@@ -44,27 +44,27 @@ def get_editor_renderer(typestring):
 
 
 class ObjectGrid(wxg.Grid):
-    def __init__(self, parent, tables, tablename):
+    def __init__(self, parent, tables, gridname):
         super().__init__(parent)
 
         self.tables: db.OfferTables = tables
+        self.gridname = gridname
 
-        self.panel_key = "objectgrid"
-        self.tablename = tablename
-        self.setup_key = self.panel_key + "." + tablename
-
-        self.table_label = ""
+        self.table_key = None
+        self.table_label = None
         self.pk_key = None
-        self.pk = None
+        self.pk_val = None
 
         self.row_keys = []
         self.row_labels = []
         self.row_types = []
+        self.n_rows = 0
 
-        self.get_setup()
-        self.rows = len(self.row_keys)
+        self.set_columns()
 
-        self.CreateGrid(self.rows, 1)
+        self.n_rows = len(self.row_keys)
+
+        self.CreateGrid(self.n_rows, 1)
         self.SetColLabelSize(1)
 
         for n, label in enumerate(self.row_labels):
@@ -74,12 +74,14 @@ class ObjectGrid(wxg.Grid):
             self.SetRowLabelValue(n, label)
 
         self.Bind(wxg.EVT_GRID_CELL_CHANGED, self.on_cell_changed)
+        self.Bind(wxg.EVT_GRID_CELL_CHANGING, self.on_cell_changing)
         self.Bind(wxg.EVT_GRID_EDITOR_HIDDEN, self.on_editor_hidden)
 
         self.SetRowLabelSize(wxg.GRID_AUTOSIZE)
+
         # self.SetRowLabelAlignment(wx.ALIGN_RIGHT, wx.ALIGN_CENTER)
 
-    def change_data(self, pk: Iterable=None):
+    def set_pk(self, pk: Iterable=None):
         """Change the data to row at new private key.
 
         Parameters
@@ -91,48 +93,55 @@ class ObjectGrid(wxg.Grid):
             self.ClearGrid()
             self.pk = None
         else:
-            self.pk = pk
+            self.pk_val = pk
             self.refresh_data()
 
     def refresh_data(self):
+        """Get the data from table to grid."""
         obj = self.tables.get(
-            self.tablename,
+            self.table_key,
             self.row_keys,
             self.pk_key,
-            self.pk
+            self.pk_val
         )
         self.BeginBatch()
-        print(f"\nSetupGrid.refresh_data - self.data: {self.data}\n")
-        for n in range(self.rows):
+        for n in range(self.n_rows):
             self.SetCellValue(n, 0, db.type2str(obj[n]))
         self.EndBatch()
 
     def on_cell_changed(self, evt):
         """Handle cell changed event."""
         row = evt.GetRow()
-        typestring = self.types[row]
+        typestring = self.row_types[row]
         value = db.str2type(typestring, self.GetCellValue(row, 0))
         self.tables.update_one(
-            self.tablename,
+            self.table_key,
             self.row_keys[row],
-            self.pk_key,
-            (value, self.pk)
+            self.pk_key[0],
+            [value] + self.pk_val
         )
+        print([value] + self.pk_val)
         evt.Skip()
+
+    def on_cell_changing(self, evt):
+        if self.pk_val is None:
+            evt.Veto()
+        else:
+            evt.Skip()
 
     def on_editor_hidden(self, evt):
         evt.Skip()
 
-    def get_setup(self):
-        col_setup = self.tables.get_column_setup(self.setup_key)
-        panel_setup = self.tables.get_panel_setup(self.panel_key)[self.tablename]
+    def set_columns(self):
+        """Set the setup values of this grid based on gridname."""
+        display_setup = self.tables.get_display_setup(self.gridname)
+        self.table_key = display_setup["table"]
+        self.table_label = display_setup["label"]
+        self.pk_key = display_setup["pk"]
+        self.row_keys = display_setup["columns"]
 
-        self.row_keys = [key for key in col_setup.keys()]
-        self.row_labels = [val["label"] for val in col_setup.values()]
-        self.row_types = [val["type"] for val in col_setup.values()]
+        column_setup = self.tables.get_column_setup(self.table_key, self.row_keys)
+        self.row_labels = [val["label"] for val in column_setup.values()]
+        self.row_types = [val["type"] for val in column_setup.values()]
 
-        self.table_label = panel_setup["label"]
-        self.pk_key = panel_setup["pk"]
-        if isinstance(self.pk_key, str):
-            self.pk_key = [self.pk_key]
 
