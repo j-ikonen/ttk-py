@@ -19,9 +19,11 @@ class GridPanel(wx.Panel):
         label = wx.StaticText(self, label=key)
         btn_del = wx.Button(self, label=self.BTN_DEL)
         # self.grid = TheGrid(self, tables, key)
-        dsp = tables.get_display_setup("database_add_products")
-        setup = tables.get_column_setup(dsp.get("table"), dsp.get("columns"))
-        self.grid = BaseGrid(self, setup)
+        # dsp = tables.get_display_setup("products")
+        # setup = tables.get_column_setup(dsp.get("table"), dsp.get("columns"))
+        self.grid = TableGrid(self, tables, "products")
+        pk = tables.group_data[0][0]
+        self.grid.set_parent_id(pk)
 
         self.Bind(wx.EVT_BUTTON, self.on_btn_del, btn_del)
 
@@ -76,7 +78,7 @@ class BaseGrid(wxg.Grid):
             evt.Veto()
 
     def on_cell_changing(self, evt):
-        """."""
+        """Veto change on unique columns and init when edit in last row."""
         value = evt.GetString()
         col = evt.GetCol()
         row = evt.GetRow()
@@ -87,7 +89,11 @@ class BaseGrid(wxg.Grid):
 
         # Init uninitiated row.
         if not self.static_rows and row >= self.GetNumberRows() - 1:
-            self.edit_in_last_row()
+            if not self.edit_in_last_row(row, col, value):
+                evt.Veto()
+        else:
+            if not self.edit_value(row, col, value):
+                evt.Veto()
 
         evt.Skip()
 
@@ -101,8 +107,26 @@ class BaseGrid(wxg.Grid):
                 return True
         return False
 
-    def edit_in_last_row(self):
+    def edit_value(self, row, col, value) -> bool:
+        """Overload this for saving the edited values where required.
+
+        Returns
+        -------
+        True. Return False from overload to Veto cell change.
+        """
+        return True
+
+    def edit_in_last_row(self, row, col, value) -> bool:
+        """Overload this for handling first edit on a new row.
+        
+        Call this through super for appending an empty row.
+
+        Returns
+        -------
+        True. Return False from overload to Veto cell change.
+        """
         self.AppendRows(1)
+        return True
 
     def set_content(self, data):
         """Set the content of the grid."""
@@ -116,7 +140,8 @@ class BaseGrid(wxg.Grid):
         self.BeginBatch()
         for row, row_data in enumerate(data):
             for col, value in enumerate(row_data):
-                self.SetCellValue(row, col, type2str(value))
+                if value is not None:
+                    self.SetCellValue(row, col, type2str(value))
         self.EndBatch()
 
     def get_content(self):
@@ -236,7 +261,7 @@ class FieldCountGrid(BaseGrid):
         self.tables = tables
 
 
-class GroupGrid(BaseGrid):
+class TableGrid(BaseGrid):
     
     def __init__(self, parent, tables: OfferTables, name):
         self.tables = tables
@@ -245,42 +270,94 @@ class GroupGrid(BaseGrid):
         self.label = display_setup["label"]
         self.tablename = display_setup["table"]
         self.pk_key = display_setup["pk"]
+        self.fk_key = display_setup["fk"]
         self.column_keys = display_setup["columns"]
 
         column_setup = self.tables.get_column_setup(self.tablename, self.column_keys)
         self.types = [val["type"] for val in column_setup.values()]
 
-        self.pk_val = None
+        self.parent_id = None
         self.ids = []
 
         super().__init__(parent, column_setup)
 
-    def set_pk(self, pk):
-        self.pk_val = pk
+        self.Bind(wxg.EVT_GRID_CELL_CHANGING, self.on_cell_changing)
+        self.Bind(wxg.EVT_GRID_EDITOR_SHOWN, self.on_show_editor)
+
+    def set_parent_id(self, parent_id):
+        self.parent_id = parent_id
         self.refresh()
 
     def refresh(self):
-        if self.pk_val is None:
+        if self.parent_id is None:
             self.clear_content()
         else:
             if self.tablename == "offer_products":
-                data = self.tables.get_offer_products(self.pk_val)
+                data = self.tables.get_offer_products(self.parent_id)
             else:
                 data = self.tables.get(
                     self.tablename,
                     ["id"] + self.column_keys,
-                    self.pk_key,
-                    [self.pk_val],
+                    self.fk_key,
+                    [self.parent_id],
                     True
             )
             content = []
             for datarow in data:
                 self.ids.append(datarow[0])
                 content.append(datarow[1:])
+                print(datarow)
             self.set_content(content)
+
 
     def get_id(self, row):
         return self.ids[row]
+
+    def on_cell_changing(self, evt):
+        super().on_cell_changing(evt)
+
+        # value = evt.GetString()
+        # row = evt.GetRow()
+        # col = evt.GetCol()
+
+
+    def on_show_editor(self, evt):
+        """Veto edit if not data source is defined."""
+        if self.parent_id is None:
+            print("Grid '{}' has no defined data source".format(self) +
+                  " to table '{}'. Vetoing show editor.\n".format(self.tablename))
+            evt.Veto()
+
+        super().on_show_editor(evt)
+
+    def edit_value(self, row, col, value):
+        key = self.column_keys[col]
+
+        table = self.tablename
+        pk = self.pk_key[0]
+        values = [str2type(self.get_type(col), value), self.ids[row]]
+
+        success = self.tables.update_one(table, key, pk, values)
+        # print(f"{table}, {key}, {pk}, {values}")
+        if success:
+            return super().edit_value(row, col, value)
+        else:
+            return False
+
+    def edit_in_last_row(self, row, col, value):
+        """Insert a new unique item to table on editing the last row."""
+        key = self.column_keys[col]
+        oid = str(ObjectId())
+
+        # Append an empty row on successful insert.
+        # print(self.pk_key)
+        columns = self.pk_key + self.fk_key + [key]
+        values = (oid, self.parent_id, value)
+        if self.tables.insert(self.tablename, columns, values):
+            self.ids.append(oid)
+            return super().edit_in_last_row(row, col, value)
+        else:
+            return False
 
 
 if __name__ == '__main__':

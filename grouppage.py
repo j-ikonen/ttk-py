@@ -1,7 +1,7 @@
 import wx
 
 from table import OfferTables
-from grid import BaseGrid, GroupGrid
+from grid import BaseGrid, TableGrid
 
 
 BORDER = 5
@@ -38,10 +38,10 @@ class GroupPage(wx.Panel):
 
         # self.set_setup()
 
-        self.grid_predefs = GroupGrid(self, tables, "predefs")
-        self.grid_materials = GroupGrid(self, tables, "materials")
-        self.grid_products = GroupGrid(self, tables, "products")
-        self.grid_parts = GroupGrid(self, tables, "parts")
+        self.grid_predefs = TableGrid(self, tables, "predefs")
+        self.grid_materials = TableGrid(self, tables, "materials")
+        self.grid_products = TableGrid(self, tables, "products")
+        self.grid_parts = TableGrid(self, tables, "parts")
 
         self.ids_predefs = []
         self.ids_materials = []
@@ -91,10 +91,10 @@ class GroupPage(wx.Panel):
     def set_pk(self, pk):
         """Set the private key string for table offers. Refresh with new values."""
         self.pk_val = pk
-        self.grid_predefs.set_pk(self.pk_val)
-        self.grid_materials.set_pk(self.pk_val)
-        self.grid_products.set_pk(self.pk_val)
-        self.grid_parts.set_pk(None)
+        self.grid_predefs.set_parent_id(self.pk_val)
+        self.grid_materials.set_parent_id(self.pk_val)
+        self.grid_products.set_parent_id(self.pk_val)
+        self.grid_parts.set_parent_id(None)
 
         # self.grid_client.set_pk([pk])   # Grid refreshes on new pk.
         self.refresh()

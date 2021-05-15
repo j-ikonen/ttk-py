@@ -853,12 +853,14 @@
             "label": "Esimääritykset",
             "table": "offer_predefs",
             "pk": ["id"],
+            "fk": ["group_id"],
             "columns": ["part", "material"]
         },
         "materials": {
             "label": "Materiaalit",
             "table": "offer_materials",
             "pk": ["id"],
+            "fk": ["group_id"],
             "columns": [
                 "code",
                 "desc",
@@ -877,6 +879,7 @@
             "label": "Tuotteet",
             "table": "offer_products",
             "pk": ["id"],
+            "fk": ["group_id"],
             "columns": [
                 "code",
                 "count",
@@ -896,6 +899,7 @@
             "label": "Osat",
             "table": "offer_parts",
             "pk": ["id"],
+            "fk": ["product_id"],
             "columns": [
                 "code",
                 "desc",

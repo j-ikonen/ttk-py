@@ -306,7 +306,7 @@ sql_insert_default = {
 }
 
 sql_select_general = """SELECT {columns} FROM {table} WHERE {cond}"""
-sql_update_general = """UPDATE {table} SET {column} = ? WHERE {pk} = (?)"""
+sql_update_general = """UPDATE {table} SET {column} = (?) WHERE {pk} = (?)"""
 
 # ****************************************************************
 #  Get Treelist Queries
@@ -370,7 +370,7 @@ class OfferTables:
             (str(ObjectId()), "Uusi tarjous")
         ]
         group_keys = ["id", "offer_id", "name"]
-        group_data = [
+        self.group_data = [
             (str(ObjectId()), self.offer_data[0][0], "Keittiö"),
             (str(ObjectId()), self.offer_data[0][0], "Kylpyhuone"),
             (str(ObjectId()), self.offer_data[1][0], "Keittiö"),
@@ -379,17 +379,17 @@ class OfferTables:
             (str(ObjectId()), self.offer_data[3][0], "...")
         ]
         opredef_keys = ["id", "group_id"]
-        opredef_data = (str(ObjectId()), group_data[0][0])
+        opredef_data = (str(ObjectId()), self.group_data[0][0])
 
         omaterial_keys = ["id", "group_id"]
-        omaterial_data = (str(ObjectId()), group_data[0][0])
+        omaterial_data = (str(ObjectId()), self.group_data[0][0])
 
         oproduct_keys = ["id", "group_id", "count", "inst_unit", "width", "height", "depth"]
         oproduct_data = [
-            (str(ObjectId()), group_data[0][0], 1, "Testiyksikkö", 1200, 2300, 620),
-            (str(ObjectId()), group_data[1][0], 2, "Testiyksikkö", 1200, 2300, 620),
-            (str(ObjectId()), group_data[0][0], 1, "Testiyksikkö", 1200, 2300, 620),
-            (str(ObjectId()), group_data[0][0], 3, "Uusi", 1200, 2300, 620)
+            (str(ObjectId()), self.group_data[0][0], 1, "Testiyksikkö", 1200, 2300, 620),
+            (str(ObjectId()), self.group_data[1][0], 2, "Testiyksikkö", 1200, 2300, 620),
+            (str(ObjectId()), self.group_data[0][0], 1, "Testiyksikkö", 1200, 2300, 620),
+            (str(ObjectId()), self.group_data[0][0], 3, "Uusi", 1200, 2300, 620)
         ]
 
         opart_keys = ["id", "product_id"]
@@ -397,7 +397,7 @@ class OfferTables:
 
         self.insert("offers", offer_keys, self.offer_data[0])
         self.insert("offers", offer_keys, self.offer_data[1:], True)
-        self.insert("offer_groups", group_keys,  group_data, True)
+        self.insert("offer_groups", group_keys,  self.group_data, True)
 
         self.insert("offer_materials", omaterial_keys, omaterial_data)
         self.insert("offer_products", oproduct_keys, oproduct_data, True)
@@ -587,9 +587,10 @@ class OfferTables:
 
         return self.cur.fetchall()
 
-    def get_offer_products(self, product_id):
+    def get_offer_products(self, group_id):
         sql = """
-            SELECT
+        SELECT *, (part_cost + wt * wc) FROM
+            (SELECT
                 pr.id,
                 pr.code,
                 pr.count,
@@ -599,16 +600,17 @@ class OfferTables:
                 pr.width,
                 pr.height,
                 pr.depth,
-                pr.work_time,
-                pr.work_cost,
-                (SUM(pa.cost)) part_cost,
-                (work_cost * work_time + (SUM(pa.cost))) tot_cost
+                pr.work_time AS wt,
+                pr.work_cost AS wc,
+                (
+                    SELECT SUM(pa.cost) FROM offer_parts AS pa WHERE pa.product_id=pr.id
+                ) part_cost
             FROM offer_products AS pr
-            LEFT JOIN offer_parts AS pa ON pr.id=pa.product_id
-            WHERE pr.id=?
+            WHERE pr.group_id=?)
         """
         try:
-            self.cur.execute(sql, (product_id,))
+            # self.cur.execute(sql, (group_id,))
+            self.cur.execute(sql, (group_id,))
             self.con.commit()
         except sqlite3.Error as e:
             print("OfferTables.get_offer_products\n\t{}".format(e))
