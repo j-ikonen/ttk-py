@@ -310,7 +310,7 @@
                 "ro": false,
                 "unique": false
             },
-            "(SUM(part.cost)) part_cost": {
+            "(SUM(parts.cost)) part_cost": {
                 "label": "Osien Hinta",
                 "type": "double:6,2",
                 "width": 45,
@@ -406,9 +406,9 @@
             },
             "cost": {
                 "label": "Hinta",
-                "type": "long",
+                "type": "double:6,2",
                 "width": 45,
-                "ro": true,
+                "ro": false,
                 "unique": false
             }
 
@@ -637,6 +637,13 @@
                 "width": 80,
                 "ro": false,
                 "unique": false
+            },
+            "cost": {
+                "label": "Hinta",
+                "type": "double:6,2",
+                "width": 45,
+                "ro": false,
+                "unique": false
             }
         }
     },
@@ -703,7 +710,8 @@
             "width", 
             "length",
             "code_width", 
-            "code_length"
+            "code_length",
+            "cost"
         ],
         "fcmults": ["unit", "mult"],
         "materials": [
@@ -737,7 +745,8 @@
             "width",  
             "length", 
             "code_width",  
-            "code_length"
+            "code_length",
+            "cost"
         ]
     },
     "display": {
@@ -835,8 +844,67 @@
                     "width",  
                     "length", 
                     "code_width",  
-                    "code_length"
+                    "code_length",
+                    "cost"
                 ]
+            ]
+        },
+        "predefs": {
+            "label": "Esimääritykset",
+            "table": "offer_predefs",
+            "pk": ["id"],
+            "columns": ["part", "material"]
+        },
+        "materials": {
+            "label": "Materiaalit",
+            "table": "offer_materials",
+            "pk": ["id"],
+            "columns": [
+                "code",
+                "desc",
+                "prod",
+                "unit",
+                "thickness",
+                "loss",
+                "cost",
+                "edg_cost",
+                "add_cost",
+                "discount",
+                "((cost + edg_cost + add_cost) * (1 + loss) * (1 - discount)) tot_cost"
+            ]
+        },
+        "products": {
+            "label": "Tuotteet",
+            "table": "offer_products",
+            "pk": ["id"],
+            "columns": [
+                "code",
+                "count",
+                "desc",
+                "prod",
+                "inst_unit",
+                "width",
+                "height",
+                "depth",
+                "work_time",
+                "work_cost",
+                "(SUM(parts.cost)) part_cost",
+                "(work_cost * work_time + part_cost) tot_cost"
+            ]
+        },
+        "parts": {
+            "label": "Osat",
+            "table": "offer_parts",
+            "pk": ["id"],
+            "columns": [
+                "code",
+                "desc",
+                "use_predef",
+                "default_mat",
+                "used_mat",
+                "width",
+                "length",
+                "cost"
             ]
         }
     }

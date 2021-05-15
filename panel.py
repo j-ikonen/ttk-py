@@ -1,3 +1,4 @@
+from grouppage import GroupPage
 import wx
 import wx.adv
 import wx.dataview as dv
@@ -53,10 +54,9 @@ class Panel(wx.Panel):
         self.Bind(dv.EVT_DATAVIEW_SELECTION_CHANGED, self.on_tree_select)
 
         self.page_offer = OfferPage(self.book, self.tables)
-        self.page_group = wx.Panel(self.book)
+        self.page_group = GroupPage(self.book, self.tables)
         self.page_db = wx.Panel(self.book)
 
-        self.page_group.SetBackgroundColour((255, 200, 255))
         self.page_db.SetBackgroundColour((220, 220, 255))
 
         PAGE_TITLE_OFFER = "Tarjous"
@@ -150,8 +150,12 @@ class Panel(wx.Panel):
 
             # Refresh page
             # page = self.book.GetPage(selection_new)
-            self.page_offer.set_pk(data[0])
-            # self.page_group.set_pk(data[1])
+            if self.page_offer.pk_val != data[0]:
+                self.page_offer.set_pk(data[0])
+
+            if len(data) > 1 and self.page_group.pk_val != data[1]:
+                self.page_group.set_pk(data[1])
+
             # self.page_db.set_pk(data)
             # page.set_pk(data[-1])
             evt.Skip()

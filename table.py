@@ -212,6 +212,7 @@ sql_create_table_offer_parts = """
         length      INTEGER,
         code_width  TEXT,
         code_length TEXT,
+        cost        REAL,
 
         FOREIGN KEY (product_id)
             REFERENCES offer_products (id)
@@ -257,6 +258,7 @@ sql_create_table_parts = """
         length          INTEGER,
         code_width      TEXT,
         code_length     TEXT,
+        cost            REAL,
 
         PRIMARY KEY (code, product_code),
         FOREIGN KEY (product_code)
@@ -382,8 +384,13 @@ class OfferTables:
         omaterial_keys = ["id", "group_id"]
         omaterial_data = (str(ObjectId()), group_data[0][0])
 
-        oproduct_keys = ["id", "group_id", "width", "height", "depth"]
-        oproduct_data = (str(ObjectId()), group_data[0][0], 1200, 2300, 620)
+        oproduct_keys = ["id", "group_id", "count", "inst_unit", "width", "height", "depth"]
+        oproduct_data = [
+            (str(ObjectId()), group_data[0][0], 1, "Testiyksikkö", 1200, 2300, 620),
+            (str(ObjectId()), group_data[1][0], 2, "Testiyksikkö", 1200, 2300, 620),
+            (str(ObjectId()), group_data[0][0], 1, "Testiyksikkö", 1200, 2300, 620),
+            (str(ObjectId()), group_data[0][0], 3, "Uusi", 1200, 2300, 620)
+        ]
 
         opart_keys = ["id", "product_id"]
         opart_data = (str(ObjectId()), oproduct_data[0][0])
@@ -393,7 +400,7 @@ class OfferTables:
         self.insert("offer_groups", group_keys,  group_data, True)
 
         self.insert("offer_materials", omaterial_keys, omaterial_data)
-        self.insert("offer_products", oproduct_keys, oproduct_data)
+        self.insert("offer_products", oproduct_keys, oproduct_data, True)
         self.insert("offer_parts", opart_keys, opart_data)
 
         self.con.commit()
@@ -557,17 +564,57 @@ class OfferTables:
         else:
             return self.cur.fetchone()
 
-    # def get_grid(self, key, parent_id):
-    #     """Return list of columns by foreign key id.
+    def get_fieldcount(self, offer_id):
+        """Return the fieldcount data of an offer."""
+        sql = """
+            SELECT pr.inst_unit, IFNULL(fc.mult, 0.0), SUM(pr.count), (IFNULL(fc.mult, 0.0) * SUM(pr.count)) cost
+            FROM offer_products pr
+                LEFT JOIN fcmults fc ON pr.inst_unit=fc.unit
+            WHERE pr.group_id IN (
+                SELECT gr.id
+                FROM offer_groups gr
+                WHERE gr.offer_id=?
+            )
+            GROUP BY pr.inst_unit
+            ORDER BY pr.inst_unit ASC
+        """
+        try:
+            self.cur.execute(sql, (offer_id,))
+            self.con.commit()
+        except sqlite3.Error as e:
+            print("OfferTables.get_fieldcount\n\t{}".format(e))
+            return []
 
-    #     [row][0] = id"""
-    #     sql = sql_select_grid[key]
-    #     try:
-    #         self.cur.execute(sql, (parent_id,))
-    #     except sqlite3.Error as e:
-    #         print(e)
-    #         return []
-    #     return self.cur.fetchall()
+        return self.cur.fetchall()
+
+    def get_offer_products(self, product_id):
+        sql = """
+            SELECT
+                pr.id,
+                pr.code,
+                pr.count,
+                pr.desc,
+                pr.prod,
+                pr.inst_unit,
+                pr.width,
+                pr.height,
+                pr.depth,
+                pr.work_time,
+                pr.work_cost,
+                (SUM(pa.cost)) part_cost,
+                (work_cost * work_time + (SUM(pa.cost))) tot_cost
+            FROM offer_products AS pr
+            LEFT JOIN offer_parts AS pa ON pr.id=pa.product_id
+            WHERE pr.id=?
+        """
+        try:
+            self.cur.execute(sql, (product_id,))
+            self.con.commit()
+        except sqlite3.Error as e:
+            print("OfferTables.get_offer_products\n\t{}".format(e))
+            return []
+
+        return self.cur.fetchall()
 
     def get_column_setup(self, table, keys):
         """Return a dictionary with column setup for keys from table."""
