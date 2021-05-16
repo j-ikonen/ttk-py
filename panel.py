@@ -1,3 +1,5 @@
+from bson.objectid import ObjectId
+from wx.core import TextEntryDialog
 from grouppage import GroupPage
 import wx
 import wx.adv
@@ -194,25 +196,47 @@ class Panel(wx.Panel):
             menu.Append(self.close_offer, "Sulje tarjous", "Sulje valittu tarjous.")
             menu.AppendSeparator()
             menu.Append(self.id_edit_name, "Muuta nimeä", "Muuta valitun tarjouksen tai ryhmän nimi.")
+            menu.AppendSeparator()
+            menu.Append(self.id_new_group, "Uusi ryhmä", "Lisää uusi ryhmä valittuun tarjoukseen.")
             if len(self.treepanel.tree.GetItemData(item)) == 2:
-                menu.AppendSeparator()
-                menu.Append(self.id_new_group, "Uusi ryhmä", "Lisää uusi ryhmä valittuun tarjoukseen.")
                 menu.Append(self.id_delete, "Poista ryhmä", "Poista valittu ryhmä.")
 
         self.PopupMenu(menu)
         menu.Destroy()
 
-    def on_new_offer(self, evt):
-        """Open a new offer."""
-        pass
-
     def on_open_offer(self, evt):
         """Open an existing offer."""
         pass
 
+    def on_new_offer(self, evt):
+        """Open a new offer."""
+        # item = self.treepanel.tree.GetSelection()
+        # if item.IsOk():
+        with TextEntryDialog(self, "Uuden tarjouksen nimi", "Uusi tarjous") as dlg:
+            if dlg.ShowModal() == wx.ID_OK:
+                oid = str(ObjectId())
+                if self.tables.insert(
+                    "offers",
+                    ["id", "name"],
+                    [oid, dlg.GetValue()]):
+
+                    self.open_offers.append(oid)
+                    self.refresh_tree()
+
+
     def on_new_group(self, evt):
         """Open a new group to selected offer."""
-        pass
+        item = self.treepanel.tree.GetSelection()
+        if item.IsOk():
+            data = self.treepanel.tree.GetItemData(item)
+            with TextEntryDialog(self, "Uuden ryhmän nimi", "Uusi ryhmä") as dlg:
+                if dlg.ShowModal() == wx.ID_OK:
+                    if self.tables.insert(
+                        "offer_groups",
+                        ["id", "offer_id", "name"],
+                        [str(ObjectId()), data[0], dlg.GetValue()]):
+
+                        self.refresh_tree()
 
     def on_edit_name(self, evt):
         print("EDIT NAME TO BE IMPLEMENTED")

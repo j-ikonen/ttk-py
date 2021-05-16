@@ -962,7 +962,6 @@
                 "desc",
                 "use_predef",
                 "default_mat",
-                "used_mat",
                 "width",
                 "length",
                 "cost"

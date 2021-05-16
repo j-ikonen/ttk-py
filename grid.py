@@ -363,6 +363,10 @@ class TableGrid(BaseGrid):
 
         super().on_show_editor(evt)
 
+    def delete_row(self, row):
+        rowid = self.ids[row]
+        return super().delete_row(row)
+
     def edit_value(self, row, col, value):
         key = self.column_keys[col]
 

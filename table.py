@@ -2,6 +2,10 @@
 
 TODO
 ----
+Do unittests for any functions that do not have them
+Add delete unittest
+Add delete function
+Implement delete in tablegrid.delete_row, delete in database panel and delete group/offer
 """
 
 import json

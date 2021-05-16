@@ -1,7 +1,8 @@
 import wx
+import wx.grid as wxg
 
 from table import OfferTables
-from grid import BaseGrid, TableGrid
+from grid import TableGrid
 
 
 BORDER = 5
@@ -32,6 +33,7 @@ class GroupPage(wx.Panel):
         self.grid_parts = TableGrid(self, tables, "parts", self.ids_parts)
         
         self.Bind(wx.EVT_BUTTON, self.on_btn_name, self.btn_edit_name)
+        self.Bind(wxg.EVT_GRID_SELECT_CELL, self.on_product_select, self.grid_products)
 
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer_label = wx.BoxSizer(wx.HORIZONTAL)
@@ -76,6 +78,14 @@ class GroupPage(wx.Panel):
             )
             self.txt_name.SetLabel(name[0])
 
+    def on_product_select(self, evt):
+        """Change the pk of parts grid to selected product."""
+        try:
+            product_id = self.ids_products[evt.GetRow()]
+        except IndexError:
+            self.grid_parts.set_parent_id(None)
+        else:
+            self.grid_parts.set_parent_id(product_id)
 
     def on_btn_name(self, evt):
         """Update the name of the offer with new value from dialog."""
