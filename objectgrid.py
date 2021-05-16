@@ -89,7 +89,7 @@ class ObjectGrid(wxg.Grid):
         pk : Iterable, optional
             Private key to the new row, must be iterable, by default None.
         """
-        if pk is None:
+        if pk is None or pk[0] is None:
             self.ClearGrid()
             self.pk = None
         else:

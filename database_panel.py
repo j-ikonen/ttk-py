@@ -303,7 +303,7 @@ class DatabasePanel(wx.Panel):
             menu.Check(self.id_show_add, True)
 
         self.PopupMenu(menu)
-        # menu.Destroy()
+        menu.Destroy()
         # evt.Skip()
 
     def set_move_to_id(self, table_key, move_to):

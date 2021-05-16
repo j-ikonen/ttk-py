@@ -159,6 +159,7 @@ sql_create_table_offer_materials = """
     CREATE TABLE IF NOT EXISTS offer_materials (
         id          TEXT PRIMARY KEY,
         group_id    TEXT NOT NULL,
+        category    TEXT,
         code        TEXT UNIQUE,
         desc        TEXT,
         prod        TEXT,
@@ -179,6 +180,7 @@ sql_create_table_offer_products = """
     CREATE TABLE IF NOT EXISTS offer_products (
         id          TEXT PRIMARY KEY,
         group_id    TEXT NOT NULL,
+        category    TEXT,
         code        TEXT,
         count       INTEGER,
         desc        TEXT,
@@ -204,6 +206,7 @@ sql_create_table_offer_parts = """
     CREATE TABLE IF NOT EXISTS offer_parts (
         id          TEXT PRIMARY KEY,
         product_id  TEXT NOT NULL,
+        category    TEXT,
         code        TEXT,
         desc        TEXT,
         use_predef  INTEGER,
@@ -224,6 +227,7 @@ sql_create_table_offer_parts = """
 sql_create_table_materials = """
     CREATE TABLE IF NOT EXISTS materials (
         code        TEXT PRIMARY KEY,
+        category    TEXT,
         desc        TEXT,
         prod        TEXT,
         unit        TEXT,
@@ -238,6 +242,7 @@ sql_create_table_materials = """
 sql_create_table_products = """
     CREATE TABLE IF NOT EXISTS products (
         code        TEXT PRIMARY KEY,
+        category    TEXT,
         desc        TEXT,
         prod        TEXT,
         inst_unit   TEXT,
@@ -252,6 +257,7 @@ sql_create_table_parts = """
     CREATE TABLE IF NOT EXISTS parts (
         code            TEXT NOT NULL,
         product_code    TEXT,
+        category        TEXT,
         desc            TEXT,
         default_mat     TEXT,
         width           INTEGER,

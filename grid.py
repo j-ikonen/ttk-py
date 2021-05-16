@@ -21,7 +21,8 @@ class GridPanel(wx.Panel):
         # self.grid = TheGrid(self, tables, key)
         # dsp = tables.get_display_setup("products")
         # setup = tables.get_column_setup(dsp.get("table"), dsp.get("columns"))
-        self.grid = TableGrid(self, tables, "products")
+        self.ids = []
+        self.grid = TableGrid(self, tables, "products", self.ids)
         pk = tables.group_data[0][0]
         self.grid.set_parent_id(pk)
 
@@ -69,6 +70,36 @@ class BaseGrid(wxg.Grid):
             
         self.Bind(wxg.EVT_GRID_EDITOR_SHOWN, self.on_show_editor)
         self.Bind(wxg.EVT_GRID_CELL_CHANGING, self.on_cell_changing)
+        self.Bind(wx.EVT_KEY_DOWN, self.on_key_down)
+
+    def on_key_down(self, evt):
+        """Handle key events for this grid."""
+        keycode = evt.GetKeyCode()
+        # alt = evt.AltDown()
+        # shift = evt.ShiftDown()
+
+        if keycode == wx.WXK_RETURN:
+            if evt.ControlDown():
+                self.moveto_first()
+
+        elif keycode == wx.WXK_TAB:
+            print("TAB")
+
+        elif keycode == wx.WXK_DELETE:
+            self.delete_selected()
+
+        evt.Skip()
+
+    def moveto_first(self):
+        """Moves cursor to the first columns of the next row."""
+        row = self.GetGridCursorRow()
+        col = self.GetGridCursorCol()
+        if row >= self.GetNumberRows() - 1:
+            newrow = row
+        else:
+            newrow = row + 1
+
+        self.SetGridCursor(newrow, 0)
 
     def on_show_editor(self, evt):
         """Veto showing of editor on read only columns."""
@@ -156,8 +187,10 @@ class BaseGrid(wxg.Grid):
         return content
 
     def clear_content(self):
-        self.DeleteRows(0, self.GetNumberRows())
-        self.AppendRows(1)
+        rows = self.GetNumberRows()
+        if rows > 0:
+            self.DeleteRows(0, rows)
+            self.AppendRows(1)
 
     def delete_selected(self):
         selected = self.GetSelectedRows()
@@ -263,7 +296,7 @@ class FieldCountGrid(BaseGrid):
 
 class TableGrid(BaseGrid):
     
-    def __init__(self, parent, tables: OfferTables, name):
+    def __init__(self, parent, tables: OfferTables, name, ids):
         self.tables = tables
 
         display_setup = self.tables.get_display_setup(name)
@@ -277,7 +310,7 @@ class TableGrid(BaseGrid):
         self.types = [val["type"] for val in column_setup.values()]
 
         self.parent_id = None
-        self.ids = []
+        self.ids = ids
 
         super().__init__(parent, column_setup)
 

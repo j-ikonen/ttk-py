@@ -21,32 +21,15 @@ class GroupPage(wx.Panel):
         self.txt_name = wx.StaticText(self, label=TXT_NAME_NO_SEL, size=(180, -1))
         self.btn_edit_name = wx.Button(self, label=BTN_EDIT_NAME)
 
-        # self.setup_predefs = {}
-        # self.setup_materials = {}
-        # self.setup_products = {}
-        # self.setup_parts = {}
-
-        # self.columns_predefs = []
-        # self.columns_materials = []
-        # self.columns_products = []
-        # self.columns_parts = []
-
-        # self.types_predefs = []
-        # self.types_materials = []
-        # self.types_products = []
-        # self.types_parts = []
-
-        # self.set_setup()
-
-        self.grid_predefs = TableGrid(self, tables, "predefs")
-        self.grid_materials = TableGrid(self, tables, "materials")
-        self.grid_products = TableGrid(self, tables, "products")
-        self.grid_parts = TableGrid(self, tables, "parts")
-
         self.ids_predefs = []
         self.ids_materials = []
         self.ids_products = []
         self.ids_parts = []
+
+        self.grid_predefs = TableGrid(self, tables, "predefs", self.ids_predefs)
+        self.grid_materials = TableGrid(self, tables, "materials", self.ids_materials)
+        self.grid_products = TableGrid(self, tables, "products", self.ids_products)
+        self.grid_parts = TableGrid(self, tables, "parts", self.ids_parts)
         
         self.Bind(wx.EVT_BUTTON, self.on_btn_name, self.btn_edit_name)
 
@@ -67,26 +50,6 @@ class GroupPage(wx.Panel):
 
         self.SetSizer(sizer)
 
-    # def set_setup(self):
-    #     disp_predefs = self.tables.get_display_setup("predefs")
-    #     disp_materials = self.tables.get_display_setup("materials")
-    #     disp_products = self.tables.get_display_setup("products")
-    #     disp_parts = self.tables.get_display_setup("parts")
-
-    #     self.columns_predefs = disp_predefs["columns"]
-    #     self.columns_materials = disp_materials["columns"]
-    #     self.columns_products = disp_products["columns"]
-    #     self.columns_parts = disp_parts["columns"]
-
-    #     self.setup_predefs = self.tables.get_column_setup("offer_predefs", self.columns_predefs)
-    #     self.setup_materials = self.tables.get_column_setup("offer_predefs", self.columns_predefs)
-    #     self.setup_products = self.tables.get_column_setup("offer_materials", self.columns_materials)
-    #     self.setup_parts = self.tables.get_column_setup("offer_products", self.columns_products)
-
-    #     self.types_predefs = [val["type"] for val in self.setup_predefs.values()]
-    #     self.types_materials = [val["type"] for val in self.setup_materials.values()]
-    #     self.types_products = [val["type"] for val in self.setup_products.values()]
-    #     self.types_parts = [val["type"] for val in self.setup_parts.values()]
 
     def set_pk(self, pk):
         """Set the private key string for table offers. Refresh with new values."""
@@ -119,6 +82,10 @@ class GroupPage(wx.Panel):
         if self.pk_val is None:
             return
 
+        self.change_name()
+
+    def change_name(self):
+        """Open TextEntryDialog and edit name of the group."""
         with wx.TextEntryDialog(self, "Ryhmän uusi nimi", "Muuta nimeä") as dlg:
             if dlg.ShowModal() == wx.ID_OK:
                 name = dlg.GetValue()

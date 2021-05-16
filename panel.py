@@ -52,6 +52,7 @@ class Panel(wx.Panel):
 
         self.Bind(wx.EVT_SIZE, self.on_size)
         self.Bind(dv.EVT_DATAVIEW_SELECTION_CHANGED, self.on_tree_select)
+        self.Bind(dv.EVT_DATAVIEW_ITEM_CONTEXT_MENU, self.on_tree_context_menu)
 
         self.page_offer = OfferPage(self.book, self.tables)
         self.page_group = GroupPage(self.book, self.tables)
@@ -150,15 +151,109 @@ class Panel(wx.Panel):
 
             # Refresh page
             # page = self.book.GetPage(selection_new)
+
+            # Selection changed offer.
             if self.page_offer.pk_val != data[0]:
                 self.page_offer.set_pk(data[0])
 
+                # No group selected with offer.
+                if len(data) == 1:
+                    self.page_group.set_pk(None)
+
+            # Selection changed group.
             if len(data) > 1 and self.page_group.pk_val != data[1]:
                 self.page_group.set_pk(data[1])
 
             # self.page_db.set_pk(data)
             # page.set_pk(data[-1])
             evt.Skip()
+
+    def on_tree_context_menu(self, evt):
+        """Open context menu for the tree."""
+        item = evt.GetItem()
+
+        if not hasattr(self, "id_new_offer"):
+            self.id_new_offer = wx.NewIdRef()
+            self.id_open_offer = wx.NewIdRef()
+            self.close_offer = wx.NewIdRef()
+            self.id_edit_name = wx.NewIdRef()
+            self.id_delete = wx.NewIdRef()
+            self.id_new_group = wx.NewIdRef()
+
+            self.Bind(wx.EVT_MENU, self.on_new_offer, self.id_new_offer)
+            self.Bind(wx.EVT_MENU, self.on_open_offer, self.id_open_offer)
+            self.Bind(wx.EVT_MENU, self.on_close_offer, self.close_offer)
+            self.Bind(wx.EVT_MENU, self.on_edit_name, self.id_edit_name)
+            self.Bind(wx.EVT_MENU, self.on_new_group, self.id_new_group)
+            self.Bind(wx.EVT_MENU, self.on_delete, self.id_delete)
+
+        menu = wx.Menu()
+        menu.Append(self.id_new_offer, "Uusi tarjous", "Avaa uusi tarjous.")
+        menu.Append(self.id_open_offer, "Avaa tarjous", "Avaa tallennettu tarjous.")
+        if item.IsOk():
+            menu.Append(self.close_offer, "Sulje tarjous", "Sulje valittu tarjous.")
+            menu.AppendSeparator()
+            menu.Append(self.id_edit_name, "Muuta nimeä", "Muuta valitun tarjouksen tai ryhmän nimi.")
+            if len(self.treepanel.tree.GetItemData(item)) == 2:
+                menu.AppendSeparator()
+                menu.Append(self.id_new_group, "Uusi ryhmä", "Lisää uusi ryhmä valittuun tarjoukseen.")
+                menu.Append(self.id_delete, "Poista ryhmä", "Poista valittu ryhmä.")
+
+        self.PopupMenu(menu)
+        menu.Destroy()
+
+    def on_new_offer(self, evt):
+        """Open a new offer."""
+        pass
+
+    def on_open_offer(self, evt):
+        """Open an existing offer."""
+        pass
+
+    def on_new_group(self, evt):
+        """Open a new group to selected offer."""
+        pass
+
+    def on_edit_name(self, evt):
+        print("EDIT NAME TO BE IMPLEMENTED")
+        # item = evt.GetItem()
+        item = self.treepanel.tree.GetSelection()
+        if item.IsOk():
+            data = self.treepanel.tree.GetItemData(item)
+
+            # Offer selected.
+            if len(data) == 1:
+                self.page_offer.change_name()
+
+            # Group selected.
+            elif len(data) == 2:
+                self.page_group.change_name()
+
+    def on_delete(self, evt):
+        """Delete the selected group."""
+        item = self.treepanel.tree.GetSelection()
+        if item.IsOk():
+            data = self.treepanel.tree.GetItemData(item)
+            # Group selected.
+            if len(data) == 2:
+                print("DELETE GROUP UNIMPLEMENTED")
+                self.page_group.set_pk(None)
+                self.refresh_tree()
+
+    def on_close_offer(self, evt):
+        """Close the selected offer."""
+        item = self.treepanel.tree.GetSelection()
+        if item.IsOk():
+            data = self.treepanel.tree.GetItemData(item)
+
+            # Find the selected offer.
+            for n, offer in enumerate(self.open_offers):
+                if offer == data[0]:
+                    del self.open_offers[n]
+                    self.page_offer.set_pk(None)
+                    self.page_group.set_pk(None)
+                    self.refresh_tree()
+                    return
 
     def refresh_tree(self):
         """Handle refreshing the tree."""

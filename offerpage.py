@@ -54,7 +54,7 @@ class OfferPage(wx.Panel):
         self.grid_client.set_pk([pk])   # Grid refreshes on new pk.
         self.refresh()
         self.Layout()
-    
+
     def refresh(self):
         """Refresh the page with new values from tables."""
         if self.pk_val is None:
@@ -93,7 +93,11 @@ class OfferPage(wx.Panel):
         """Update the name of the offer with new value from dialog."""
         if self.pk_val is None:
             return
+        
+        self.change_name()
 
+    def change_name(self):
+        """Open TextEntryDialog and change the name of the offer."""
         with wx.TextEntryDialog(self, "Tarjouksen uusi nimi", "Muuta nimeä") as dlg:
             if dlg.ShowModal() == wx.ID_OK:
                 name = dlg.GetValue()
@@ -105,3 +109,4 @@ class OfferPage(wx.Panel):
                 )
                 self.GetGrandParent().GetParent().refresh_tree()
                 self.refresh()
+    
