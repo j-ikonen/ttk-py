@@ -401,14 +401,14 @@
                 "label": "Leveys",
                 "type": "long",
                 "width": 45,
-                "ro": true,
+                "ro": false,
                 "unique": false
             },
             "length": {
                 "label": "Pituus",
                 "type": "long",
                 "width": 45,
-                "ro": true,
+                "ro": false,
                 "unique": false
             },
             "code_width": {

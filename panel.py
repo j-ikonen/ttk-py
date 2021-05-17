@@ -1,15 +1,28 @@
-from database_panel import DatabasePanel
-from offer_dialog import OfferDialog
-from bson.objectid import ObjectId
-from wx.core import TextEntryDialog
-from grouppage import GroupPage
+"""Main panel for handling events between different ui parts.
+
+TODO
+----
+    Add material thickness and cost to sql select columns of parts based on def/predef material.
+    Add parsing and evaluating coded values from some part columns.
+    Database panel should add parts to selected product.
+    Refresh the page content on page change.
+    Refresh grid row content on cell value change.
+    Update parts to_offer product_id in databasepanel on product selection.
+
+"""
+
 import wx
 import wx.adv
 import wx.dataview as dv
+from bson.objectid import ObjectId
+from wx.core import TextEntryDialog
 
-from table import OfferTables
+from database_panel import DatabasePanel
+from offer_dialog import OfferDialog
 from tree_panel import TreePanel
+from grouppage import GroupPage
 from offerpage import OfferPage
+from table import OfferTables
 
 
 FRAME_SIZE = (1200, 750)
@@ -55,8 +68,8 @@ class Panel(wx.Panel):
             id2=max(winids))
 
         self.Bind(wx.EVT_SIZE, self.on_size)
-        self.Bind(dv.EVT_DATAVIEW_SELECTION_CHANGED, self.on_tree_select)
-        self.Bind(dv.EVT_DATAVIEW_ITEM_CONTEXT_MENU, self.on_tree_context_menu)
+        self.Bind(dv.EVT_DATAVIEW_SELECTION_CHANGED, self.on_tree_select, self.treepanel.tree)
+        self.Bind(dv.EVT_DATAVIEW_ITEM_CONTEXT_MENU, self.on_tree_context_menu, self.treepanel.tree)
 
         self.page_offer = OfferPage(self.book, self.tables)
         self.page_group = GroupPage(self.book, self.tables)
@@ -146,6 +159,10 @@ class Panel(wx.Panel):
             # Selection changed group.
             if len(data) > 1 and self.page_group.pk_val != data[1]:
                 self.page_group.set_pk(data[1])
+
+                self.page_db.set_move_to_id("materials", data[1])
+                self.page_db.set_move_to_id("products", data[1])
+                self.page_db.set_move_to_id("parts", None)
 
             # self.page_db.set_pk(data)
             # page.set_pk(data[-1])

@@ -310,7 +310,7 @@ class TableGrid(BaseGrid):
         self.types = [val["type"] for val in column_setup.values()]
 
         self.parent_id = None
-        self.ids = ids
+        self.ids: list = ids
 
         super().__init__(parent, column_setup)
 
@@ -322,11 +322,14 @@ class TableGrid(BaseGrid):
         self.refresh()
 
     def refresh(self):
+        self.ids.clear()
         if self.parent_id is None:
             self.clear_content()
         else:
             if self.tablename == "offer_products":
                 data = self.tables.get_offer_products(self.parent_id)
+            elif self.tablename == "offer_parts":
+                data = self.tables.get_group_parts(self.parent_id)
             else:
                 data = self.tables.get(
                     self.tablename,
