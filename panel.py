@@ -1,3 +1,5 @@
+from database_panel import DatabasePanel
+from offer_dialog import OfferDialog
 from bson.objectid import ObjectId
 from wx.core import TextEntryDialog
 from grouppage import GroupPage
@@ -58,7 +60,7 @@ class Panel(wx.Panel):
 
         self.page_offer = OfferPage(self.book, self.tables)
         self.page_group = GroupPage(self.book, self.tables)
-        self.page_db = wx.Panel(self.book)
+        self.page_db = DatabasePanel(self.book, self.tables)
 
         self.page_db.SetBackgroundColour((220, 220, 255))
 
@@ -70,31 +72,10 @@ class Panel(wx.Panel):
         self.book.AddPage(self.page_group, PAGE_TITLE_GROUP)
         self.book.AddPage(self.page_db, PAGE_TITLE_DB)
 
-        # self.Bind(wx.EVT_BOOKCTRL_PAGE_CHANGING, self.on_book_pagechanged, self.book)
         sizer_book = wx.BoxSizer(wx.HORIZONTAL)
         sizer_book.Add(self.book, 1, wx.EXPAND)
         self.main_win.SetSizer(sizer_book)
 
-    # def on_btn_add_group(self, evt):
-    #     selected_link = self.treepanel.get_selected_link()
-    #     if selected_link is None:
-    #         return
-
-    #     print(selected_link)
-    #     offer_id = selected_link[0]
-    #     group_id = self.tables.insert_group(offer_id)
-    #     if group_id is not None:
-    #         self.refresh_tree()
-    #     else:
-    #         print("panel.on_btn_add_offer - failed to add offer")
-
-    # def on_btn_add_offer(self, evt):
-    #     offer_id = self.tables.insert_offer()
-    #     if offer_id is not None:
-    #         self.offers.append(offer_id)
-    #         self.refresh_tree()
-    #     else:
-    #         print("panel.on_btn_add_offer - failed to add offer")
 
     def create_left_window(self, winids):
         leftwin = wx.adv.SashLayoutWindow(
@@ -206,12 +187,14 @@ class Panel(wx.Panel):
 
     def on_open_offer(self, evt):
         """Open an existing offer."""
-        pass
+        with OfferDialog(self, self.tables, self.open_offers) as dlg:
+            if dlg.ShowModal() == wx.ID_OK:
+                offer_id = dlg.selected_id
+                self.open_offers.append(offer_id)
+                self.refresh_tree()
 
     def on_new_offer(self, evt):
-        """Open a new offer."""
-        # item = self.treepanel.tree.GetSelection()
-        # if item.IsOk():
+        """Create a new offer."""
         with TextEntryDialog(self, "Uuden tarjouksen nimi", "Uusi tarjous") as dlg:
             if dlg.ShowModal() == wx.ID_OK:
                 oid = str(ObjectId())
@@ -260,9 +243,10 @@ class Panel(wx.Panel):
             data = self.treepanel.tree.GetItemData(item)
             # Group selected.
             if len(data) == 2:
-                print("DELETE GROUP UNIMPLEMENTED")
-                self.page_group.set_pk(None)
-                self.refresh_tree()
+                group_id = data[-1]
+                if self.tables.delete("offer_groups", ["id"], [group_id]):
+                    self.page_group.set_pk(None)
+                    self.refresh_tree()
 
     def on_close_offer(self, evt):
         """Close the selected offer."""

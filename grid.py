@@ -339,7 +339,7 @@ class TableGrid(BaseGrid):
             for datarow in data:
                 self.ids.append(datarow[0])
                 content.append(datarow[1:])
-                print(datarow)
+                # print(datarow)
             self.set_content(content)
 
 
@@ -348,11 +348,6 @@ class TableGrid(BaseGrid):
 
     def on_cell_changing(self, evt):
         super().on_cell_changing(evt)
-
-        # value = evt.GetString()
-        # row = evt.GetRow()
-        # col = evt.GetCol()
-
 
     def on_show_editor(self, evt):
         """Veto edit if not data source is defined."""
@@ -364,8 +359,13 @@ class TableGrid(BaseGrid):
         super().on_show_editor(evt)
 
     def delete_row(self, row):
+        """Delete from table, if successful delete from grid."""
         rowid = self.ids[row]
-        return super().delete_row(row)
+        if self.tables.delete(
+            self.tablename,
+            ["id"],
+            [rowid]):
+            return super().delete_row(row)
 
     def edit_value(self, row, col, value):
         key = self.column_keys[col]

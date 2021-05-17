@@ -324,14 +324,14 @@
                 "ro": false,
                 "unique": false
             },
-            "(SUM(parts.cost)) part_cost": {
+            "part_cost": {
                 "label": "Osien Hinta",
                 "type": "double:6,2",
                 "width": 45,
                 "ro": true,
                 "unique": false
             },
-            "(work_cost * work_time + part_cost) tot_cost": {
+            "tot_cost": {
                 "label": "Kokonais Hinta",
                 "type": "double:6,2",
                 "width": 45,
@@ -947,8 +947,8 @@
                 "depth",
                 "work_time",
                 "work_cost",
-                "(SUM(parts.cost)) part_cost",
-                "(work_cost * work_time + part_cost) tot_cost"
+                "part_cost",
+                "tot_cost"
             ]
         },
         "parts": {

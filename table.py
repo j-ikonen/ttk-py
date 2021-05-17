@@ -4,8 +4,6 @@ TODO
 ----
 Do unittests for any functions that do not have them
 Add delete unittest
-Add delete function
-Implement delete in tablegrid.delete_row, delete in database panel and delete group/offer
 """
 
 import json
@@ -372,12 +370,24 @@ class OfferTables:
         self.insert_from_csv("products", "../../ttk-dbtestdata-products.csv")
         self.insert_from_csv("parts", "../../ttk-dbtestdata-parts.csv")
 
-        offer_keys = ["id", "name"]
+        offer_keys = [
+            "id",
+            "name",
+            "firstname",
+            "lastname",
+            "company",
+            "phone",
+            "email",
+            "address",
+            "postcode",
+            "postarea",
+            "info",
+        ]
         self.offer_data = [
-            (str(ObjectId()), "Tarjous 1"),
-            (str(ObjectId()), "Tarjous 2"),
-            (str(ObjectId()), "Testi tarjous"),
-            (str(ObjectId()), "Uusi tarjous")
+            (str(ObjectId()), "Tarjous 1", "Nimi", "Suku", "asd", "012 345", "nimi.suku@mail.net", "Tie 12", "123", "KAUPUNKI", ""),
+            (str(ObjectId()), "Tarjous 2", "Etu", "Nimi", "asd", "012 346", "etu.nimi@mail.net", "Tie 13", "1234", "KAUPUNKI2", ""),
+            (str(ObjectId()), "Testi tarjous", "Testi", "Nimi", "qwe", "012 347", "testi.nimi@mail.net", "Tie 14", "1236", "KAUPUNKI2", ""),
+            (str(ObjectId()), "Uusi tarjous", "Etu", "Suku", "qwe", "012 348", "etu.suku@mail.net", "Tie 15", "1237", "KAUPUNKI", "")
         ]
         group_keys = ["id", "offer_id", "name"]
         self.group_data = [
@@ -388,30 +398,83 @@ class OfferTables:
             (str(ObjectId()), self.offer_data[3][0], "Keittiö"),
             (str(ObjectId()), self.offer_data[3][0], "...")
         ]
-        opredef_keys = ["id", "group_id"]
-        opredef_data = (str(ObjectId()), self.group_data[0][0])
-
-        omaterial_keys = ["id", "group_id"]
-        omaterial_data = (str(ObjectId()), self.group_data[0][0])
-
-        oproduct_keys = ["id", "group_id", "count", "inst_unit", "width", "height", "depth"]
-        oproduct_data = [
-            (str(ObjectId()), self.group_data[0][0], 1, "Testiyksikkö", 1200, 2300, 620),
-            (str(ObjectId()), self.group_data[1][0], 2, "Testiyksikkö", 1200, 2300, 620),
-            (str(ObjectId()), self.group_data[0][0], 1, "Testiyksikkö", 1200, 2300, 620),
-            (str(ObjectId()), self.group_data[0][0], 3, "Uusi", 1200, 2300, 620)
+        opredef_keys = ["id", "group_id", "part", "material"]
+        opredef_data = [
+            (str(ObjectId()), self.group_data[0][0], "sivu", "MAT"),
+            (str(ObjectId()), self.group_data[0][0], "hylly", "MAT"),
+            (str(ObjectId()), self.group_data[0][0], "tausta", "MAT3"),
         ]
 
-        opart_keys = ["id", "product_id"]
-        opart_data = (str(ObjectId()), oproduct_data[0][0])
+        omaterial_keys = [
+            "id",         
+            "group_id",   
+            "category",   
+            "code",       
+            "desc",       
+            "prod",       
+            "unit",       
+            "thickness",  
+            "loss",       
+            "cost",       
+            "edg_cost",   
+            "add_cost",   
+            "discount" 
+        ]
+        omaterial_data = [
+            (str(ObjectId()), self.group_data[0][0], "qwe", "MAT", "Materiaali", "Valmistaja", "€/m^2", 16, 0.15, 12.42, 0.33, 2.45, 0.0),
+            (str(ObjectId()), self.group_data[0][0], "qwe", "MAT3", "Materiaali 1", "Valmistaja", "€/m^2", 18, 0.17, 14.42, 0.53, 4.45, 0.0),
+            (str(ObjectId()), self.group_data[0][0], "qwe", "MAT8", "Materiaali 2", "Valmistaja", "€/m^2", 8, 0.19, 13.42, 0.31, 2.49, 0.1),
+            (str(ObjectId()), self.group_data[0][0], "zxc", "OSA", "OSA", "Valmistaja", "€/kpl", None, 0.10, 22.42, 0.0, 2.85, 0.15)
+        ]
 
-        self.insert("offers", offer_keys, self.offer_data[0])
-        self.insert("offers", offer_keys, self.offer_data[1:], True)
+        oproduct_keys = [
+            "id",          
+            "group_id",    
+            "category",    
+            "code",        
+            "count",       
+            "desc",        
+            "prod",        
+            "inst_unit",   
+            "width",       
+            "height",      
+            "depth",       
+            "work_time",   
+            "work_cost"
+        ]
+        oproduct_data = [
+            (str(ObjectId()), self.group_data[0][0], "tuoteryhmä", "KOODI", 1, "Kuvaus", "Valmistaja", "Asennusyksikkö", 1200, 2300, 620, 0.48, 20.0),
+            (str(ObjectId()), self.group_data[1][0], "tuoteryhmä", "KOODI2", 2, "Kuvaus", "Valmistaja", "Asennusyksikkö", 1200, 2300, 620, 0.48, 20.0),
+            (str(ObjectId()), self.group_data[0][0], "toinen ryhmä", "TOINEN1", 1, "Kuvaus", "Valmistaja", "Testi yksikkö", 1200, 2300, 620, 0.88, 20.0),
+            (str(ObjectId()), self.group_data[0][0], "toinen ryhmä", "TOINEN3", 3, "Uusi Kuvaus", "Valmistaja", "Testi yksikkö", 1200, 2300, 620, 1.18, 20.0)
+        ]
+
+        opart_keys = [
+            "id",          
+            "product_id",  
+            "category",    
+            "code",        
+            "desc",        
+            "use_predef",  
+            "default_mat", 
+            "width",
+            "length",
+            "cost"
+        ]
+        opart_data = [
+            (str(ObjectId()), oproduct_data[0][0], "sivu", "LEVY01", "Sivulevy", 0, "MAT", 120, 302, 8.2),
+            (str(ObjectId()), oproduct_data[0][0], "hylly", "LEVY02", "Kuvaus....", 0, "MAT3", 280, 302, 18.2),
+            (str(ObjectId()), oproduct_data[0][0], "tausta", "LEVY01", "Sivulevy", 0, "MAT", 555, 302, 28.2),
+            (str(ObjectId()), oproduct_data[0][0], "sivu", "LEVY01", "Toinen Sivulevy", 0, "MAT", 120, 302, 38.2)
+        ]
+
+        self.insert("offers", offer_keys, self.offer_data, True)
         self.insert("offer_groups", group_keys,  self.group_data, True)
 
-        self.insert("offer_materials", omaterial_keys, omaterial_data)
+        self.insert("offer_predefs", opredef_keys, opredef_data, True)
+        self.insert("offer_materials", omaterial_keys, omaterial_data, True)
         self.insert("offer_products", oproduct_keys, oproduct_data, True)
-        self.insert("offer_parts", opart_keys, opart_data)
+        self.insert("offer_parts", opart_keys, opart_data, True)
 
         self.con.commit()
 
@@ -528,8 +591,8 @@ class OfferTables:
             return False
         return True
 
-    def get(self, table: str, columns: Iterable,
-            match_columns: Iterable, values: Iterable, many=False, operator='='):
+    def get(self, table: str, columns: Iterable, match_columns: Iterable,
+            values: Iterable, many=False, operator='='):
         """Get a row of values.
 
         Parameters
@@ -544,6 +607,8 @@ class OfferTables:
             Values matching columns used to find results.
         many : bool, optional
             True if returing multiple rows, by default False
+        operator : str, optional
+            Operator used for matching the select.
 
         Returns
         -------
@@ -562,21 +627,26 @@ class OfferTables:
             columns=cols,
             cond=conditions
         )
-        print(sql)
+        # print(sql)
         try:
             self.cur.execute(sql, values)
             self.con.commit()
         except sqlite3.Error as e:
-            print("OfferTables.get - {}".format(e))
+            print("OfferTables.get\n\t{}".format(e))
+            print("\tsql: {}".format(sql))
+            print("\ttable: {}".format(table))
+            print("\tcolumns: {}".format(columns))
+            print("\tmatch_columns: {}".format(match_columns))
+            print("\tvalues: {}".format(values))
+            print("\tmany: {}".format(many))
+            print("\toperator: {}".format(operator))
             return []
         if many:
             return self.cur.fetchall()
         else:
             return self.cur.fetchone()
 
-    def get_fieldcount(self, offer_id):
-        """Return the fieldcount data of an offer."""
-        sql = """
+    sql_select_fieldcount = """
             SELECT pr.inst_unit, IFNULL(fc.mult, 0.0), SUM(pr.count), (IFNULL(fc.mult, 0.0) * SUM(pr.count)) cost
             FROM offer_products pr
                 LEFT JOIN fcmults fc ON pr.inst_unit=fc.unit
@@ -588,8 +658,10 @@ class OfferTables:
             GROUP BY pr.inst_unit
             ORDER BY pr.inst_unit ASC
         """
+    def get_fieldcount(self, offer_id):
+        """Return the fieldcount data of an offer."""
         try:
-            self.cur.execute(sql, (offer_id,))
+            self.cur.execute(self.sql_select_fieldcount, (offer_id,))
             self.con.commit()
         except sqlite3.Error as e:
             print("OfferTables.get_fieldcount\n\t{}".format(e))
@@ -597,11 +669,11 @@ class OfferTables:
 
         return self.cur.fetchall()
 
-    def get_offer_products(self, group_id):
-        sql = """
+    sql_select_group_products = """
         SELECT *, (part_cost + wt * wc) FROM
             (SELECT
                 pr.id,
+                pr.category,
                 pr.code,
                 pr.count,
                 pr.desc,
@@ -618,14 +690,61 @@ class OfferTables:
             FROM offer_products AS pr
             WHERE pr.group_id=?)
         """
+    def get_offer_products(self, group_id):
+        """Get the group products grid data.
+
+        Parameters
+        ----------
+        group_id : str
+            Id of group whose products will be returned.
+
+        Returns
+        -------
+        list
+            list of tuples containing the grid data.
+        """
         try:
-            # self.cur.execute(sql, (group_id,))
-            self.cur.execute(sql, (group_id,))
+            self.cur.execute(self.sql_select_group_products, (group_id,))
             self.con.commit()
         except sqlite3.Error as e:
             print("OfferTables.get_offer_products\n\t{}".format(e))
             return []
 
+        return self.cur.fetchall()
+
+    sql_select_group_parts = """
+        SELECT
+            p.id,
+            p.category,
+            p.code,
+            p.desc,
+            p.use_predef,
+            p.default_mat,
+            p.width,
+            p.length,
+            p.cost
+        FROM offer_parts AS p
+        WHERE product_id=?
+        """
+    def get_group_parts(self, product_id):
+        """Get the group parts grid data.
+
+        Parameters
+        ----------
+        product_id : str
+            Id of products whose parts will be returned.
+
+        Returns
+        -------
+        list
+            list of tuples containing the grid data.
+        """
+        try:
+            self.cur.execute(self.sql_select_group_parts, (product_id,))
+            self.con.commit()
+        except sqlite3.Error as e:
+            print("OfferTables.get_group_parts\n\t{}".format(e))
+            return []
         return self.cur.fetchall()
 
     def get_column_setup(self, table, keys):
@@ -661,84 +780,55 @@ class OfferTables:
             table=table,
             column=column_key,
             pk=pk)
-        print(sql)
-        # print(column_key)
-        # print(pk)
-        # print(values)
         try:
             self.cur.execute(sql, values)
             self.con.commit()
         except sqlite3.Error as e:
-            print("OfferTables.update_one - {}".format(e))
+            print("OfferTables.update_one\n\t{}".format(e))
+            print("\tsql: {}".format(sql))
+            print("\ttable: {}".format(table))
+            print("\tcolumn_key: {}".format(column_key))
+            print("\tpk: {}".format(pk))
+            print("\tvalues: {}".format(values))
             return False
         return True
 
-    # def upsert(self, key, column_key, values):
-    #     """
-    #     INSERT INTO materials (id, group_id, {column})
-    #     VALUES (?, ?, ?)
-    #     ON CONFLICT (id) DO UPDATE SET {column}=excluded.{column}
-    #     """
-    #     sql = sql_upsert[key].format(column=column_key)
+    sql_delete_general = """DELETE FROM {table} WHERE {match}=({qm})"""
+    def delete(self, table, match_columns: Iterable, values: Iterable):
+        """Delete rows matching the columns and values specified.
+
+        Parameters
+        ----------
+        table : str
+            Name of the table.
+        match_columns : Iterable
+            Columns that are used for matching the deleted rows.
+        values : Iterable
+            Values for the columns used to match.
+
+        Returns
+        -------
+        bool
+            True on success, False otherwise.
+        """
         
-    #     try:
-    #         self.cur.execute(sql, values)
-    #     except sqlite3.Error as e:
-    #         print(e)
-    #         return False
-    #     return True
+        sql = self.sql_delete_general.format(
+            table=table,
+            match=','.join(match_columns),
+            qm=','.join(['?'] * len(match_columns))
+        )
 
-    # def delete(self, key, id):
-    #     """Delete a row with id. Return True on success."""
-    #     sql = {"materials": """DELETE FROM materials WHERE id=?"""}[key]
-    #     return self.execute(sql, (id,))
-
-    # def execute(self, sql, values=None):
-    #     """Execute with values. Return True on success."""
-    #     try:
-    #         if values is None:
-    #             self.cur.execute(sql)
-    #         else:
-    #             self.cur.execute(sql, values)
-    #         self.con.commit()
-    #     except sqlite3.Error as e:
-    #         print(e)
-    #         return False
-    #     return True
-
-    # def get_unitcount(self,):
-    #     """."""
-
-    # def get_ids(self, key, parent_id):
-    #     """Return the lists of ids by foreign key id."""
-    #     sql = sql_select_ids[key]
-    #     res = self.execute(sql, (parent_id,))
-    #     if res:
-    #         return self.cur.fetchall()
-    #     return []
-
-
-    # def get_by_ids(self, key, ids):
-    #     """Return rows where id"""
-    #     sql = {"materials": """SELECT """}
-    # def get_offer_page(self, offer_id):
-    #     """Return the relevant data for offer page as a list."""
-    #     try:
-    #         res = self.cur.execute(sql_select_offer_page, (offer_id,)).fetchone()
-    #     except sqlite3.Error as e:
-    #         print(e)
-    #         return None
-
-    #     print(res)
-    #     return res
-
-    # def get_labels(self, key):
-    #     """Return the list of labels matching get_offer_page return tuple indexes."""
-    #     return table_labels[key]
-
-    # def get_types(self, key):
-    #     """Return the list of types matching get_offer_page return tuple indexes."""
-    #     return table_types[key]
+        try:
+            self.cur.execute(sql, values)
+            self.con.commit()
+        except sqlite3.Error as e:
+            print("OfferTables.delete\n\t{}".format(e))
+            print("\tsql: {}".format(sql))
+            print("\ttable: {}".format(table))
+            print("\tmatch_columns: {}".format(match_columns))
+            print("\tvalues: {}".format(values))
+            return False
+        return True
 
     def get_treelist(self, offer_ids: list):
         """Return a list of offer and group names and ids.
@@ -768,70 +858,13 @@ class OfferTables:
                 print("ERROR in OfferTables.get_treelist\n\t{}".format(e))
                 return []
 
-            # self.con.commit()
             groups = self.cur.fetchall()
 
             treelist.append(item)
             for g in groups:
                 treelist.append(g)
 
-        # for item in treelist:
-        #     print(item)
         return treelist
-
-    # def get_unit_count(self, offer_id):
-    #     """Return the install unit count of products in the offer.
-        
-    #     Return (unit, count, mult)
-    #     """
-    #     self.execute(sql_count_units)
-
-
-    # def update_one_offers(self, offer_id, name, col, value):
-    #     """Update a value in offers table."""
-    #     key = table_keys[name] if col is None else table_keys[name][col]
-    #     sql = sql_update_one_offers.format(col=key)
-    #     self.execute(sql, (value, offer_id))
-
-    # def update_one_groups(self, ids, name, col, value):
-    #     """Update a value in groups table. (offer_id, group_id) = ids"""
-    #     (offer_id, group_id) = ids
-    #     pass
-    
-
-    # def insert(self, name, ids):
-    #     """."""
-    #     oid = ObjectId()
-    #     if self.execute(sql_insert[name], (oid,) + ids):
-    #         return oid
-    #     return None
-
-    # def insert_default(self, table, ids):
-    #     """
-    #     sql_insert_default = {
-    #         "offers": INSERT INTO offers (id) VALUES (?),
-    #         "groups": INSERT INTO groups (id, offer_id) VALUES (?, ?),
-    #         "predefs": INSERT INTO predefs (id, group_id, offer_id) VALUES (?, ?, ?),
-    #         "materials": INSERT INTO materials (id, group_id, offer_id) VALUES (?, ?, ?)
-    #     """
-    #     oid = ObjectId()
-    #     if self.execute(sql_insert_default[table], (oid,) + ids):
-    #         return oid
-    #     return None
-
-    # def insert_offer(self):
-    #     """Insert a new offer. Return id of inserted offer or None if not successful."""
-    #     oid = str(ObjectId())
-    #     if self.execute(sql_insert_default["offers"], (oid,)):
-    #         return oid
-    #     return None
-
-    # def insert_group(self, offer_id: str):
-    #     """Insert a new group. Return id of inserted group or None if not successful."""
-    #     oid = str(ObjectId())
-    #     if self.execute(sql_insert_default["groups"], (oid, offer_id)):
-    #         return oid
-    #     return None
 
 
 if __name__ == '__main__':

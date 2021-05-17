@@ -363,11 +363,29 @@ class DatabasePanel(wx.Panel):
         print("Menu - ")
 
     def on_del_offer(self, evt):
-        print("Menu - ")
         self.del_to_offer()
 
     def on_del_db(self, evt):
-        print("Menu - ")
+        sel_items = self.list_search.GetSelections()
+        selected_rows = [self.list_search.ItemToRow(item) for item in sel_items]
+        pk_key = self.table_pk[self.choice_dbs.GetSelection()]
+        table_key = self.table_keys[self.choice_dbs.GetSelection()]
+        pk_idx = [self.column_keys.index(key) for key in pk_key]
+
+        selected_rows.sort(reverse=True)
+
+        for n in selected_rows:
+            pk_value = []
+            # Form the private key values.
+            for col in pk_idx:
+                pk_value.append(self.list_search.GetValue(n, col))
+
+            self.tables.delete(
+                table_key,
+                pk_key,
+                pk_value
+            )
+            self.list_search.DeleteItem(n)
 
     def on_del_add(self, evt):
         print("Menu - ")
