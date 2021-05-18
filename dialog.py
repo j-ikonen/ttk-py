@@ -1,5 +1,5 @@
 from copy import deepcopy
-from table import OfferTables
+import table as tb
 
 import wx
 import wx.dataview as dv
@@ -381,7 +381,7 @@ class DbAddDialog(wx.Dialog):
         )
         self.CenterOnParent()
 
-        self.grid = SetupGrid(self, OfferTables(), "", "")
+        self.grid = SetupGrid(self, tb.OfferTables(), "", "")
         self.grid.change_data(self.object, ("",))
 
         sizer_children = wx.BoxSizer(wx.VERTICAL)

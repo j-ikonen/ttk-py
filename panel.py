@@ -22,7 +22,7 @@ from offer_dialog import OfferDialog
 from tree_panel import TreePanel
 from grouppage import GroupPage
 from offerpage import OfferPage
-from table import OfferTables
+import table as tb
 
 
 FRAME_SIZE = (1200, 750)
@@ -42,7 +42,7 @@ class Panel(wx.Panel):
         """
         super().__init__(parent)
 
-        self.tables: OfferTables = tables
+        self.tables: tb.OfferTables = tables
         self.open_offers = [
             self.tables.offer_data[0][0],
             self.tables.offer_data[1][0],

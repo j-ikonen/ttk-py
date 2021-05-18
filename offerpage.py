@@ -1,6 +1,6 @@
 import wx
 
-from table import OfferTables
+import table as tb
 from objectgrid import ObjectGrid
 from grid import BaseGrid, FieldCountGrid
 
@@ -15,7 +15,7 @@ class OfferPage(wx.Panel):
     def __init__(self, parent, tables):
         super().__init__(parent)
 
-        self.tables: OfferTables = tables
+        self.tables: tb.OfferTables = tables
         self.SetBackgroundColour((220, 255, 220))
 
         self.pk_val = None

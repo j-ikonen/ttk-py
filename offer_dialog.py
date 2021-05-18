@@ -1,7 +1,7 @@
-from table import OfferTables
 import wx
 import wx.dataview as dv
 
+import table as tb
 
 BORDER = 5
 TITLE_OPEN_OFFER = "Avaa tarjous"
@@ -17,7 +17,7 @@ class OfferDialog(wx.Dialog):
         )
         self.CenterOnParent()
 
-        self.tables: OfferTables = tables
+        self.tables: tb.OfferTables = tables
         self.open_offers = open_offers
         self.selected_id = None
         self.list_ids = []

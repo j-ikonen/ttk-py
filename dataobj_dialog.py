@@ -1,5 +1,5 @@
 from copy import deepcopy
-from table import OfferTables
+import table as tb
 import wx
 
 from setup_grid import SetupGrid
@@ -25,7 +25,7 @@ class DataObjectDialog(wx.Dialog):
 
         self.obj = obj
         self.setup = setup
-        self.tables = OfferTables()
+        self.tables = tb.OfferTables()
 
         # wx.Windows
         txt_msg = wx.StaticText(self, label=DOD_MSG.format(setup['label']))

@@ -111,12 +111,50 @@ TABLE_LABELS = {
     "products": "Tuotteet",
     "parts": "Osat"
 }
-sql_create_table_fcmults = """
-    CREATE TABLE IF NOT EXISTS fcmults (
-        unit    TEXT PRIMARY KEY,
-        mult    REAL
+# sql_create_table_fcmults = """
+#     CREATE TABLE IF NOT EXISTS fcmults (
+#         unit    TEXT PRIMARY KEY,
+#         mult    REAL
+#     )
+# """
+sql_create_table_variables = """
+    CREATE TABLE IF NOT EXISTS variables (
+        key     TEXT PRIMARY KEY,
+        val     REAL
     )
 """
+sql_create_table_columns = """
+    CREATE TABLE IF NOT EXISTS columns (
+        tablename   TEXT,
+        key         TEXT,
+        label       TEXT,
+        type        TEXT,
+        col_idx     INTEGER,
+        width       INTEGER,
+        is_unique   INTEGER,
+        ro          INTEGER,
+        PRIMARY KEY (tablename, key)
+    )
+"""
+columns_keys = [
+    "tablename",
+    "key",
+    "label",
+    "type",
+    "col_idx",
+    "width",
+    "is_unique",
+    "ro"
+]
+TABLE = 0
+KEY = 1
+LABEL = 2
+TYPE = 3
+INDEX = 4
+WIDTH = 5
+UNIQUE = 6
+READ_ONLY = 7
+
 sql_create_table_offers = """
     CREATE TABLE IF NOT EXISTS offers (
         id          TEXT PRIMARY KEY,
@@ -162,22 +200,43 @@ sql_create_table_offer_materials = """
         id          TEXT PRIMARY KEY,
         group_id    TEXT NOT NULL,
         category    TEXT,
-        code        TEXT UNIQUE,
+        code        TEXT,
         desc        TEXT,
         prod        TEXT,
-        unit        TEXT,
         thickness   INTEGER,
-        loss        REAL,
-        cost        REAL,
-        edg_cost    REAL,
-        add_cost    REAL,
-        discount    REAL,
+        unit        TEXT,
+        cost        REAL DEFAULT 0.0,
+        add_cost    REAL DEFAULT 0.0,
+        edg_cost    REAL DEFAULT 0.0,
+        loss        REAL DEFAULT 0.0,
+        discount    REAL DEFAULT 0.0,
+        tot_cost    REAL
+            GENERATED ALWAYS AS
+            ((cost + edg_cost + add_cost) * (1 + loss) * (1 - discount))
+            STORED,
 
-        FOREIGN KEY (group_id) REFERENCES groups (id)
+        FOREIGN KEY (group_id) REFERENCES offer_groups (id)
             ON DELETE CASCADE
             ON UPDATE CASCADE
     )
 """
+columns_omats = [
+    ("offer_materials", "id", "ID", "string", 0, 80, 1, 1),
+    ("offer_materials", "group_id", "RyhmäID", "string", 1, 80, 1, 1),
+    ("offer_materials", "category", "Tuoteryhmä", "string", 2, 60, 0, 0),
+    ("offer_materials", "code", "Koodi", "string", 3, 60, 0, 0),
+    ("offer_materials", "desc", "Kuvaus", "string", 4, 80, 0, 0),
+    ("offer_materials", "prod", "Valmistaja", "string", 5, 60, 0, 0),
+    ("offer_materials", "thickness", "Paksuus", "long", 6, 60, 0, 0),
+    ("offer_materials", "unit", "Hintayksikkö", "string:€/m2,€/kpl", 7, 60, 0, 0),
+    ("offer_materials", "cost", "Hinta", "double:6,2", 8, 60, 0, 0),
+    ("offer_materials", "edg_cost", "R.Nauhan hinta", "double:6,2", 9, 60, 0, 0),
+    ("offer_materials", "add_cost", "Lisähinta", "double:6,2", 10, 60, 0, 0),
+    ("offer_materials", "loss", "Hukka", "double:6,2", 11, 60, 0, 0),
+    ("offer_materials", "discount", "Alennus", "double:6,2", 12, 60, 0, 0),
+    ("offer_materials", "tot_cost", "Kokonaishinta", "double:6,2", 13, 60, 0, 1)
+]
+select_omats = """SELECT * FROM offer_materials WHERE group_id=(?)"""
 sql_create_table_offer_products = """
     CREATE TABLE IF NOT EXISTS offer_products (
         id          TEXT PRIMARY KEY,
@@ -187,28 +246,24 @@ sql_create_table_offer_products = """
         count       INTEGER,
         desc        TEXT,
         prod        TEXT,
-        inst_unit   TEXT,
+        inst_unit   REAL,
         width       INTEGER,
         height      INTEGER,
         depth       INTEGER,
         work_time   REAL,
-        work_cost   REAL,
 
         FOREIGN KEY (group_id)
             REFERENCES offer_groups (id)
             ON DELETE CASCADE
-            ON UPDATE CASCADE,
-        FOREIGN KEY (inst_unit)
-            REFERENCES fcmults (unit)
-            ON DELETE NO ACTION
-            ON UPDATE NO ACTION
+            ON UPDATE CASCADE
     )
 """
 sql_create_table_offer_parts = """
     CREATE TABLE IF NOT EXISTS offer_parts (
         id          TEXT PRIMARY KEY,
         product_id  TEXT NOT NULL,
-        category    TEXT,
+        part        TEXT,
+        count       INTEGER,
         code        TEXT,
         desc        TEXT,
         use_predef  INTEGER,
@@ -276,7 +331,8 @@ sql_create_table_parts = """
     )
 """
 sql_create_table = {
-    "fcmults": sql_create_table_fcmults,
+    "variables": sql_create_table_variables,
+    "columns": sql_create_table_columns,
     "offers": sql_create_table_offers,
     "offer_groups": sql_create_table_offer_groups,
     "offer_predefs": sql_create_table_offer_predefs,
@@ -314,7 +370,6 @@ sql_insert_default = {
 }
 
 sql_select_general = """SELECT {columns} FROM {table} WHERE {cond}"""
-sql_update_general = """UPDATE {table} SET {column} = (?) WHERE {pk} = (?)"""
 
 # ****************************************************************
 #  Get Treelist Queries
@@ -468,14 +523,15 @@ class OfferTables:
             (str(ObjectId()), oproduct_data[0][0], "sivu", "LEVY01", "Toinen Sivulevy", 0, "MAT", 120, 302, 38.2)
         ]
 
-        self.insert("offers", offer_keys, self.offer_data, True)
-        self.insert("offer_groups", group_keys,  self.group_data, True)
-
-        self.insert("offer_predefs", opredef_keys, opredef_data, True)
-        self.insert("offer_materials", omaterial_keys, omaterial_data, True)
-        self.insert("offer_products", oproduct_keys, oproduct_data, True)
-        self.insert("offer_parts", opart_keys, opart_data, True)
-
+        self.insert("columns", columns_keys, columns_omats, True)
+        # self.insert("offers", offer_keys, self.offer_data, True)
+        # self.insert("offer_groups", group_keys,  self.group_data, True)
+# 
+        # self.insert("offer_predefs", opredef_keys, opredef_data, True)
+        # self.insert("offer_materials", omaterial_keys, omaterial_data, True)
+        # self.insert("offer_products", oproduct_keys, oproduct_data, True)
+        # self.insert("offer_parts", opart_keys, opart_data, True)
+# 
         self.con.commit()
 
     def insert_from_csv(self, table, file):
@@ -747,6 +803,28 @@ class OfferTables:
             return []
         return self.cur.fetchall()
 
+    select_get_columns = """SELECT * FROM columns WHERE tablename=(?) ORDER BY col_idx ASC"""
+    def get_columns(self, table):
+        """Return the column setup for given table.
+
+        Parameters
+        ----------
+        table : str
+            Name of table.
+
+        Returns
+        -------
+        List of tuples
+            Column setup for table. Empty list on error.
+        """
+        try:
+            self.cur.execute(self.select_get_columns, (table,))
+            self.con.commit()
+        except sqlite3.Error as e:
+            print("OfferTables.get_columns\n\t{}".format(e))
+            return []
+        return self.cur.fetchall()
+
     def get_column_setup(self, table, keys):
         """Return a dictionary with column setup for keys from table."""
         cols = self.table_setup["columns"][table]
@@ -756,7 +834,8 @@ class OfferTables:
         """Return the display setup."""
         return self.table_setup["display"][display_key]
 
-    def update_one(self, table: str, column_key: str, pk: str, values: Iterable):
+    sql_update_general = """UPDATE {table} SET {column}=(?) WHERE {cond}"""
+    def update_one(self, table: str, column_key: str, pk: Iterable, values: Iterable):
         """Update a single column with values.
 
         Parameters
@@ -765,10 +844,10 @@ class OfferTables:
             Name of the table.
         column_key : str
             Column to update.
-        pk : str
+        pk : Iterable
             Private key to find the row to update.
         values : Iterable
-            (NewValue, private_key, pk_if_multi_part_pk).
+            [NewValue] + Iterable private_key
 
         Returns
         -------
@@ -776,10 +855,16 @@ class OfferTables:
             True if successful.
         """
         # qm = '?' if isinstance(pk, str) else ','.join(['?'] * len(pk))
-        sql = sql_update_general.format(
+        condition = ""
+        for key in pk:
+            condition += key + "=(?)"
+            if key != pk[-1]:
+                condition += " AND "
+
+        sql = self.sql_update_general.format(
             table=table,
             column=column_key,
-            pk=pk)
+            cond=condition)
         try:
             self.cur.execute(sql, values)
             self.con.commit()

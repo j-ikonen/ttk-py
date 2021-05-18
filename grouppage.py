@@ -1,7 +1,7 @@
 import wx
 import wx.grid as wxg
 
-from table import OfferTables
+import table as tb
 from grid import TableGrid
 
 
@@ -14,7 +14,7 @@ class GroupPage(wx.Panel):
     def __init__(self, parent, tables):
         super().__init__(parent)
 
-        self.tables: OfferTables = tables
+        self.tables: tb.OfferTables = tables
         self.SetBackgroundColour((255, 200, 255))
 
         self.pk_val = None

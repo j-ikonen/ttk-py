@@ -47,7 +47,7 @@ class ObjectGrid(wxg.Grid):
     def __init__(self, parent, tables, gridname):
         super().__init__(parent)
 
-        self.tables: db.OfferTables = tables
+        self.tables: db.tb.OfferTables = tables
         self.gridname = gridname
 
         self.table_key = None

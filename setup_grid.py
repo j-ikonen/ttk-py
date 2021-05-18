@@ -1,10 +1,12 @@
 import wx
 import wx.grid as wxg
 
-from table import OfferTables, str2type, type2str
+import table as tb
+
 
 COL_MIN_W = 350
 ROW_LABEL_SIZE = 120
+
 
 def get_editor_renderer(typestring):
     """Return the cell editor matching the given type string."""
@@ -49,7 +51,7 @@ class SetupGrid(wxg.Grid):
         super().__init__(parent)
 
         self.data = None
-        self.tables: OfferTables = tables
+        self.tables: tb.OfferTables = tables
         self.tablename = tablename
         self.gridname = tablename + "." + gridname
         self.ids = None

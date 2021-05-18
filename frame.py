@@ -1,14 +1,7 @@
-
-import os
-
 import wx
-from wx.core import MultiChoiceDialog
 
-from table import OfferTables
-from pages import ItemPage
-from ttk_data import Data, DataChild, DataItem, DataRoot
+import table as tb
 from panel import Panel, FRAME_SIZE
-from setup import read_file, write_file, split_path, Setup
 
 
 FRAME_TITLE = "Ttk-py"
@@ -43,7 +36,7 @@ class AppFrame(wx.Frame):
         )
 
         # self.setup: Setup = setup
-        self.tables: OfferTables = tables
+        self.tables: tb.OfferTables = tables
 
         # from_file = read_file(None, ROOTDATA_FILE)
         # if from_file is None:

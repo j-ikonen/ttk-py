@@ -1,11 +1,10 @@
-from table import OfferTables
 import wx
 
+import table as tb
 from dialog import DbDialog
-from datagrid_dialog import NotebookDialog
 from setup_grid import SetupGrid
 from ttk_grid import TtkGrid
-from ttk_data import DataChild, DataItem, DataRoot
+from ttk_data import DataChild
 from setup import Setup
 
 
@@ -86,7 +85,7 @@ class ItemPage(wx.Panel):
         # self.setup_child: Setup = setup.get_parent().get_child("child")
         self.setup: Setup = setup
         # self.data: DataItem = None
-        self.tables: OfferTables = tables
+        self.tables: tb.OfferTables = tables
         self.offer_id = None
         self.refresh_tree = refresh_tree
         self.use_global = False

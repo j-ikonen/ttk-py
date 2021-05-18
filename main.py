@@ -71,7 +71,7 @@ from frame import AppFrame
 # from database import Database
 # from ttk_data import Data
 # from setup import Setup
-from table import OfferTables
+import table as tb
 
 def main():
     app = wx.App(useBestVisual=True)
@@ -79,7 +79,7 @@ def main():
     # setup = Setup(['pages'])
     # data = Data(setup)
     # data.push(setup)
-    tables = OfferTables()
+    tables = tb.OfferTables()
 
     # indexes = Database('materials').get_indexes()
     # if 'code' not in indexes:

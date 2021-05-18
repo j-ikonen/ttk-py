@@ -1,9 +1,9 @@
 from copy import deepcopy
-from table import OfferTables
 
 import wx
 import wx.grid as wxg
 
+import table as tb
 from dialog import DbDialog
 from dataobj_dialog import DataObjectDialog
 from database import Database
@@ -51,7 +51,7 @@ class TtkGrid(wxg.Grid):
         super().__init__(parent)
 
         self.data = None
-        self.tables: OfferTables = tables
+        self.tables: tb.OfferTables = tables
         self.tablename = gridname.split('.')[0]
         self.gridname = gridname
         self.setup: Setup = setup

@@ -164,7 +164,7 @@ class DatabasePanel(wx.Panel):
     def __init__(self, parent, tables, selection=0):
         super().__init__(parent)
 
-        self.tables: db.OfferTables = tables
+        self.tables: db.tb.OfferTables = tables
 
         self.display_key = "database"
 
@@ -575,7 +575,7 @@ if __name__ == '__main__':
         ("tausta", "kaappi"),
         ("ovi", "kaappi")
     ]
-    tables = db.OfferTables()
+    tables = db.tb.OfferTables()
 
     tables.insert("offers", offer_keys, offer_data[0])
     tables.insert("offers", offer_keys, offer_data[1:], True)

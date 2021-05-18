@@ -3,14 +3,14 @@ import wx.grid as wxg
 from bson.objectid import ObjectId
 
 
-from table import OfferTables, str2type, type2str
+import table as tb
 
 
 class GridPanel(wx.Panel):
     BORDER = 5
     BTN_DEL = "Poista valitut"
 
-    def __init__(self, parent, tables: OfferTables, key):
+    def __init__(self, parent, tables: tb.OfferTables, key):
         super().__init__(parent)
 
         # self.SetBackgroundColour((255, 150, 100))
@@ -258,7 +258,7 @@ class BaseGrid(wxg.Grid):
 
 
 class FieldCountGrid(BaseGrid):
-    def __init__(self, parent, tables: OfferTables):
+    def __init__(self, parent, tables: tb.OfferTables):
 
         setup = {
             "unit": {
@@ -296,7 +296,7 @@ class FieldCountGrid(BaseGrid):
 
 class TableGrid(BaseGrid):
     
-    def __init__(self, parent, tables: OfferTables, name, ids):
+    def __init__(self, parent, tables: tb.OfferTables, name, ids):
         self.tables = tables
 
         display_setup = self.tables.get_display_setup(name)
@@ -402,7 +402,7 @@ class TableGrid(BaseGrid):
 
 if __name__ == '__main__':
     app = wx.App(useBestVisual=True)
-    tables = OfferTables()
+    tables = tb.OfferTables()
 
     # offer_keys = ["id", "name"]
     # offer_data = [

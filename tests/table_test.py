@@ -2,12 +2,12 @@ import unittest
 
 from bson.objectid import ObjectId
 
-from table import OfferTables
+import table as tb
 
 
 class TestTables(unittest.TestCase):
     
-    tables = OfferTables()
+    tables = tb.OfferTables()
 
     offer_keys = ["id", "name"]
     offer_data = [
