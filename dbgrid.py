@@ -10,6 +10,7 @@ TODO
 import wx
 import wx.grid as wxg
 from bson.objectid import ObjectId
+from asteval import Interpreter
 
 import table as tb
 
@@ -206,9 +207,15 @@ class DatabaseGridTable(wxg.GridTableBase):
         # return super().UpdateReadOnly(row)
 
     def update_data(self, row):
+        """Return True if update is ok do do."""
+        if self.fk_value is None:
+            return False
+
+        self.Clear()
+        self.data.clear()
         self.is_changed = False
-        return
-    
+        return True
+
     def set_fk_value(self, value):
         """Set the foreign key value used to find grid data.
 
@@ -218,6 +225,34 @@ class DatabaseGridTable(wxg.GridTableBase):
             List of foreign keys for this table.
         """
         self.fk_value = value
+
+        oldlen = self.GetNumberRows()
+        # self.is_changed = True
+        self.update_data(None)
+        self.GetView().Refresh()
+        newlen = self.GetNumberRows()
+        self.change_number_rows(oldlen, newlen)
+        # print(f"old: {oldlen}, new: {newlen}")
+        
+    def change_number_rows(self, old, new):
+        
+        if new > old:
+            msg = wxg.GridTableMessage(
+                self,
+                wxg.GRIDTABLE_NOTIFY_ROWS_APPENDED,
+                new - old
+            )
+        elif old > new:
+            msg = wxg.GridTableMessage(
+                self,
+                wxg.GRIDTABLE_NOTIFY_ROWS_DELETED,
+                new,
+                old - new
+            )
+        else:
+            return
+
+        self.GetView().ProcessTableMessage(msg)
 
     def get_col_width(self, col):
         datacol = self.GetDataCol(col)
@@ -257,7 +292,7 @@ class GroupMaterialsTable(DatabaseGridTable):
         self.col_widths = [val[tb.WIDTH] for val in setup]
         self.unique = []
         self.read_only = []
-        self.ro_dependency = [8, 9, 10, 11, 12]
+        # self.ro_dependency = [8, 9, 10, 11, 12]
         self.cant_update = [13]
 
         for n, val in enumerate(setup):
@@ -269,32 +304,188 @@ class GroupMaterialsTable(DatabaseGridTable):
         # self.fk_value = ["uusi ryhmä"]
 
     def update_data(self, row):
-        self.data.clear()
-        if self.fk_value is None:
-            return
+        if super().update_data(row):
 
-        print("UPDATE DATA")
-        res = self.db.get_omaterials(self.fk_value[0])
-        for datarow in res:
-            self.data.append(list(datarow))
-
-        return super().update_data(row)
+            res = self.db.get_omaterials(self.fk_value[0])
+            for datarow in res:
+                self.data.append(list(datarow))
 
 
 class GroupProductsTable(DatabaseGridTable):
     def __init__(self, db: tb.OfferTables):
         super().__init__(db)
 
+        self.tablename = "offer_products"
+        setup = db.get_columns(self.tablename)
+        self.pk = ["id"]
+        self.fk = ["group_id"]
+        self.fk_value = None
+        self.pk_column = [0]
+        self.columns = [i for i in range(14)]
+        self.col_keys = [val[tb.KEY] for val in setup]
+        self.col_labels = [val[tb.LABEL] for val in setup]
+        self.col_types = [val[tb.TYPE] for val in setup]
+        self.col_widths = [val[tb.WIDTH] for val in setup]
+        self.unique = []
+        self.read_only = []
+        # self.ro_dependency = [8, 9, 10, 11, 12]
+        self.cant_update = [13]
+
+        for n, val in enumerate(setup):
+            if val[tb.UNIQUE] == 1:
+                self.unique.append(n)
+            if val[tb.READ_ONLY] == 1:
+                self.read_only.append(n)
+
+        # self.fk_value = ["uusi ryhmä"]
+
+    def update_data(self, row):
+        if super().update_data(row):
+
+            res = self.db.get_oproducts(self.fk_value[0])
+            for datarow in res:
+                # print(datarow)
+                self.data.append(list(datarow))
+
 
 class GroupPartsTable(DatabaseGridTable):
     def __init__(self, db: tb.OfferTables):
         super().__init__(db)
 
+        self.tablename = "offer_parts"
+        setup = db.get_columns(self.tablename)
+        self.pk = ["id"]
+        self.fk = ["product_id"]
+        self.fk_value = None
+        self.pk_column = [0]
+        self.columns = [i for i in range(20)]
+        self.col_keys = [val[tb.KEY] for val in setup]
+        self.col_labels = [val[tb.LABEL] for val in setup]
+        self.col_types = [val[tb.TYPE] for val in setup]
+        self.col_widths = [val[tb.WIDTH] for val in setup]
+        self.unique = []
+        self.read_only = []
+        # self.ro_dependency = [8, 9, 10, 11, 12]
+        self.cant_update = []
+        self.coded = [11, 12, 13]
+        self.coded_tar = [8, 9, 10]
+        self.aeval = Interpreter()
+        self.code2col = {
+            "määrä": 4,
+            "leveys": 8,
+            "pituus": 9,
+            "mpaksuus": 15,
+            "mhinta": 16,
+            "tleveys": 17,
+            "tkorkeus": 18,
+            "tsyvyys": 19
+        }
+
+        for n, val in enumerate(setup):
+            if val[tb.UNIQUE] == 1:
+                self.unique.append(n)
+            if val[tb.READ_ONLY] == 1:
+                self.read_only.append(n)
+
+        # self.fk_value = ["uusi ryhmä"]
+
+    def update_data(self, row):
+        if super().update_data(row):
+
+            res = self.db.get_oparts(self.fk_value[0])
+            for datarow in res:
+                self.data.append(list(datarow))
+
+    def GetValue(self, row, col):
+        value = super().GetValue(row, col)
+        datacol = self.GetDataCol(col)
+        if datacol in self.coded:
+            val_from_code = self.parse_code(row, value)
+            if val_from_code is not None:
+                tar_col = self.columns.index(self.coded_tar[self.coded.index(datacol)])
+                self.SetValue(row, tar_col, val_from_code)
+                self.is_changed = True
+        return value
+
+    def parse_code(self, row, code: str):
+        if code is not None and len(code) > 0 and code[0] == "=":
+            parsed_code: str = code[1:]
+            codelist = parsed_code.split(" ")
+            for item in codelist:
+                if item[0] == '"':
+                    try:
+                        (source, colcode) = item.split(".")
+                        # print(f"{source}, {colcode}")
+                    except ValueError:
+                        print('Syntax to refer to another part: "part".sarake')
+                        src_row = row
+                        colcode = item
+                    else:
+                        src_row = self.find_row(source.strip('"'))
+                        if src_row is None:
+                            src_row = row
+                else:
+                    src_row = row
+                    colcode = item
+
+                try:
+                    # print(f"code2col: {self.code2col}, colcode: {colcode}")
+                    col = self.code2col[colcode]
+                except:
+                    itemval = 0.0
+                else:
+                    itemval = str(self.data[src_row][col])
+                    parsed_code = parsed_code.replace(item, itemval)
+
+            returnvalue = self.aeval(parsed_code)
+            # print("GroupPartsTable.parse_code")
+            # print("\tcode:  {}".format(parsed_code))
+            # print("\tvalue: {}".format(returnvalue))
+            return returnvalue
+        else:
+            return None
+
+    def find_row(self, value):
+        # print(f"FIND ROW: {value}")
+        for row, datarow in enumerate(self.data):
+            if datarow[2] == value:
+                return row
+        return None
 
 class GroupPredefsTable(DatabaseGridTable):
     def __init__(self, db: tb.OfferTables):
         super().__init__(db)
 
+        self.tablename = "offer_predefs"
+        setup = db.get_columns(self.tablename)
+        self.pk = ["id"]
+        self.fk = ["group_id"]
+        self.fk_value = None
+        self.pk_column = [0]
+        self.columns = [i for i in range(4)]
+        self.col_keys = [val[tb.KEY] for val in setup]
+        self.col_labels = [val[tb.LABEL] for val in setup]
+        self.col_types = [val[tb.TYPE] for val in setup]
+        self.col_widths = [val[tb.WIDTH] for val in setup]
+        self.unique = []
+        self.read_only = []
+        # self.ro_dependency = [8, 9, 10, 11, 12]
+        self.cant_update = []
+
+        for n, val in enumerate(setup):
+            if val[tb.UNIQUE] == 1:
+                self.unique.append(n)
+            if val[tb.READ_ONLY] == 1:
+                self.read_only.append(n)
+
+        # self.fk_value = ["uusi ryhmä"]
+
+    def update_data(self, row):
+        if super().update_data(row):
+
+            res = self.db.get_opredefs(self.fk_value[0])
+            for datarow in res:
+                self.data.append(list(datarow))
 
 class TestGrid(wxg.Grid):
     def __init__(self, parent, db, name):
@@ -312,7 +503,7 @@ class TestGrid(wxg.Grid):
 
         self.SetTable(table, True)
         self.read_only = table.read_only
-        table.set_fk_value(["TuoteID"])
+        # table.set_fk_value(["TuoteID"])
 
         for col in range(self.GetNumberCols()):
             width = table.get_col_width(col)
@@ -323,17 +514,29 @@ class TestGrid(wxg.Grid):
         self.Bind(wxg.EVT_GRID_EDITOR_SHOWN, self.on_show_editor)
         self.Bind(wxg.EVT_GRID_CELL_CHANGED, self.on_cell_changed)
         self.Bind(wxg.EVT_GRID_COL_SIZE, self.on_col_size)
+        self.Bind(wxg.EVT_GRID_CMD_LABEL_RIGHT_CLICK, self.on_label_menu)
+        self.Bind(wx.EVT_KEY_DOWN, self.on_key_down)
         self.Refresh()
     
     def on_cell_changed(self, evt):
         # self.GetTable().OnCellChanged(evt.GetRow(), evt.GetCol())
-        pass
+        self.Refresh()
+        evt.Skip()
 
     def on_col_size(self, evt):
         # width = evt.GetWidth()
         col = evt.GetRowOrCol()
         width = self.GetColSize(col)
         self.GetTable().set_col_width(col, width)
+        evt.Skip()
+
+    def on_key_down(self, evt):
+        print("KEY DOWN")
+        evt.Skip()
+
+    def on_label_menu(self, evt):
+        print("LABEL MENU")
+        evt.Skip()
 
     def on_show_editor(self, evt):
         """Veto edits in read only columns."""
@@ -344,8 +547,9 @@ class TestGrid(wxg.Grid):
             print(f"Column '{label}' is read only.")
             evt.Veto()
         evt.Skip()
-    
 
+    def set_fk_value(self, fk):
+        self.GetTable().set_fk_value(fk)
     #     self.Bind(wxg.EVT_GRID_CELL_LEFT_DCLICK, self.on_left_dclick)
     
     # def on_left_dclick(self, evt):
@@ -353,23 +557,59 @@ class TestGrid(wxg.Grid):
     #         self.EnableCellEditControl()
 
 
+class GroupPanel(wx.Panel):
+    def __init__(self, parent):
+        super().__init__(parent)
+
+        self.grid_pdef = TestGrid(self, db, "offer_predefs")
+        self.grid_mats = TestGrid(self, db, "offer_materials")
+        self.grid_prod = TestGrid(self, db, "offer_products")
+        self.grid_part = TestGrid(self, db, "offer_parts")
+
+        self.grid_pdef.set_fk_value(["RyhmäID"])
+        self.grid_mats.set_fk_value(["RyhmäID"])
+        self.grid_prod.set_fk_value(["RyhmäID"])
+        self.grid_part.set_fk_value(None)
+
+        self.Bind(wxg.EVT_GRID_SELECT_CELL, self.on_product_selection, self.grid_prod)
+        self.Bind(wxg.EVT_GRID_CELL_CHANGED, self.on_cell_changed, self.grid_pdef)
+        self.Bind(wxg.EVT_GRID_CELL_CHANGED, self.on_cell_changed, self.grid_mats)
+        self.Bind(wxg.EVT_GRID_CELL_CHANGED, self.on_cell_changed, self.grid_prod)
+        self.Bind(wxg.EVT_GRID_CELL_CHANGED, self.on_cell_changed, self.grid_part)
+
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(self.grid_mats, 1, wx.EXPAND)
+        sizer.Add(self.grid_prod, 1, wx.EXPAND)
+        sizer.Add(self.grid_part, 1, wx.EXPAND)
+        sizer.Add(self.grid_pdef, 1, wx.EXPAND)
+        self.SetSizer(sizer)
+
+    def on_product_selection(self, evt):
+        row = evt.GetRow()
+        product_id = self.grid_prod.GetTable().GetPkValue(row)
+        self.grid_part.set_fk_value(product_id)
+
+    def on_cell_changed(self, evt):
+        # print("ON CELL CHANGED")
+        # self.grid_pdef.GetTable().is_changed = True
+        # self.grid_pdef.Refresh()
+        # self.grid_mats.GetTable().is_changed = True
+        # self.grid_mats.Refresh()
+        # self.grid_prod.GetTable().is_changed = True
+        # self.grid_prod.Refresh()
+        # self.grid_part.GetTable().is_changed = True
+        # self.grid_part.Refresh()
+        # self.grid_prod.GetTable().is_changed = True
+        # self.grid_prod.Refresh()
+        evt.Skip()
+
+
 if __name__ == '__main__':
     app = wx.App()
 
     frame = wx.Frame(None, size=(1300, 1000))
     db = tb.OfferTables()
-
-    panel = wx.Panel(frame)
-    grid_mats = TestGrid(panel, db, "offer_materials")
-    grid_prod = TestGrid(panel, db, "offer_products")
-    grid_part = TestGrid(panel, db, "offer_parts")
-    grid_pdef = TestGrid(panel, db, "offer_predefs")
-    sizer = wx.BoxSizer(wx.VERTICAL)
-    sizer.Add(grid_mats, 1, wx.EXPAND)
-    sizer.Add(grid_prod, 1, wx.EXPAND)
-    sizer.Add(grid_part, 1, wx.EXPAND)
-    sizer.Add(grid_pdef, 1, wx.EXPAND)
-    panel.SetSizer(sizer)
+    panel = GroupPanel(frame)
     frame.Show()
 
     app.MainLoop()

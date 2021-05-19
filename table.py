@@ -195,6 +195,17 @@ sql_create_table_offer_predefs = """
             ON UPDATE CASCADE
     )
 """
+columns_opredefs = [
+    ("offer_predefs", "id", "ID", "string", 0, 25, 1, 1),
+    ("offer_predefs", "group_id", "RyhmäID", "string", 1, 25, 1, 1),
+    ("offer_predefs", "part", "Osa", "string", 2, 60, 0, 0),
+    ("offer_predefs", "material", "Materiaali", "string", 3, 60, 0, 0)
+]
+select_opredefs = """
+    SELECT id, group_id, part, material
+    FROM offer_predefs
+    WHERE group_id=(?)
+"""
 sql_create_table_offer_materials = """
     CREATE TABLE IF NOT EXISTS offer_materials (
         id          TEXT PRIMARY KEY,
@@ -309,12 +320,12 @@ sql_create_table_offer_parts = """
         product_id  TEXT NOT NULL,
         part        TEXT,
         code        TEXT,
-        count       INTEGER,
+        count       INTEGER DEFAULt 1,
         desc        TEXT,
-        use_predef  INTEGER,
+        use_predef  INTEGER DEFAULT 0,
         default_mat TEXT,
-        width       INTEGER,
-        length      INTEGER,
+        width       INTEGER DEFAULT 0,
+        length      INTEGER DEFAULT 0,
         cost        REAL DEFAULT 0.0,
         code_width  TEXT,
         code_length TEXT,
@@ -334,13 +345,19 @@ columns_oparts = [
     ("offer_parts", "count", "Määrä", "long", 4, 45, 0, 0),
     ("offer_parts", "desc", "Kuvaus", "string", 5, 80, 0, 0),
     ("offer_parts", "use_predef", "Käytä esimääritystä", "bool", 6, 45, 0, 0),
-    ("offer_parts", "default_mat", "Oletus materiaali", "string", 7, 80, 0, 0),
+    ("offer_parts", "default_mat", "Oletus materiaali", "string", 7, 45, 0, 0),
     ("offer_parts", "width", "Leveys", "long", 8, 45, 0, 1),
     ("offer_parts", "length", "Pituus", "long", 9, 45, 0, 1),
     ("offer_parts", "cost", "Hinta", "double:6,2", 10, 45, 0, 1),
     ("offer_parts", "code_width", "Koodi Leveys", "string", 11, 120, 0, 0),
     ("offer_parts", "code_length", "Koodi Pituus", "string", 12, 120, 0, 0),
     ("offer_parts", "code_cost", "Koodi Hinta", "string", 13, 120, 0, 0),
+    ("offer_parts", "used_mat", "Käyt. Mat.", "string", 14, 55, 0, 1),
+    ("offer_parts", "m.thickness", "Paksuus", "long", 15, 35, 0, 1),
+    ("offer_parts", "m.tot_cost", "Mat. Hinta", "double:6,2", 16, 35, 0, 1),
+    ("offer_parts", "pr.width", "Tuote leveys", "long", 17, 35, 0, 1),
+    ("offer_parts", "pr.height", "Tuote korkeus", "long", 18, 35, 0, 1),
+    ("offer_parts", "pr.depth", "Tuote syvyys", "long", 19, 35, 0, 1),
 ]
 select_oparts = """
     SELECT
@@ -348,13 +365,22 @@ select_oparts = """
         pa.product_id,
         pa.part,
         pa.code,
+        pa.count,
+        pa.desc,
         pa.use_predef,
         pa.default_mat,
-        IIF(
-            pa.use_predef=0,
-            pa.default_mat,
-            d.material
-        ) used_mat,
+        pa.width,
+        pa.length,
+        pa.cost,
+        pa.code_width,
+        pa.code_length,
+        pa.code_cost,
+        CASE
+            WHEN pa.use_predef=0 THEN
+                pa.default_mat
+            ELSE
+                d.material
+            END used_mat,
         m.thickness,
         m.tot_cost,
         pr.width,
@@ -369,7 +395,14 @@ select_oparts = """
             ON pr.group_id=d.group_id AND pa.part=d.part
 
         LEFT JOIN offer_materials m
-            ON IIF(pa.use_predef=0, pa.default_mat, d.material) = m.code
+            ON (
+                CASE
+                    WHEN pa.use_predef=0 THEN
+                        pa.default_mat
+                    ELSE
+                        d.material
+                    END
+                ) = m.code
 
     WHERE pa.product_id=(?)
 """
@@ -510,7 +543,7 @@ class OfferTables:
         cur = self.create_connection("ttk.db")
 
         for table, sql in sql_create_table.items():
-            cur.execute("""DROP TABLE IF EXISTS {};""".format(table))
+            # cur.execute("""DROP TABLE IF EXISTS {};""".format(table))
             self.create_table(sql)
 
         # self.insert_from_csv("materials", "../../ttk-dbtestdata-materials.csv")
@@ -618,6 +651,7 @@ class OfferTables:
         self.insert("columns", columns_keys, columns_omats, True)
         self.insert("columns", columns_keys, columns_oproducts, True)
         self.insert("columns", columns_keys, columns_oparts, True)
+        self.insert("columns", columns_keys, columns_opredefs, True)
         # self.insert("offers", offer_keys, self.offer_data, True)
         # self.insert("offer_groups", group_keys,  self.group_data, True)
 
@@ -794,6 +828,15 @@ class OfferTables:
 
         return self.cur.fetchall()
 
+    def get_opredefs(self, group_id: str):
+        try:
+            self.cur.execute(select_opredefs, (group_id,))
+            self.con.commit()
+        except sqlite3.Error as e:
+            print("OfferTables.get_oparts\n\t{}".format(e))
+            return []
+
+        return self.cur.fetchall()
 
     def get_offer_products(self, group_id):
         """Get the group products grid data.
