@@ -513,117 +513,119 @@ class OfferTables:
             cur.execute("""DROP TABLE IF EXISTS {};""".format(table))
             self.create_table(sql)
 
-        self.insert_from_csv("materials", "../../ttk-dbtestdata-materials.csv")
-        self.insert_from_csv("products", "../../ttk-dbtestdata-products.csv")
-        self.insert_from_csv("parts", "../../ttk-dbtestdata-parts.csv")
+        # self.insert_from_csv("materials", "../../ttk-dbtestdata-materials.csv")
+        # self.insert_from_csv("products", "../../ttk-dbtestdata-products.csv")
+        # self.insert_from_csv("parts", "../../ttk-dbtestdata-parts.csv")
 
-        offer_keys = [
-            "id",
-            "name",
-            "firstname",
-            "lastname",
-            "company",
-            "phone",
-            "email",
-            "address",
-            "postcode",
-            "postarea",
-            "info",
-        ]
-        self.offer_data = [
-            (str(ObjectId()), "Tarjous 1", "Nimi", "Suku", "asd", "012 345", "nimi.suku@mail.net", "Tie 12", "123", "KAUPUNKI", ""),
-            (str(ObjectId()), "Tarjous 2", "Etu", "Nimi", "asd", "012 346", "etu.nimi@mail.net", "Tie 13", "1234", "KAUPUNKI2", ""),
-            (str(ObjectId()), "Testi tarjous", "Testi", "Nimi", "qwe", "012 347", "testi.nimi@mail.net", "Tie 14", "1236", "KAUPUNKI2", ""),
-            (str(ObjectId()), "Uusi tarjous", "Etu", "Suku", "qwe", "012 348", "etu.suku@mail.net", "Tie 15", "1237", "KAUPUNKI", "")
-        ]
-        group_keys = ["id", "offer_id", "name"]
-        self.group_data = [
-            (str(ObjectId()), self.offer_data[0][0], "Keittiö"),
-            (str(ObjectId()), self.offer_data[0][0], "Kylpyhuone"),
-            (str(ObjectId()), self.offer_data[1][0], "Keittiö"),
-            (str(ObjectId()), self.offer_data[2][0], "Keittiö"),
-            (str(ObjectId()), self.offer_data[3][0], "Keittiö"),
-            (str(ObjectId()), self.offer_data[3][0], "...")
-        ]
-        opredef_keys = ["id", "group_id", "part", "material"]
-        opredef_data = [
-            (str(ObjectId()), self.group_data[0][0], "sivu", "MAT"),
-            (str(ObjectId()), self.group_data[0][0], "hylly", "MAT"),
-            (str(ObjectId()), self.group_data[0][0], "tausta", "MAT3"),
-        ]
+        # offer_keys = [
+        #     "id",
+        #     "name",
+        #     "firstname",
+        #     "lastname",
+        #     "company",
+        #     "phone",
+        #     "email",
+        #     "address",
+        #     "postcode",
+        #     "postarea",
+        #     "info",
+        # ]
+        # self.offer_data = [
+        #     (str(ObjectId()), "Tarjous 1", "Nimi", "Suku", "asd", "012 345", "nimi.suku@mail.net", "Tie 12", "123", "KAUPUNKI", ""),
+        #     (str(ObjectId()), "Tarjous 2", "Etu", "Nimi", "asd", "012 346", "etu.nimi@mail.net", "Tie 13", "1234", "KAUPUNKI2", ""),
+        #     (str(ObjectId()), "Testi tarjous", "Testi", "Nimi", "qwe", "012 347", "testi.nimi@mail.net", "Tie 14", "1236", "KAUPUNKI2", ""),
+        #     (str(ObjectId()), "Uusi tarjous", "Etu", "Suku", "qwe", "012 348", "etu.suku@mail.net", "Tie 15", "1237", "KAUPUNKI", "")
+        # ]
+        # group_keys = ["id", "offer_id", "name"]
+        # self.group_data = [
+        #     (str(ObjectId()), self.offer_data[0][0], "Keittiö"),
+        #     (str(ObjectId()), self.offer_data[0][0], "Kylpyhuone"),
+        #     (str(ObjectId()), self.offer_data[1][0], "Keittiö"),
+        #     (str(ObjectId()), self.offer_data[2][0], "Keittiö"),
+        #     (str(ObjectId()), self.offer_data[3][0], "Keittiö"),
+        #     (str(ObjectId()), self.offer_data[3][0], "...")
+        # ]
+        # opredef_keys = ["id", "group_id", "part", "material"]
+        # opredef_data = [
+        #     (str(ObjectId()), self.group_data[0][0], "sivu", "MAT"),
+        #     (str(ObjectId()), self.group_data[0][0], "hylly", "MAT"),
+        #     (str(ObjectId()), self.group_data[0][0], "tausta", "MAT3"),
+        # ]
 
-        omaterial_keys = [
-            "id",         
-            "group_id",   
-            "category",   
-            "code",       
-            "desc",       
-            "prod",       
-            "unit",       
-            "thickness",  
-            "loss",       
-            "cost",       
-            "edg_cost",   
-            "add_cost",   
-            "discount" 
-        ]
-        omaterial_data = [
-            (str(ObjectId()), self.group_data[0][0], "qwe", "MAT", "Materiaali", "Valmistaja", "€/m^2", 16, 0.15, 12.42, 0.33, 2.45, 0.0),
-            (str(ObjectId()), self.group_data[0][0], "qwe", "MAT3", "Materiaali 1", "Valmistaja", "€/m^2", 18, 0.17, 14.42, 0.53, 4.45, 0.0),
-            (str(ObjectId()), self.group_data[0][0], "qwe", "MAT8", "Materiaali 2", "Valmistaja", "€/m^2", 8, 0.19, 13.42, 0.31, 2.49, 0.1),
-            (str(ObjectId()), self.group_data[0][0], "zxc", "OSA", "OSA", "Valmistaja", "€/kpl", None, 0.10, 22.42, 0.0, 2.85, 0.15)
-        ]
+        # omaterial_keys = [
+        #     "id",         
+        #     "group_id",   
+        #     "category",   
+        #     "code",       
+        #     "desc",       
+        #     "prod",       
+        #     "unit",       
+        #     "thickness",  
+        #     "loss",       
+        #     "cost",       
+        #     "edg_cost",   
+        #     "add_cost",   
+        #     "discount" 
+        # ]
+        # omaterial_data = [
+        #     (str(ObjectId()), self.group_data[0][0], "qwe", "MAT", "Materiaali", "Valmistaja", "€/m^2", 16, 0.15, 12.42, 0.33, 2.45, 0.0),
+        #     (str(ObjectId()), self.group_data[0][0], "qwe", "MAT3", "Materiaali 1", "Valmistaja", "€/m^2", 18, 0.17, 14.42, 0.53, 4.45, 0.0),
+        #     (str(ObjectId()), self.group_data[0][0], "qwe", "MAT8", "Materiaali 2", "Valmistaja", "€/m^2", 8, 0.19, 13.42, 0.31, 2.49, 0.1),
+        #     (str(ObjectId()), self.group_data[0][0], "zxc", "OSA", "OSA", "Valmistaja", "€/kpl", None, 0.10, 22.42, 0.0, 2.85, 0.15)
+        # ]
 
-        oproduct_keys = [
-            "id",          
-            "group_id",    
-            "category",    
-            "code",        
-            "count",       
-            "desc",        
-            "prod",        
-            "inst_unit",   
-            "width",       
-            "height",      
-            "depth",       
-            "work_time",   
-            "work_cost"
-        ]
-        oproduct_data = [
-            (str(ObjectId()), self.group_data[0][0], "tuoteryhmä", "KOODI", 1, "Kuvaus", "Valmistaja", "Asennusyksikkö", 1200, 2300, 620, 0.48, 20.0),
-            (str(ObjectId()), self.group_data[1][0], "tuoteryhmä", "KOODI2", 2, "Kuvaus", "Valmistaja", "Asennusyksikkö", 1200, 2300, 620, 0.48, 20.0),
-            (str(ObjectId()), self.group_data[0][0], "toinen ryhmä", "TOINEN1", 1, "Kuvaus", "Valmistaja", "Testi yksikkö", 1200, 2300, 620, 0.88, 20.0),
-            (str(ObjectId()), self.group_data[0][0], "toinen ryhmä", "TOINEN3", 3, "Uusi Kuvaus", "Valmistaja", "Testi yksikkö", 1200, 2300, 620, 1.18, 20.0)
-        ]
+        # oproduct_keys = [
+        #     "id",          
+        #     "group_id",    
+        #     "category",    
+        #     "code",        
+        #     "count",       
+        #     "desc",        
+        #     "prod",        
+        #     "inst_unit",   
+        #     "width",       
+        #     "height",      
+        #     "depth",       
+        #     "work_time",   
+        #     "work_cost"
+        # ]
+        # oproduct_data = [
+        #     (str(ObjectId()), self.group_data[0][0], "tuoteryhmä", "KOODI", 1, "Kuvaus", "Valmistaja", "Asennusyksikkö", 1200, 2300, 620, 0.48, 20.0),
+        #     (str(ObjectId()), self.group_data[1][0], "tuoteryhmä", "KOODI2", 2, "Kuvaus", "Valmistaja", "Asennusyksikkö", 1200, 2300, 620, 0.48, 20.0),
+        #     (str(ObjectId()), self.group_data[0][0], "toinen ryhmä", "TOINEN1", 1, "Kuvaus", "Valmistaja", "Testi yksikkö", 1200, 2300, 620, 0.88, 20.0),
+        #     (str(ObjectId()), self.group_data[0][0], "toinen ryhmä", "TOINEN3", 3, "Uusi Kuvaus", "Valmistaja", "Testi yksikkö", 1200, 2300, 620, 1.18, 20.0)
+        # ]
 
-        opart_keys = [
-            "id",          
-            "product_id",  
-            "category",    
-            "code",        
-            "desc",        
-            "use_predef",  
-            "default_mat", 
-            "width",
-            "length",
-            "cost"
-        ]
-        opart_data = [
-            (str(ObjectId()), oproduct_data[0][0], "sivu", "LEVY01", "Sivulevy", 0, "MAT", 120, 302, 8.2),
-            (str(ObjectId()), oproduct_data[0][0], "hylly", "LEVY02", "Kuvaus....", 0, "MAT3", 280, 302, 18.2),
-            (str(ObjectId()), oproduct_data[0][0], "tausta", "LEVY01", "Sivulevy", 0, "MAT", 555, 302, 28.2),
-            (str(ObjectId()), oproduct_data[0][0], "sivu", "LEVY01", "Toinen Sivulevy", 0, "MAT", 120, 302, 38.2)
-        ]
+        # opart_keys = [
+        #     "id",          
+        #     "product_id",  
+        #     "category",    
+        #     "code",        
+        #     "desc",        
+        #     "use_predef",  
+        #     "default_mat", 
+        #     "width",
+        #     "length",
+        #     "cost"
+        # ]
+        # opart_data = [
+        #     (str(ObjectId()), oproduct_data[0][0], "sivu", "LEVY01", "Sivulevy", 0, "MAT", 120, 302, 8.2),
+        #     (str(ObjectId()), oproduct_data[0][0], "hylly", "LEVY02", "Kuvaus....", 0, "MAT3", 280, 302, 18.2),
+        #     (str(ObjectId()), oproduct_data[0][0], "tausta", "LEVY01", "Sivulevy", 0, "MAT", 555, 302, 28.2),
+        #     (str(ObjectId()), oproduct_data[0][0], "sivu", "LEVY01", "Toinen Sivulevy", 0, "MAT", 120, 302, 38.2)
+        # ]
 
         self.insert("columns", columns_keys, columns_omats, True)
+        self.insert("columns", columns_keys, columns_oproducts, True)
+        self.insert("columns", columns_keys, columns_oparts, True)
         # self.insert("offers", offer_keys, self.offer_data, True)
         # self.insert("offer_groups", group_keys,  self.group_data, True)
-# 
+
         # self.insert("offer_predefs", opredef_keys, opredef_data, True)
         # self.insert("offer_materials", omaterial_keys, omaterial_data, True)
         # self.insert("offer_products", oproduct_keys, oproduct_data, True)
         # self.insert("offer_parts", opart_keys, opart_data, True)
-# 
+
         self.con.commit()
 
     def insert_from_csv(self, table, file):
@@ -643,10 +645,6 @@ class OfferTables:
                 else:
                     conv_row = [str2type(types[n], v) for n, v in enumerate(row)]
                     data.append(conv_row)
-
-        # print(data_keys)
-        # for row in data:
-        #     print(row)
 
         self.insert(
             table,
