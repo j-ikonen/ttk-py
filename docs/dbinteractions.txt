@@ -1,0 +1,26 @@
+Required database interaction:
+
+Search primary key by any column, any operator and any combination.
+    Open offer - offers
+    Add to group - materials
+    Add to group - products
+    Add to group - parts
+
+Get all columns where primary key
+    All tables
+
+Edit single column where primary key
+    All tables
+
+Insert with single column and primary key
+    All tables
+
+TreeCtrl
+    Get offer id and name by list of offer ids
+    Get group ids and names by offer id
+
+Update returns new values from dependend columns
+    omats (tot_cost)
+    oproducts (w,h,d to registered oparts rows)
+    oparts (SUM(cost) to products part cost, )
+

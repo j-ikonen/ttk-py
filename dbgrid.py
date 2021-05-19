@@ -20,6 +20,7 @@ class DatabaseGridTable(wxg.GridTableBase):
 
         self.db: tb.OfferTables = db
         self.data = []
+        self.is_changed = True
 
     def GetNumberRows(self):
         return len(self.data) + 1
@@ -42,12 +43,17 @@ class DatabaseGridTable(wxg.GridTableBase):
             return False
 
     def GetValue(self, row, col):
+        print(f"GetValue {row}, {col}")
+        if self.is_changed:
+            self.update_data(row)
         try:
             return self.data[row][self.columns[col]]
         except IndexError:
             return ""
 
     def SetValue(self, row, col, value):
+        print(f"SetValue {row}, {col}, {value}")
+        self.is_changed = True
         def innerSetValue(row, col, value):
             try:
                 idx = self.columns[col]
@@ -159,6 +165,31 @@ class DatabaseGridTable(wxg.GridTableBase):
         if self.ChangedDependency(col):
             self.UpdateReadOnly(row)
 
+    def UpdateReadOnly(self, row):
+        read_only_data = self.db.get(
+            self.tablename,
+            [self.col_keys[c] for c in self.read_only],
+            self.pk,
+            self.GetPkValue(row)
+        )
+        print(read_only_data)
+        for n, value in enumerate(read_only_data):
+            try:
+                col = self.columns.index(self.read_only[n])
+                if self.data[row][self.read_only[n]] == value:
+                    continue
+
+            except ValueError:
+                self.data[row][self.read_only[n]] = value
+            else:
+                self.SetValue(row, col, value)
+
+        # return super().UpdateReadOnly(row)
+
+    def update_data(self, row):
+        self.is_changed = False
+        return
+
 
 class GroupMaterialsTable(DatabaseGridTable):
     def __init__(self, db: tb.OfferTables):
@@ -170,7 +201,7 @@ class GroupMaterialsTable(DatabaseGridTable):
         self.fk = ["group_id"]
         self.fk_value = None
         self.pk_column = [0]
-        self.columns = [3, 6, 7, 8, 9, 10, 11, 12, 13]
+        self.columns = [i for i in range(14)]
         self.col_keys = [val[tb.KEY] for val in setup]
         self.col_labels = [val[tb.LABEL] for val in setup]
         self.col_types = [val[tb.TYPE] for val in setup]
@@ -187,25 +218,14 @@ class GroupMaterialsTable(DatabaseGridTable):
 
         self.fk_value = ["uusi ryhmä"]
 
-    def UpdateReadOnly(self, row):
-        # datacol = self.GetDataCol(col)
-        # if datacol in self.read_only:
-        read_only_data = self.db.get(
-            self.tablename,
-            [self.col_keys[c] for c in self.read_only],
-            self.pk,
-            self.GetPkValue(row)
-        )
-        print(read_only_data)
-        for n, value in enumerate(read_only_data):
-            try:
-                col = self.columns.index(self.read_only[n])
-            except ValueError:
-                self.data[row][self.read_only[n]] = value
-            else:
-                self.SetValue(row, col, value)
+    def update_data(self, row):
+        print("UPDATE DATA")
+        self.data.clear()
+        res = self.db.get_omaterials(self.fk_value[0])
+        for datarow in res:
+            self.data.append(list(datarow))
 
-        return super().UpdateReadOnly(row)
+        return super().update_data(row)
 
 
 class TestGrid(wxg.Grid):

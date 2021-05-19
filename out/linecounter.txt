@@ -241,3 +241,95 @@ ttk.db, it is a binary file.
 ttk_data.py, code is 180, comment is 10, blank is 65.
 ttk_grid.py, code is 278, comment is 44, blank is 84.
 ===============================================================================
+===============================================================================
+EXTENSION NAME : linecounter
+EXTENSION VERSION : 0.2.7
+-------------------------------------------------------------------------------
+count time : 2021-05-18 17:01:04
+count workspace : c:\Users\Cosa Dove Ky\Desktop\Uusi kansio\koodi\ttk-py
+total files : 69
+total code lines : 7497
+total comment lines : 764
+total blank lines : 1634
+
+    statistics
+   |      extension|     total code|  total comment|    total blank|percent|
+   -------------------------------------------------------------------------
+   |            .py|           5242|            762|           1552|     70|
+   |.code-workspace|              8|              0|              0|   0.11|
+   |          .json|           2115|              0|             48|     28|
+   |               |            105|              1|             26|    1.4|
+   |           .TAG|              4|              1|              0|  0.053|
+   |            .md|              2|              0|              1|  0.027|
+   |           .txt|             21|              0|              7|   0.28|
+   -------------------------------------------------------------------------
+.gitignore, code is 102, comment is 1, blank is 26.
+.pytest_cache\.gitignore, code is 2, comment is 0, blank is 0.
+.pytest_cache\CACHEDIR.TAG, code is 4, comment is 1, blank is 0.
+.pytest_cache\README.md, code is 2, comment is 0, blank is 1.
+.pytest_cache\v\cache\stepwise, code is 1, comment is 0, blank is 0.
+__pycache__\data.cpython-38.pyc, it is a binary file.
+__pycache__\database.cpython-38.pyc, it is a binary file.
+__pycache__\database_panel.cpython-38.pyc, it is a binary file.
+__pycache__\datagrid_dialog.cpython-38.pyc, it is a binary file.
+__pycache__\dataobj_dialog.cpython-38.pyc, it is a binary file.
+__pycache__\dialog.cpython-38.pyc, it is a binary file.
+__pycache__\frame.cpython-38.pyc, it is a binary file.
+__pycache__\grid.cpython-38.pyc, it is a binary file.
+__pycache__\grouppage.cpython-38.pyc, it is a binary file.
+__pycache__\main.cpython-38.pyc, it is a binary file.
+__pycache__\objectgrid.cpython-38.pyc, it is a binary file.
+__pycache__\offer_dialog.cpython-38.pyc, it is a binary file.
+__pycache__\offerpage.cpython-38.pyc, it is a binary file.
+__pycache__\pages.cpython-38.pyc, it is a binary file.
+__pycache__\panel.cpython-38.pyc, it is a binary file.
+__pycache__\setup.cpython-38.pyc, it is a binary file.
+__pycache__\setup_grid.cpython-38.pyc, it is a binary file.
+__pycache__\setupgrid.cpython-38.pyc, it is a binary file.
+__pycache__\table.cpython-38.pyc, it is a binary file.
+__pycache__\tree_data.cpython-38.pyc, it is a binary file.
+__pycache__\tree_panel.cpython-38.pyc, it is a binary file.
+__pycache__\ttk_data.cpython-38.pyc, it is a binary file.
+__pycache__\ttk_grid.cpython-38.pyc, it is a binary file.
+database.py, code is 63, comment is 0, blank is 25.
+database_panel.py, code is 416, comment is 50, blank is 127.
+datagrid_dialog.py, code is 45, comment is 2, blank is 13.
+dataobj_dialog.py, code is 35, comment is 4, blank is 16.
+dbgrid.py, code is 187, comment is 8, blank is 53.
+dialog.py, code is 342, comment is 31, blank is 103.
+docs\setup.txt, code is 21, comment is 0, blank is 7.
+doodles\data.py, code is 724, comment is 163, blank is 158.
+doodles\grid.py, code is 445, comment is 61, blank is 136.
+doodles\setupgrid.py, code is 21, comment is 0, blank is 5.
+doodles\tree_data.py, code is 149, comment is 2, blank is 44.
+doodles\tree_panel.py, code is 204, comment is 35, blank is 71.
+frame.py, code is 55, comment is 124, blank is 49.
+grid.py, code is 291, comment is 32, blank is 101.
+grouppage.py, code is 79, comment is 1, blank is 29.
+main.py, code is 14, comment is 12, blank is 9.
+objectgrid.py, code is 107, comment is 1, blank is 33.
+offer_dialog.py, code is 69, comment is 0, blank is 23.
+offerpage.py, code is 81, comment is 3, blank is 28.
+pages.py, code is 297, comment is 76, blank is 101.
+panel.py, code is 192, comment is 17, blank is 60.
+savedsetup.json, code is 618, comment is 0, blank is 18.
+setup.py, code is 146, comment is 3, blank is 42.
+setup_grid.py, code is 82, comment is 9, blank is 23.
+Suku_Nimi_Tarjous.json, code is 38, comment is 0, blank is 0.
+table.json, code is 949, comment is 0, blank is 22.
+table.py, code is 484, comment is 45, blank is 87.
+test.json, code is 200, comment is 0, blank is 0.
+test_setup.json, code is 310, comment is 0, blank is 8.
+tests\__init__.py, code is 2, comment is 0, blank is 1.
+tests\__pycache__\__init__.cpython-38.pyc, it is a binary file.
+tests\__pycache__\table_test.cpython-38.pyc, it is a binary file.
+tests\__pycache__\test_ttkdata.cpython-38-pytest-6.1.1.pyc, it is a binary file.
+tests\__pycache__\ttk_data_test.cpython-38.pyc, it is a binary file.
+tests\table_test.py, code is 98, comment is 0, blank is 25.
+tests\ttk_data_test.py, code is 102, comment is 10, blank is 17.
+tree_panel.py, code is 54, comment is 19, blank is 24.
+ttk.db, it is a binary file.
+ttk_data.py, code is 180, comment is 10, blank is 65.
+ttk_grid.py, code is 278, comment is 44, blank is 84.
+workspace.code-workspace, code is 8, comment is 0, blank is 0.
+===============================================================================

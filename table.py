@@ -228,29 +228,29 @@ columns_omats = [
     ("offer_materials", "desc", "Kuvaus", "string", 4, 80, 0, 0),
     ("offer_materials", "prod", "Valmistaja", "string", 5, 60, 0, 0),
     ("offer_materials", "thickness", "Paksuus", "long", 6, 60, 0, 0),
-    ("offer_materials", "unit", "Hintayksikkö", "string:€/m2,€/kpl", 7, 60, 0, 0),
+    ("offer_materials", "unit", "Hintayksikkö", "choice:€/m2,€/kpl", 7, 60, 0, 0),
     ("offer_materials", "cost", "Hinta", "double:6,2", 8, 60, 0, 0),
-    ("offer_materials", "edg_cost", "R.Nauhan hinta", "double:6,2", 9, 60, 0, 0),
-    ("offer_materials", "add_cost", "Lisähinta", "double:6,2", 10, 60, 0, 0),
+    ("offer_materials", "add_cost", "Lisähinta", "double:6,2", 9, 60, 0, 0),
+    ("offer_materials", "edg_cost", "R.Nauhan hinta", "double:6,2", 10, 60, 0, 0),
     ("offer_materials", "loss", "Hukka", "double:6,2", 11, 60, 0, 0),
     ("offer_materials", "discount", "Alennus", "double:6,2", 12, 60, 0, 0),
     ("offer_materials", "tot_cost", "Kokonaishinta", "double:6,2", 13, 60, 0, 1)
 ]
-select_omats = """SELECT * FROM offer_materials WHERE group_id=(?)"""
+select_omaterials = """SELECT * FROM offer_materials WHERE group_id=(?)"""
 sql_create_table_offer_products = """
     CREATE TABLE IF NOT EXISTS offer_products (
         id          TEXT PRIMARY KEY,
         group_id    TEXT NOT NULL,
         category    TEXT,
         code        TEXT,
-        count       INTEGER,
+        count       INTEGER DEFAULT 1,
         desc        TEXT,
         prod        TEXT,
-        inst_unit   REAL,
-        width       INTEGER,
-        height      INTEGER,
-        depth       INTEGER,
-        work_time   REAL,
+        inst_unit   REAL DEFAULT 0.0,
+        width       INTEGER DEFAULT 0,
+        height      INTEGER DEFAULT 0,
+        depth       INTEGER DEFAULT 0,
+        work_time   REAL DEFAULT 0.0,
 
         FOREIGN KEY (group_id)
             REFERENCES offer_groups (id)
@@ -258,21 +258,67 @@ sql_create_table_offer_products = """
             ON UPDATE CASCADE
     )
 """
+columns_oproducts = [
+    ("offer_products", "id", "ID", "string", 0, 80, 1, 1),
+    ("offer_products", "group_id", "RyhmäID", "string", 1, 80, 1, 1),
+    ("offer_products", "category", "Tuoteryhmä", "string", 2, 60, 0, 0),
+    ("offer_products", "code", "Koodi", "string", 3, 60, 0, 0),
+    ("offer_products", "count", "Määrä", "long", 4, 45, 0, 0),
+    ("offer_products", "desc", "Kuvaus", "string", 5, 80, 0, 0),
+    ("offer_products", "prod", "Valmistaja", "string", 6, 60, 0, 0),
+    ("offer_products", "inst_unit", "As.Yksikkö", "double:6,2", 7, 45, 0, 0),
+    ("offer_products", "width", "Leveys", "long", 8, 45, 0, 0),
+    ("offer_products", "height", "Korkeus", "long", 9, 45, 0, 0),
+    ("offer_products", "depth", "Syvyys", "long", 10, 45, 0, 0),
+    ("offer_products", "work_time", "Työaika", "double:6,2", 11, 45, 0, 0),
+    ("offer_products", "part_cost", "Osahinta", "double:6,2", 12, 45, 0, 1),
+    ("offer_products", "tot_cost", "Kokonaishinta", "double:6,2", 13, 45, 0, 1),
+]
+select_oproducts = """
+    SELECT
+        pr.id,
+        pr.group_id,
+        pr.category,
+        pr.code,
+        pr.count,
+        pr.desc,
+        pr.prod,
+        pr.inst_unit,
+        pr.width,
+        pr.height,
+        pr.depth,
+        pr.work_time,
+        pa.part_cost,
+        (pa.part_cost + pr.work_time *
+            (
+                SELECT var.val
+                FROM variables AS var
+                WHERE key="work_cost"
+            )
+        ) tot_cost
+    FROM offer_products AS pr
+    LEFT JOIN (
+        SELECT pa.product_id, SUM(pa.cost) AS part_cost
+        FROM offer_parts AS pa
+        GROUP BY pa.product_id) pa ON pr.id=pa.product_id
+    WHERE pr.group_id=(?)
+    """
 sql_create_table_offer_parts = """
     CREATE TABLE IF NOT EXISTS offer_parts (
         id          TEXT PRIMARY KEY,
         product_id  TEXT NOT NULL,
         part        TEXT,
-        count       INTEGER,
         code        TEXT,
+        count       INTEGER,
         desc        TEXT,
         use_predef  INTEGER,
         default_mat TEXT,
         width       INTEGER,
         length      INTEGER,
+        cost        REAL DEFAULT 0.0,
         code_width  TEXT,
         code_length TEXT,
-        cost        REAL,
+        code_cost   TEXT,
 
         FOREIGN KEY (product_id)
             REFERENCES offer_products (id)
@@ -280,7 +326,53 @@ sql_create_table_offer_parts = """
             ON UPDATE CASCADE
     )
 """
+columns_oparts = [
+    ("offer_parts", "id", "ID", "string", 0, 80, 1, 1),
+    ("offer_parts", "product_id", "TuoteID", "string", 1, 80, 1, 1),
+    ("offer_parts", "part", "Osa", "string", 2, 60, 0, 0),
+    ("offer_parts", "code", "Koodi", "string", 3, 60, 0, 0),
+    ("offer_parts", "count", "Määrä", "long", 4, 45, 0, 0),
+    ("offer_parts", "desc", "Kuvaus", "string", 5, 80, 0, 0),
+    ("offer_parts", "use_predef", "Käytä esimääritystä", "bool", 6, 45, 0, 0),
+    ("offer_parts", "default_mat", "Oletus materiaali", "string", 7, 80, 0, 0),
+    ("offer_parts", "width", "Leveys", "long", 8, 45, 0, 1),
+    ("offer_parts", "length", "Pituus", "long", 9, 45, 0, 1),
+    ("offer_parts", "cost", "Hinta", "double:6,2", 10, 45, 0, 1),
+    ("offer_parts", "code_width", "Koodi Leveys", "string", 11, 120, 0, 0),
+    ("offer_parts", "code_length", "Koodi Pituus", "string", 12, 120, 0, 0),
+    ("offer_parts", "code_cost", "Koodi Hinta", "string", 13, 120, 0, 0),
+]
+select_oparts = """
+    SELECT
+        pa.id,
+        pa.product_id,
+        pa.part,
+        pa.code,
+        pa.use_predef,
+        pa.default_mat,
+        IIF(
+            pa.use_predef=0,
+            pa.default_mat,
+            d.material
+        ) used_mat,
+        m.thickness,
+        m.tot_cost,
+        pr.width,
+        pr.height,
+        pr.depth
 
+    FROM offer_parts pa
+        INNER JOIN offer_products pr
+            ON pa.product_id=pr.id
+
+        LEFT JOIN offer_predefs d
+            ON pr.group_id=d.group_id AND pa.part=d.part
+
+        LEFT JOIN offer_materials m
+            ON IIF(pa.use_predef=0, pa.default_mat, d.material) = m.code
+
+    WHERE pa.product_id=(?)
+"""
 sql_create_table_materials = """
     CREATE TABLE IF NOT EXISTS materials (
         code        TEXT PRIMARY KEY,
@@ -619,34 +711,6 @@ class OfferTables:
             return False
         return True
 
-    def insert_many(self, table: str, columns: Iterable, values: Iterable):
-        """Insert multiple rows of values into a table.
-
-        Parameters
-        ----------
-        table : str
-            Name of the table.
-        columns : Iterable
-            The column names where values are inserted.
-        values : Iterable
-            Values for insertion matching the column names inside an iterable.
-
-        Returns
-        -------
-        bool
-            True if successful, False otherwise. Prints error to console.
-        """
-        cols = ','.join(columns)
-        qms = ','.join(['?'] * len(columns))
-        sql = sql_insert_general.format(table=table, columns=cols, qm=qms)
-        try:
-            self.cur.executemany(sql, values)
-            self.con.commit()
-        except sqlite3.Error as e:
-            print(e)
-            return False
-        return True
-
     def get(self, table: str, columns: Iterable, match_columns: Iterable,
             values: Iterable, many=False, operator='='):
         """Get a row of values.
@@ -702,50 +766,37 @@ class OfferTables:
         else:
             return self.cur.fetchone()
 
-    sql_select_fieldcount = """
-            SELECT pr.inst_unit, IFNULL(fc.mult, 0.0), SUM(pr.count), (IFNULL(fc.mult, 0.0) * SUM(pr.count)) cost
-            FROM offer_products pr
-                LEFT JOIN fcmults fc ON pr.inst_unit=fc.unit
-            WHERE pr.group_id IN (
-                SELECT gr.id
-                FROM offer_groups gr
-                WHERE gr.offer_id=?
-            )
-            GROUP BY pr.inst_unit
-            ORDER BY pr.inst_unit ASC
-        """
-    def get_fieldcount(self, offer_id):
-        """Return the fieldcount data of an offer."""
+    def get_omaterials(self, group_id: str):
         try:
-            self.cur.execute(self.sql_select_fieldcount, (offer_id,))
+            self.cur.execute(select_omaterials, (group_id,))
             self.con.commit()
         except sqlite3.Error as e:
-            print("OfferTables.get_fieldcount\n\t{}".format(e))
+            print("OfferTables.get_omaterials\n\t{}".format(e))
+            return []
+
+        return self.cur.fetchall()
+    
+    def get_oproducts(self, group_id: str):
+        try:
+            self.cur.execute(select_oproducts, (group_id,))
+            self.con.commit()
+        except sqlite3.Error as e:
+            print("OfferTables.get_oproducts\n\t{}".format(e))
             return []
 
         return self.cur.fetchall()
 
-    sql_select_group_products = """
-        SELECT *, (part_cost + wt * wc) FROM
-            (SELECT
-                pr.id,
-                pr.category,
-                pr.code,
-                pr.count,
-                pr.desc,
-                pr.prod,
-                pr.inst_unit,
-                pr.width,
-                pr.height,
-                pr.depth,
-                pr.work_time AS wt,
-                pr.work_cost AS wc,
-                (
-                    SELECT SUM(pa.cost) FROM offer_parts AS pa WHERE pa.product_id=pr.id
-                ) part_cost
-            FROM offer_products AS pr
-            WHERE pr.group_id=?)
-        """
+    def get_oparts(self, product_id: str):
+        try:
+            self.cur.execute(select_oparts, (product_id,))
+            self.con.commit()
+        except sqlite3.Error as e:
+            print("OfferTables.get_oparts\n\t{}".format(e))
+            return []
+
+        return self.cur.fetchall()
+
+
     def get_offer_products(self, group_id):
         """Get the group products grid data.
 
