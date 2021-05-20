@@ -115,62 +115,6 @@ def parse_code(code, row, data):
     else:
         return None
 
-TABLE_COLUMNS_FCMULTS = {
-    "unit": {"label": "Asennusyksikkö", "width": 80},
-    "mult": {"label": "Kerroin", "width": 80}
-}
-TABLE_COLUMNS_MATERIALS = {
-    "code": {"label": "Koodi", "type": "string", "width": 55},
-    "desc": {"label": "Kuvaus", "type": "string", "width": 55},
-    "prod": {"label": "Valmistaja", "type": "string", "width": 55},
-    "thck": {"label": "Paksuus", "type": "long", "width": 55},
-    "unit": {"label": "Hintayksikkö", "type": "string", "width": 55},
-    "loss": {"label": "Hukka", "type": "double:6,2", "width": 55},
-    "cost": {"label": "Mat. Hinta", "type": "double:6,2", "width": 55},
-    "edg_cost": {"label": "R.Nauhan hinta", "type": "double:6,2", "width": 55},
-    "add_cost": {"label": "Lisähinta", "type": "double:6,2", "width": 55},
-    "discount": {"label": "Alennus", "type": "double:6,2", "width": 55}
-}
-EXTRA_COLUMNS_MATERIALS = {
-    "((cost + edg_cost + add_cost) * (1 + loss) * (1 - discount)) tot_cost": {"label": "Kok. Hinta", "type": "double:6,2", "width": 55}
-}
-TABLE_COLUMNS_PRODUCTS = {
-    "code": {"label": "Koodi", "type": "string", "width": 55},
-    "desc": {"label": "Kuvaus", "type": "string", "width": 55},
-    "prod": {"label": "Valmistaja", "type": "string", "width": 55},
-    "inst_unit": {"label": "Asennusyksikkö", "type": "string", "width": 55},
-    "width": {"label": "Leveys", "type": "string", "width": 55},
-    "height": {"label": "Korkeus", "type": "string", "width": 55},
-    "depth": {"label": "Syvyys", "type": "string", "width": 55},
-    "work_time": {"label": "Työaika", "type": "string", "width": 55},
-    "work_cost": {"label": "Työn hinta", "type": "string", "width": 55}
-}
-TABLE_COLUMNS = {
-    "fcmults": TABLE_COLUMNS_FCMULTS,
-    "materials": TABLE_COLUMNS_MATERIALS,
-    "products": TABLE_COLUMNS_PRODUCTS,
-}
-GRID_COLUMNS = {
-    "grouppagegrid.offer_materials": {**TABLE_COLUMNS_MATERIALS, **EXTRA_COLUMNS_MATERIALS}
-}
-TABLE_LABELS = {
-    "offers": "Tarjoukset",
-    "offer_groups": "Ryhmät",
-    "offer_predefs": "Esimääritykset",
-    "offer_materials": "Materiaalit",
-    "offer_products": "Tuotteet",
-    "offer_parts": "Osat",
-    "fcmults": "Asennusyksikkökertoimet",
-    "materials": "Materiaalit",
-    "products": "Tuotteet",
-    "parts": "Osat"
-}
-# sql_create_table_fcmults = """
-#     CREATE TABLE IF NOT EXISTS fcmults (
-#         unit    TEXT PRIMARY KEY,
-#         mult    REAL
-#     )
-# """
 sql_create_table_variables = """
     CREATE TABLE IF NOT EXISTS variables (
         key     TEXT PRIMARY KEY,
@@ -187,6 +131,7 @@ sql_create_table_columns = """
         width       INTEGER,
         is_unique   INTEGER,
         ro          INTEGER,
+        visible     INTEGER DEFAULT 1,
         PRIMARY KEY (tablename, key)
     )
 """
@@ -746,7 +691,10 @@ class OfferTables:
         self.con.close()
 
     def create_connection(self, database_file):
-        """Create connection if it does not exists and return the cursor."""
+        """Create connection if it does not exists and return the cursor.
+        
+        Sets OfferTables.cur and OfferTables.con
+        """
         try:
             if self.con is None:
                 OfferTables.con = sqlite3.connect(database_file)
@@ -950,62 +898,62 @@ class OfferTables:
 
         return self.cur.fetchall()
 
-    def get_offer_products(self, group_id):
-        """Get the group products grid data.
+    # def get_offer_products(self, group_id):
+    #     """Get the group products grid data.
 
-        Parameters
-        ----------
-        group_id : str
-            Id of group whose products will be returned.
+    #     Parameters
+    #     ----------
+    #     group_id : str
+    #         Id of group whose products will be returned.
 
-        Returns
-        -------
-        list
-            list of tuples containing the grid data.
-        """
-        try:
-            self.cur.execute(self.sql_select_group_products, (group_id,))
-            self.con.commit()
-        except sqlite3.Error as e:
-            print("OfferTables.get_offer_products\n\t{}".format(e))
-            return []
+    #     Returns
+    #     -------
+    #     list
+    #         list of tuples containing the grid data.
+    #     """
+    #     try:
+    #         self.cur.execute(self.sql_select_group_products, (group_id,))
+    #         self.con.commit()
+    #     except sqlite3.Error as e:
+    #         print("OfferTables.get_offer_products\n\t{}".format(e))
+    #         return []
 
-        return self.cur.fetchall()
+    #     return self.cur.fetchall()
 
-    sql_select_group_parts = """
-        SELECT
-            p.id,
-            p.category,
-            p.code,
-            p.desc,
-            p.use_predef,
-            p.default_mat,
-            p.width,
-            p.length,
-            p.cost
-        FROM offer_parts AS p
-        WHERE product_id=?
-        """
-    def get_group_parts(self, product_id):
-        """Get the group parts grid data.
+    # sql_select_group_parts = """
+    #     SELECT
+    #         p.id,
+    #         p.category,
+    #         p.code,
+    #         p.desc,
+    #         p.use_predef,
+    #         p.default_mat,
+    #         p.width,
+    #         p.length,
+    #         p.cost
+    #     FROM offer_parts AS p
+    #     WHERE product_id=?
+    #     """
+    # def get_group_parts(self, product_id):
+    #     """Get the group parts grid data.
 
-        Parameters
-        ----------
-        product_id : str
-            Id of products whose parts will be returned.
+    #     Parameters
+    #     ----------
+    #     product_id : str
+    #         Id of products whose parts will be returned.
 
-        Returns
-        -------
-        list
-            list of tuples containing the grid data.
-        """
-        try:
-            self.cur.execute(self.sql_select_group_parts, (product_id,))
-            self.con.commit()
-        except sqlite3.Error as e:
-            print("OfferTables.get_group_parts\n\t{}".format(e))
-            return []
-        return self.cur.fetchall()
+    #     Returns
+    #     -------
+    #     list
+    #         list of tuples containing the grid data.
+    #     """
+    #     try:
+    #         self.cur.execute(self.sql_select_group_parts, (product_id,))
+    #         self.con.commit()
+    #     except sqlite3.Error as e:
+    #         print("OfferTables.get_group_parts\n\t{}".format(e))
+    #         return []
+    #     return self.cur.fetchall()
 
     select_get_columns = """SELECT * FROM columns WHERE tablename=(?) ORDER BY col_idx ASC"""
     def get_columns(self, table):
@@ -1154,6 +1102,43 @@ class OfferTables:
                 treelist.append(g)
 
         return treelist
+
+    def set_visible(self, table, col, is_visible):
+        """Set the visibility of a column.
+
+        Parameters
+        ----------
+        table: str
+            Name of the table.
+        col : int
+            Column index
+        is_visible : bool
+            True if column is to be set visible. False for hiding.
+        """
+        sql = """
+            UPDATE columns
+            SET visible = (?)
+            WHERE tablename = (?) AND col_idx = (?)
+        """
+        val = 1 if is_visible else 0
+        return self.update(sql, (val, table, col))
+
+    def get_visible(self, table):
+        """Return list of visible column indexes.
+
+        Parameters
+        ----------
+        table : str
+            Name of table.
+        """
+        sql = """
+            SELECT col_idx
+            FROM columns
+            WHERE tablename = (?) AND visible = 1
+            ORDER BY col_idx ASC
+        """
+        data = self.select(sql, (table,))
+        return [c[0] for c in data]
 
 
 if __name__ == '__main__':

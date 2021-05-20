@@ -239,6 +239,51 @@ class DatabaseGridTable(wxg.GridTableBase):
             [width, self.tablename, self.col_keys[datacol]]
         )
 
+    def get_all_column_labels(self):
+        return self.col_labels
+
+    def get_visible(self):
+        return self.db.get_visible(self.tablename)
+
+    def get_visible_columns(self):
+        return self.columns
+
+    def show_column(self, col):
+        self.columns.append(col)
+        self.AppendCols(1)
+        self.db.set_visible(self.tablename, col, True)
+        self.GetView().Refresh()
+        self.GetView().Update()
+        return self.get_col_width(self.GetNumberCols() - 1)[0]
+
+    def hide_column(self, col):
+        gridcol = self.columns.index(col)
+        del self.columns[gridcol]
+        self.DeleteCols(gridcol, 1)
+        self.db.set_visible(self.tablename, col, False)
+        self.GetView().Refresh()
+        self.GetView().Update()
+
+    def DeleteCols(self, pos, numCols):
+        # return super().DeleteCols(pos=pos, numCols=numCols)
+        msg = wxg.GridTableMessage(
+            self,
+            wxg.GRIDTABLE_NOTIFY_COLS_DELETED,
+            pos,
+            numCols
+        )
+        self.GetView().ProcessTableMessage(msg)
+        return True
+    
+    def AppendCols(self, numCols):
+        # return super().AppendCols(numCols=numCols)
+        msg = wxg.GridTableMessage(
+            self,
+            wxg.GRIDTABLE_NOTIFY_COLS_APPENDED,
+            numCols
+        )
+        self.GetView().ProcessTableMessage(msg)
+        return True
 
 class GroupMaterialsTable(DatabaseGridTable):
     def __init__(self, db: tb.OfferTables):
@@ -250,7 +295,8 @@ class GroupMaterialsTable(DatabaseGridTable):
         self.fk = ["group_id"]
         self.fk_value = None
         self.pk_column = [0]
-        self.columns = [i for i in range(14)]
+        # self.columns = [i for i in range(14)]
+        self.columns = self.get_visible()
         self.col_keys = [val[tb.KEY] for val in setup]
         self.col_labels = [val[tb.LABEL] for val in setup]
         self.col_types = [val[tb.TYPE] for val in setup]
@@ -286,7 +332,7 @@ class GroupProductsTable(DatabaseGridTable):
         self.fk = ["group_id"]
         self.fk_value = None
         self.pk_column = [0]
-        self.columns = [i for i in range(14)]
+        self.columns = self.get_visible()
         self.col_keys = [val[tb.KEY] for val in setup]
         self.col_labels = [val[tb.LABEL] for val in setup]
         self.col_types = [val[tb.TYPE] for val in setup]
@@ -325,7 +371,7 @@ class GroupPartsTable(DatabaseGridTable):
         self.fk = ["product_id"]
         self.fk_value = None
         self.pk_column = [0]
-        self.columns = [i for i in range(20)]
+        self.columns = self.get_visible()
         self.col_keys = [val[tb.KEY] for val in setup]
         self.col_labels = [val[tb.LABEL] for val in setup]
         self.col_types = [val[tb.TYPE] for val in setup]
@@ -447,7 +493,7 @@ class GroupPredefsTable(DatabaseGridTable):
         self.fk = ["group_id"]
         self.fk_value = None
         self.pk_column = [0]
-        self.columns = [i for i in range(4)]
+        self.columns = self.get_visible()
         self.col_keys = [val[tb.KEY] for val in setup]
         self.col_labels = [val[tb.LABEL] for val in setup]
         self.col_types = [val[tb.TYPE] for val in setup]
@@ -476,7 +522,7 @@ class GroupPredefsTable(DatabaseGridTable):
 
 class TestGrid(wxg.Grid):
     def __init__(self, parent, db, name):
-        super().__init__(parent)
+        super().__init__(parent, style=wx.WANTS_CHARS|wx.HD_ALLOW_REORDER)
 
         table = None
         if name == "offer_materials":
@@ -490,41 +536,86 @@ class TestGrid(wxg.Grid):
 
         self.SetTable(table, True)
         self.read_only = table.read_only
-        # table.set_fk_value(["TuoteID"])
+        self.labels = table.get_all_column_labels()
+        self.col_ids = wx.NewIdRef(len(self.labels))
 
         for col in range(self.GetNumberCols()):
             width = table.get_col_width(col)
             self.SetColSize(col, width[0])
 
         self.SetRowLabelSize(35)
+        self.EnableDragColMove(True)
+        # self.UseNativeColHeader(True)
 
+
+        self.Bind(wx.EVT_MENU_RANGE, self.on_col_menu, id=self.col_ids[0], id2=self.col_ids[-1])
         self.Bind(wxg.EVT_GRID_EDITOR_SHOWN, self.on_show_editor)
         self.Bind(wxg.EVT_GRID_CELL_CHANGED, self.on_cell_changed)
         self.Bind(wxg.EVT_GRID_COL_SIZE, self.on_col_size)
         self.Bind(wxg.EVT_GRID_CMD_LABEL_RIGHT_CLICK, self.on_label_menu)
+        self.Bind(wxg.EVT_GRID_COL_MOVE, self.on_col_move)
         self.Bind(wx.EVT_KEY_DOWN, self.on_key_down)
-        self.Refresh()
+        # self.Refresh()
     
     def on_cell_changed(self, evt):
+        """Update the data of this grid on edit."""
         self.GetTable().update_data(None)
-        # self.Refresh()
-        # self.GetTable().update_data(None)
         evt.Skip()
 
     def on_col_size(self, evt):
-        # width = evt.GetWidth()
+        """Save new columns size to columns table."""
         col = evt.GetRowOrCol()
         width = self.GetColSize(col)
         self.GetTable().set_col_width(col, width)
         evt.Skip()
+
+    def on_col_move(self, evt):
+        """Save the new order."""
+        col = evt.GetCol()
+        pos = self.GetColPos(col)
+        wx.CallAfter(self.col_moved, col, pos)
+        # print("NEW COLUMN ORDER FOR id: {}, old_pos: {}".format(col, pos))
+
+    def col_moved(self, col_id, old_pos):
+        pass
+        # colpos = self.GetColPos(col_id)
+        # print("New col pos: {}, old pos: {}".format(colpos, old_pos))
 
     def on_key_down(self, evt):
         print("KEY DOWN")
         evt.Skip()
 
     def on_label_menu(self, evt):
+        """Open menu to select visible columns."""
         print("LABEL MENU")
+        menu = wx.Menu()
+        table = self.GetTable()
+
+        for n, colid in enumerate(self.col_ids):
+            menu.AppendCheckItem(colid, self.labels[n], "Muuta sarakkeen näkyvyyttä")
+        
+        columns = table.get_visible_columns()
+        for col in columns:
+            menu.Check(self.col_ids[col], True)
+        
+        self.PopupMenu(menu)
+        menu.Destroy()
         evt.Skip()
+    
+    def on_col_menu(self, evt):
+        """Show or hide the checked column."""
+        is_checked = evt.IsChecked()
+        col = self.col_ids.index(evt.GetId())
+        table = self.GetTable()
+        print("check: {}, col: {}".format(is_checked, col))
+        if is_checked:
+            w = table.show_column(col)
+            gridcol = table.columns.index(col)
+            self.SetColSize(gridcol, w)
+            print(w)
+            print(gridcol)
+        else:
+            table.hide_column(col)
 
     def on_show_editor(self, evt):
         """Veto edits in read only columns."""
@@ -537,6 +628,7 @@ class TestGrid(wxg.Grid):
         evt.Skip()
 
     def set_fk_value(self, fk):
+        """Set the foreign key for the table of this grid."""
         self.GetTable().set_fk_value(fk)
 
 
