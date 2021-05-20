@@ -366,31 +366,31 @@ class GroupPartsTable(DatabaseGridTable):
                 self.data.append(list(datarow))
             self.GetView().Refresh()
 
-    def GetValue(self, row, col):
-        value = super().GetValue(row, col)
-        datacol = self.GetDataCol(col)
-        # Get value from a code cell.
-        if datacol in self.coded:
-            val_from_code = self.parse_code(row, value)
-            if val_from_code is not None:
-                tar_col = self.columns.index(self.coded_tar[self.coded.index(datacol)])
-                old_value = super().GetValue(row, tar_col)
-                if val_from_code != old_value:
-                    print(f"parsed new, old: {val_from_code}, {old_value}")
-                    self.SetValue(row, tar_col, val_from_code)
+    # def GetValue(self, row, col):
+    #     value = super().GetValue(row, col)
+    #     datacol = self.GetDataCol(col)
+    #     # Get value from a code cell.
+    #     if datacol in self.coded:
+    #         val_from_code = self.parse_code(row, value)
+    #         if val_from_code is not None:
+    #             tar_col = self.columns.index(self.coded_tar[self.coded.index(datacol)])
+    #             old_value = super().GetValue(row, tar_col)
+    #             if val_from_code != old_value:
+    #                 print(f"parsed new, old: {val_from_code}, {old_value}")
+    #                 self.SetValue(row, tar_col, val_from_code)
 
-        # Get value from cell that receives value from code.
-        elif datacol in self.coded_tar:
-            code_col = self.coded[self.coded_tar.index(datacol)]
-            code = super().GetValue(row, code_col)
-            parsed_value = self.parse_code(row, code)
-            if parsed_value is not None:
-                old_value = super().GetValue(row, datacol)
-                if parsed_value != old_value:
-                    print(f"parsed new, old: {parsed_value}, {old_value}")
-                    self.SetValue(row, datacol, parsed_value)
-                    return parsed_value
-        return value
+    #     # Get value from cell that receives value from code.
+    #     elif datacol in self.coded_tar:
+    #         code_col = self.coded[self.coded_tar.index(datacol)]
+    #         code = super().GetValue(row, code_col)
+    #         parsed_value = self.parse_code(row, code)
+    #         if parsed_value is not None:
+    #             old_value = super().GetValue(row, datacol)
+    #             if parsed_value != old_value:
+    #                 print(f"parsed new, old: {parsed_value}, {old_value}")
+    #                 self.SetValue(row, datacol, parsed_value)
+    #                 return parsed_value
+    #     return value
 
     def parse_code(self, row, code: str):
         if code is not None and len(code) > 0 and code[0] == "=":
@@ -538,11 +538,6 @@ class TestGrid(wxg.Grid):
 
     def set_fk_value(self, fk):
         self.GetTable().set_fk_value(fk)
-    #     self.Bind(wxg.EVT_GRID_CELL_LEFT_DCLICK, self.on_left_dclick)
-    
-    # def on_left_dclick(self, evt):
-    #     if self.CanEnableCellControl():
-    #         self.EnableCellEditControl()
 
 
 class GroupPanel(wx.Panel):
@@ -597,6 +592,7 @@ class GroupPanel(wx.Panel):
             print("CHANGE IN GRID PART")
             self.grid_part.Update()
             self.grid_prod.GetTable().update_data(None)
+            # self.grid_part.GetTable().update_data(None)
 
         evt.Skip()
 

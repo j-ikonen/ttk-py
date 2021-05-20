@@ -61,6 +61,60 @@ def type2str(value):
         return strvalue.replace('.', ',')
     return strvalue
 
+code2col = {
+    "määrä": 4,
+    "leveys": 8,
+    "pituus": 9,
+    "mpaksuus": 15,
+    "mhinta": 16,
+    "tleveys": 17,
+    "tkorkeus": 18,
+    "tsyvyys": 19
+}
+from asteval import Interpreter
+aeval = Interpreter()
+
+def find_row(col, code, data):
+    for n, datarow in enumerate(data):
+        if datarow[col] == code:
+            return n
+    return None
+
+def parse_code(code, row, data):
+    if code is not None and len(code) > 0 and code[0] == "=":
+        parsed_code: str = code[1:] # "=code" -> "code"
+        split_code = list(dict.fromkeys(parsed_code.split(" ")))
+        for var in split_code:
+            # Default values
+            src_row = row
+            key = var
+            # If variable is link to another row in data. "code".key
+            # get value from data arg.
+            if var[0] == '"':
+                try:
+                    (source, key) = var.split(".") # ["code", key]
+                # Use default values on error.
+                except ValueError:
+                    print('SyntaxError when parsing "{}"\n'.format(code) +
+                          'to refer to another part: "part".key')
+                # Find the row containing key given in code.
+                else:
+                    res = find_row(2, source.strip('"'), data)
+                    if res is not None:
+                        src_row = res
+
+            # Get the column and value to replace the var substring with.
+            if key in code2col:
+                col = code2col[key]
+                var_value = str(data[src_row][col])
+                parsed_code = parsed_code.replace(var, var_value)
+
+        return aeval(parsed_code)
+
+    # Invalid code
+    else:
+        return None
+
 TABLE_COLUMNS_FCMULTS = {
     "unit": {"label": "Asennusyksikkö", "width": 80},
     "mult": {"label": "Kerroin", "width": 80}
@@ -809,6 +863,7 @@ class OfferTables:
         return self.cur.fetchall()
     
     def get_oproducts(self, group_id: str):
+        self.update_parts(group_id)
         try:
             self.cur.execute(select_oproducts, (group_id,))
             self.con.commit()
@@ -818,16 +873,72 @@ class OfferTables:
         print("select oproducts")
         return self.cur.fetchall()
 
-    def get_oparts(self, product_id: str):
+    def select(self, sql, values):
         try:
-            self.cur.execute(select_oparts, (product_id,))
+            self.cur.execute(sql, values)
             self.con.commit()
         except sqlite3.Error as e:
-            print("OfferTables.get_oparts\n\t{}".format(e))
+            print("OfferTables.select\n\tsql: {}\n\t{}".format(sql, e))
             return []
 
-        print("select oparts")
         return self.cur.fetchall()
+
+    def update(self, sql, values, many=False):
+        try:
+            if many:
+                self.cur.executemany(sql, values)
+            else:
+                self.cur.execute(sql, values)
+            self.con.commit()
+        except sqlite3.Error as e:
+            print("OfferTables.update\n\tsql: {}\n\t{}".format(sql, e))
+            return False
+        return True
+
+    def update_parts(self, group_id: str, products=None):
+        update_parts = """
+            UPDATE offer_parts
+            SET width = (?),
+                length = (?),
+                cost = (?)
+
+            WHERE id = (?)
+        """
+        select_oproduct_ids = """
+            SELECT id
+            FROM offer_products
+            WHERE group_id = (?)
+        """
+        if products is None:
+            product_ids = self.select(select_oproduct_ids, (group_id,))
+        else:
+            product_ids = products
+
+        for pid in product_ids:
+            part_list = self.select(select_oparts, (pid[0],))
+            new_values_list = []
+
+            for row, part in enumerate(part_list):
+                new_values = []
+                is_changed = False
+
+                for n in range(8, 11):
+                    old_value = part[n]
+                    code = part[n + 3]
+                    value = parse_code(code, row, part_list)
+                    new_values.append(value)
+                    if value != old_value:
+                        is_changed = True
+
+                if is_changed:
+                    new_values.append(part[0])
+                    new_values_list.append(new_values)
+
+            self.update(update_parts, new_values_list, True)
+
+    def get_oparts(self, product_id: str):
+        self.update_parts("", [(product_id,)])
+        return self.select(select_oparts, (product_id,))
 
     def get_opredefs(self, group_id: str):
         try:
