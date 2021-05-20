@@ -59,15 +59,16 @@ class DatabaseGridTable(wxg.GridTableBase):
 
     def GetValue(self, row, col):
         # print(f"GetValue {row}, {col}")
-        if self.is_changed:
-            self.update_data(row)
+        # if self.is_changed:
+        #     self.is_changed = False
+        #     self.update_data(row)
         try:
             return self.data[row][self.columns[col]]
         except IndexError:
             return ""
 
     def SetValue(self, row, col, value):
-        # print(f"SetValue {row}, {col}, {value}")
+        print(f"SetValue {row}, {col}, {value}")
 
         if self.fk_value is None:
             print(f"Foreign key {self.fk} is not defined.")
@@ -97,7 +98,9 @@ class DatabaseGridTable(wxg.GridTableBase):
 
 
             if update_success:
-                self.is_changed = True
+                pass
+                # self.is_changed = True
+                # self.update_data(row)
 
             else:
                 new_id = [str(ObjectId())]
@@ -112,7 +115,7 @@ class DatabaseGridTable(wxg.GridTableBase):
                     insert_success = False
 
                 if insert_success:
-                    self.is_changed = True
+                    # self.is_changed = True
                     
                     msg = wxg.GridTableMessage(
                         self,
@@ -120,10 +123,10 @@ class DatabaseGridTable(wxg.GridTableBase):
                         1
                     )
                     self.GetView().ProcessTableMessage(msg)
+                    # self.update_data(row)
 
                 else:
                     print(f"{type(self)}.SetValue insert not successful.")
-
 
     def GetColLabelValue(self, col):
         return self.col_labels[self.columns[col]]
@@ -167,44 +170,6 @@ class DatabaseGridTable(wxg.GridTableBase):
             return super().GetValueAsBool(row, col)
         except TypeError:
             return False
-    
-    # def UpdateReadOnly(self, row):
-    #     return
-    
-    # def ChangedDependency(self, col):
-    #     datacol = self.GetDataCol(col)
-    #     if datacol in self.ro_dependency:
-    #         return True
-    #     else:
-    #         return False
-
-    # def OnCellChanged(self, row, col):
-    #     if self.fk_value is None:
-    #         return
-
-    #     elif self.ChangedDependency(col):
-    #         self.UpdateReadOnly(row)
-
-    # def UpdateReadOnly(self, row):
-    #     read_only_data = self.db.get(
-    #         self.tablename,
-    #         [self.col_keys[c] for c in self.read_only],
-    #         self.pk,
-    #         self.GetPkValue(row)
-    #     )
-    #     print(read_only_data)
-    #     for n, value in enumerate(read_only_data):
-    #         try:
-    #             col = self.columns.index(self.read_only[n])
-    #             if self.data[row][self.read_only[n]] == value:
-    #                 continue
-
-    #         except ValueError:
-    #             self.data[row][self.read_only[n]] = value
-    #         else:
-    #             self.SetValue(row, col, value)
-
-        # return super().UpdateReadOnly(row)
 
     def update_data(self, row):
         """Return True if update is ok do do."""
@@ -213,7 +178,7 @@ class DatabaseGridTable(wxg.GridTableBase):
 
         self.Clear()
         self.data.clear()
-        self.is_changed = False
+        print(f"Updating {type(self)}")
         return True
 
     def set_fk_value(self, value):
@@ -229,11 +194,11 @@ class DatabaseGridTable(wxg.GridTableBase):
         oldlen = self.GetNumberRows()
         # self.is_changed = True
         self.update_data(None)
-        self.GetView().Refresh()
+        self.GetView().Update()
         newlen = self.GetNumberRows()
         self.change_number_rows(oldlen, newlen)
         # print(f"old: {oldlen}, new: {newlen}")
-        
+
     def change_number_rows(self, old, new):
         
         if new > old:
@@ -309,7 +274,7 @@ class GroupMaterialsTable(DatabaseGridTable):
             res = self.db.get_omaterials(self.fk_value[0])
             for datarow in res:
                 self.data.append(list(datarow))
-
+        self.GetView().Refresh()
 
 class GroupProductsTable(DatabaseGridTable):
     def __init__(self, db: tb.OfferTables):
@@ -341,12 +306,14 @@ class GroupProductsTable(DatabaseGridTable):
 
     def update_data(self, row):
         if super().update_data(row):
-
             res = self.db.get_oproducts(self.fk_value[0])
+            print("\n")
             for datarow in res:
+                # print("PROD: {}".format(datarow[12]))
                 # print(datarow)
                 self.data.append(list(datarow))
 
+            self.GetView().Refresh()
 
 class GroupPartsTable(DatabaseGridTable):
     def __init__(self, db: tb.OfferTables):
@@ -370,6 +337,7 @@ class GroupPartsTable(DatabaseGridTable):
         self.coded = [11, 12, 13]
         self.coded_tar = [8, 9, 10]
         self.aeval = Interpreter()
+        self.parse_done = False
         self.code2col = {
             "määrä": 4,
             "leveys": 8,
@@ -393,18 +361,35 @@ class GroupPartsTable(DatabaseGridTable):
         if super().update_data(row):
 
             res = self.db.get_oparts(self.fk_value[0])
+            print("\n")
             for datarow in res:
                 self.data.append(list(datarow))
+            self.GetView().Refresh()
 
     def GetValue(self, row, col):
         value = super().GetValue(row, col)
         datacol = self.GetDataCol(col)
+        # Get value from a code cell.
         if datacol in self.coded:
             val_from_code = self.parse_code(row, value)
             if val_from_code is not None:
                 tar_col = self.columns.index(self.coded_tar[self.coded.index(datacol)])
-                self.SetValue(row, tar_col, val_from_code)
-                self.is_changed = True
+                old_value = super().GetValue(row, tar_col)
+                if val_from_code != old_value:
+                    print(f"parsed new, old: {val_from_code}, {old_value}")
+                    self.SetValue(row, tar_col, val_from_code)
+
+        # Get value from cell that receives value from code.
+        elif datacol in self.coded_tar:
+            code_col = self.coded[self.coded_tar.index(datacol)]
+            code = super().GetValue(row, code_col)
+            parsed_value = self.parse_code(row, code)
+            if parsed_value is not None:
+                old_value = super().GetValue(row, datacol)
+                if parsed_value != old_value:
+                    print(f"parsed new, old: {parsed_value}, {old_value}")
+                    self.SetValue(row, datacol, parsed_value)
+                    return parsed_value
         return value
 
     def parse_code(self, row, code: str):
@@ -486,6 +471,8 @@ class GroupPredefsTable(DatabaseGridTable):
             res = self.db.get_opredefs(self.fk_value[0])
             for datarow in res:
                 self.data.append(list(datarow))
+            self.GetView().Refresh()
+
 
 class TestGrid(wxg.Grid):
     def __init__(self, parent, db, name):
@@ -519,8 +506,9 @@ class TestGrid(wxg.Grid):
         self.Refresh()
     
     def on_cell_changed(self, evt):
-        # self.GetTable().OnCellChanged(evt.GetRow(), evt.GetCol())
-        self.Refresh()
+        self.GetTable().update_data(None)
+        # self.Refresh()
+        # self.GetTable().update_data(None)
         evt.Skip()
 
     def on_col_size(self, evt):
@@ -590,17 +578,26 @@ class GroupPanel(wx.Panel):
         self.grid_part.set_fk_value(product_id)
 
     def on_cell_changed(self, evt):
-        # print("ON CELL CHANGED")
-        # self.grid_pdef.GetTable().is_changed = True
-        # self.grid_pdef.Refresh()
-        # self.grid_mats.GetTable().is_changed = True
-        # self.grid_mats.Refresh()
-        # self.grid_prod.GetTable().is_changed = True
-        # self.grid_prod.Refresh()
-        # self.grid_part.GetTable().is_changed = True
-        # self.grid_part.Refresh()
-        # self.grid_prod.GetTable().is_changed = True
-        # self.grid_prod.Refresh()
+        eobj = evt.GetEventObject()
+        if eobj == self.grid_pdef or eobj == self.grid_mats:
+            print("CHANGE IN GRID PDEF")
+            self.grid_part.GetTable().update_data(None)
+            # grid_part.Update required for products to get updated coded values.
+            self.grid_part.Update()
+            self.grid_prod.GetTable().update_data(None)
+            self.grid_prod.Update()
+
+        elif eobj == self.grid_prod:
+            print("CHANGE IN GRID PROD")
+            self.grid_part.GetTable().update_data(None)
+            self.grid_part.Update()
+            self.grid_prod.GetTable().update_data(None)
+
+        elif eobj == self.grid_part:
+            print("CHANGE IN GRID PART")
+            self.grid_part.Update()
+            self.grid_prod.GetTable().update_data(None)
+
         evt.Skip()
 
 

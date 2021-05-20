@@ -815,7 +815,7 @@ class OfferTables:
         except sqlite3.Error as e:
             print("OfferTables.get_oproducts\n\t{}".format(e))
             return []
-
+        print("select oproducts")
         return self.cur.fetchall()
 
     def get_oparts(self, product_id: str):
@@ -826,6 +826,7 @@ class OfferTables:
             print("OfferTables.get_oparts\n\t{}".format(e))
             return []
 
+        print("select oparts")
         return self.cur.fetchall()
 
     def get_opredefs(self, group_id: str):
