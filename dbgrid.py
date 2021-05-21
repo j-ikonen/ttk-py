@@ -68,7 +68,7 @@ class DatabaseGridTable(wxg.GridTableBase):
             return ""
 
     def SetValue(self, row, col, value):
-        print(f"SetValue {row}, {col}, {value}")
+        # print(f"SetValue {row}, {col}, {value}")
 
         if self.fk_value is None:
             print(f"Foreign key {self.fk} is not defined.")
@@ -178,7 +178,7 @@ class DatabaseGridTable(wxg.GridTableBase):
 
         self.Clear()
         self.data.clear()
-        print(f"Updating {type(self)}")
+        # print(f"Updating {type(self)}")
         return True
 
     def set_fk_value(self, value):
@@ -194,7 +194,7 @@ class DatabaseGridTable(wxg.GridTableBase):
         oldlen = self.GetNumberRows()
         # self.is_changed = True
         self.update_data(None)
-        self.GetView().Update()
+        self.GetView().ForceRefresh()
         newlen = self.GetNumberRows()
         self.change_number_rows(oldlen, newlen)
         # print(f"old: {oldlen}, new: {newlen}")
@@ -252,8 +252,9 @@ class DatabaseGridTable(wxg.GridTableBase):
         self.columns.append(col)
         self.AppendCols(1)
         self.db.set_visible(self.tablename, col, True)
-        self.GetView().Refresh()
-        self.GetView().Update()
+        self.GetView().ForceRefresh()
+        # self.GetView().Refresh()
+        # self.GetView().Update()
         return self.get_col_width(self.GetNumberCols() - 1)[0]
 
     def hide_column(self, col):
@@ -261,8 +262,29 @@ class DatabaseGridTable(wxg.GridTableBase):
         del self.columns[gridcol]
         self.DeleteCols(gridcol, 1)
         self.db.set_visible(self.tablename, col, False)
-        self.GetView().Refresh()
-        self.GetView().Update()
+        self.GetView().ForceRefresh()
+        # self.GetView().Refresh()
+        # self.GetView().Update()
+
+    def DeleteRows(self, pos, numRows):
+        """Delete the rows and their data."""
+        for row in range(pos, pos + numRows):
+            pkval = self.GetPkValue(row)
+            if pkval is not None:
+                self.db.delete(self.tablename, self.pk, pkval)
+
+        for n in range(numRows):
+            del self.data[pos]
+
+        msg = wxg.GridTableMessage(
+            self,
+            wxg.GRIDTABLE_NOTIFY_ROWS_DELETED,
+            pos,
+            numRows
+        )
+        self.GetView().ProcessTableMessage(msg)
+        # self.GetView().ForceRefresh()
+        return True
 
     def DeleteCols(self, pos, numCols):
         # return super().DeleteCols(pos=pos, numCols=numCols)
@@ -320,7 +342,7 @@ class GroupMaterialsTable(DatabaseGridTable):
             res = self.db.get_omaterials(self.fk_value[0])
             for datarow in res:
                 self.data.append(list(datarow))
-        self.GetView().Refresh()
+        self.GetView().ForceRefresh()
 
 class GroupProductsTable(DatabaseGridTable):
     def __init__(self, db: tb.OfferTables):
@@ -359,7 +381,7 @@ class GroupProductsTable(DatabaseGridTable):
                 # print(datarow)
                 self.data.append(list(datarow))
 
-            self.GetView().Refresh()
+            self.GetView().ForceRefresh()
 
 class GroupPartsTable(DatabaseGridTable):
     def __init__(self, db: tb.OfferTables):
@@ -410,78 +432,53 @@ class GroupPartsTable(DatabaseGridTable):
             print("\n")
             for datarow in res:
                 self.data.append(list(datarow))
-            self.GetView().Refresh()
+            self.GetView().ForceRefresh()
 
-    # def GetValue(self, row, col):
-    #     value = super().GetValue(row, col)
-    #     datacol = self.GetDataCol(col)
-    #     # Get value from a code cell.
-    #     if datacol in self.coded:
-    #         val_from_code = self.parse_code(row, value)
-    #         if val_from_code is not None:
-    #             tar_col = self.columns.index(self.coded_tar[self.coded.index(datacol)])
-    #             old_value = super().GetValue(row, tar_col)
-    #             if val_from_code != old_value:
-    #                 print(f"parsed new, old: {val_from_code}, {old_value}")
-    #                 self.SetValue(row, tar_col, val_from_code)
 
-    #     # Get value from cell that receives value from code.
-    #     elif datacol in self.coded_tar:
-    #         code_col = self.coded[self.coded_tar.index(datacol)]
-    #         code = super().GetValue(row, code_col)
-    #         parsed_value = self.parse_code(row, code)
-    #         if parsed_value is not None:
-    #             old_value = super().GetValue(row, datacol)
-    #             if parsed_value != old_value:
-    #                 print(f"parsed new, old: {parsed_value}, {old_value}")
-    #                 self.SetValue(row, datacol, parsed_value)
-    #                 return parsed_value
-    #     return value
+    # def parse_code(self, row, code: str):
+    #     if code is not None and len(code) > 0 and code[0] == "=":
+    #         parsed_code: str = code[1:]
+    #         codelist = parsed_code.split(" ")
+    #         for item in codelist:
+    #             if item[0] == '"':
+    #                 try:
+    #                     (source, colcode) = item.split(".")
+    #                     # print(f"{source}, {colcode}")
+    #                 except ValueError:
+    #                     print('Syntax to refer to another part: "part".sarake')
+    #                     src_row = row
+    #                     colcode = item
+    #                 else:
+    #                     src_row = self.find_row(source.strip('"'))
+    #                     if src_row is None:
+    #                         src_row = row
+    #             else:
+    #                 src_row = row
+    #                 colcode = item
 
-    def parse_code(self, row, code: str):
-        if code is not None and len(code) > 0 and code[0] == "=":
-            parsed_code: str = code[1:]
-            codelist = parsed_code.split(" ")
-            for item in codelist:
-                if item[0] == '"':
-                    try:
-                        (source, colcode) = item.split(".")
-                        # print(f"{source}, {colcode}")
-                    except ValueError:
-                        print('Syntax to refer to another part: "part".sarake')
-                        src_row = row
-                        colcode = item
-                    else:
-                        src_row = self.find_row(source.strip('"'))
-                        if src_row is None:
-                            src_row = row
-                else:
-                    src_row = row
-                    colcode = item
+    #             try:
+    #                 # print(f"code2col: {self.code2col}, colcode: {colcode}")
+    #                 col = self.code2col[colcode]
+    #             except:
+    #                 itemval = 0.0
+    #             else:
+    #                 itemval = str(self.data[src_row][col])
+    #                 parsed_code = parsed_code.replace(item, itemval)
 
-                try:
-                    # print(f"code2col: {self.code2col}, colcode: {colcode}")
-                    col = self.code2col[colcode]
-                except:
-                    itemval = 0.0
-                else:
-                    itemval = str(self.data[src_row][col])
-                    parsed_code = parsed_code.replace(item, itemval)
+    #         returnvalue = self.aeval(parsed_code)
+    #         # print("GroupPartsTable.parse_code")
+    #         # print("\tcode:  {}".format(parsed_code))
+    #         # print("\tvalue: {}".format(returnvalue))
+    #         return returnvalue
+    #     else:
+    #         return None
 
-            returnvalue = self.aeval(parsed_code)
-            # print("GroupPartsTable.parse_code")
-            # print("\tcode:  {}".format(parsed_code))
-            # print("\tvalue: {}".format(returnvalue))
-            return returnvalue
-        else:
-            return None
-
-    def find_row(self, value):
-        # print(f"FIND ROW: {value}")
-        for row, datarow in enumerate(self.data):
-            if datarow[2] == value:
-                return row
-        return None
+    # def find_row(self, value):
+    #     # print(f"FIND ROW: {value}")
+    #     for row, datarow in enumerate(self.data):
+    #         if datarow[2] == value:
+    #             return row
+    #     return None
 
 class GroupPredefsTable(DatabaseGridTable):
     def __init__(self, db: tb.OfferTables):
@@ -517,7 +514,7 @@ class GroupPredefsTable(DatabaseGridTable):
             res = self.db.get_opredefs(self.fk_value[0])
             for datarow in res:
                 self.data.append(list(datarow))
-            self.GetView().Refresh()
+            self.GetView().ForceRefresh()
 
 
 class TestGrid(wxg.Grid):
@@ -538,6 +535,7 @@ class TestGrid(wxg.Grid):
         self.read_only = table.read_only
         self.labels = table.get_all_column_labels()
         self.col_ids = wx.NewIdRef(len(self.labels))
+        self.cursor_text = ""
 
         for col in range(self.GetNumberCols()):
             width = table.get_col_width(col)
@@ -545,8 +543,15 @@ class TestGrid(wxg.Grid):
 
         self.SetRowLabelSize(35)
         self.EnableDragColMove(True)
+        # self.SetBackgroundColour((220, 200, 255))
+        # self.SetLabelBackgroundColour((220, 200, 255))
+        self.SetLabelBackgroundColour((225, 225, 255))
+        self.SetForegroundColour((255,255,255))
+        # self.SetGridLineColour((220, 150, 255))
+        # self.SetDefaultCellBackgroundColour((235, 220, 255))
         # self.UseNativeColHeader(True)
-
+        # colwin: wx.Window = self.GetGridColLabelWindow()
+        # colwin.SetToolTip("LABEL")
 
         self.Bind(wx.EVT_MENU_RANGE, self.on_col_menu, id=self.col_ids[0], id2=self.col_ids[-1])
         self.Bind(wxg.EVT_GRID_EDITOR_SHOWN, self.on_show_editor)
@@ -554,12 +559,35 @@ class TestGrid(wxg.Grid):
         self.Bind(wxg.EVT_GRID_COL_SIZE, self.on_col_size)
         self.Bind(wxg.EVT_GRID_CMD_LABEL_RIGHT_CLICK, self.on_label_menu)
         self.Bind(wxg.EVT_GRID_COL_MOVE, self.on_col_move)
+        self.Bind(wxg.EVT_GRID_SELECT_CELL, self.on_cell_selected)
         self.Bind(wx.EVT_KEY_DOWN, self.on_key_down)
         # self.Refresh()
     
+    def delete_selected(self):
+        """Delete the selected rows."""
+        selected = self.GetSelectedRows()
+        selected.sort(reverse=True)
+        if selected[0] == self.GetNumberRows() - 1:
+            del selected[0]
+
+        table = self.GetTable()
+        for row in selected:
+            table.DeleteRows(row, 1)
+        self.ForceRefresh()
+        self.Update()
+
     def on_cell_changed(self, evt):
         """Update the data of this grid on edit."""
         self.GetTable().update_data(None)
+        evt.Skip()
+    
+    def on_cell_selected(self, evt):
+        """Change the grid cursor text to new position."""
+        row = evt.GetRow()
+        col = evt.GetCol()
+        label = self.GetTable().GetColLabelValue(col)
+        # print()
+        self.cursor_text = "{}, {}".format(row, label)
         evt.Skip()
 
     def on_col_size(self, evt):
@@ -574,6 +602,7 @@ class TestGrid(wxg.Grid):
         col = evt.GetCol()
         pos = self.GetColPos(col)
         wx.CallAfter(self.col_moved, col, pos)
+        evt.Skip()
         # print("NEW COLUMN ORDER FOR id: {}, old_pos: {}".format(col, pos))
 
     def col_moved(self, col_id, old_pos):
@@ -582,7 +611,12 @@ class TestGrid(wxg.Grid):
         # print("New col pos: {}, old pos: {}".format(colpos, old_pos))
 
     def on_key_down(self, evt):
-        print("KEY DOWN")
+        # print("KEY DOWN")
+        keycode = evt.GetKeyCode()
+        if keycode == wx.WXK_DELETE:
+            self.delete_selected()
+
+        # print(keycode)
         evt.Skip()
 
     def on_label_menu(self, evt):
@@ -612,10 +646,10 @@ class TestGrid(wxg.Grid):
             w = table.show_column(col)
             gridcol = table.columns.index(col)
             self.SetColSize(gridcol, w)
-            print(w)
-            print(gridcol)
         else:
             table.hide_column(col)
+        # self.Layout()
+        evt.Skip()
 
     def on_show_editor(self, evt):
         """Veto edits in read only columns."""
@@ -632,6 +666,11 @@ class TestGrid(wxg.Grid):
         self.GetTable().set_fk_value(fk)
 
 
+BORDER = 5
+PARTS_NO_SELECTION = "Osat - Tuotetta ei ole valittu"
+PARTS_LABEL = "Osat tuotteeseen '{}'"
+
+
 class GroupPanel(wx.Panel):
     def __init__(self, parent):
         super().__init__(parent)
@@ -641,10 +680,19 @@ class GroupPanel(wx.Panel):
         self.grid_prod = TestGrid(self, db, "offer_products")
         self.grid_part = TestGrid(self, db, "offer_parts")
 
-        self.grid_pdef.set_fk_value(["RyhmäID"])
-        self.grid_mats.set_fk_value(["RyhmäID"])
-        self.grid_prod.set_fk_value(["RyhmäID"])
-        self.grid_part.set_fk_value(None)
+        self.label_pdef = wx.StaticText(self, label="Esimääritykset")
+        self.label_mats = wx.StaticText(self, label="Materiaalit")
+        self.label_prod = wx.StaticText(self, label="Tuotteet")
+        self.label_part = wx.StaticText(self, label=PARTS_NO_SELECTION)
+
+        self.cursor_pdef = wx.StaticText(self)
+        self.cursor_mats = wx.StaticText(self)
+        self.cursor_prod = wx.StaticText(self)
+        self.cursor_part = wx.StaticText(self)
+
+        self.set_fk(["RyhmäID"])
+        # self.SetBackgroundColour((235, 220, 255))
+        self.SetBackgroundColour((230, 230, 245))
 
         self.Bind(wxg.EVT_GRID_SELECT_CELL, self.on_product_selection, self.grid_prod)
         self.Bind(wxg.EVT_GRID_CELL_CHANGED, self.on_cell_changed, self.grid_pdef)
@@ -653,11 +701,28 @@ class GroupPanel(wx.Panel):
         self.Bind(wxg.EVT_GRID_CELL_CHANGED, self.on_cell_changed, self.grid_part)
 
         sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer.Add(self.grid_mats, 1, wx.EXPAND)
-        sizer.Add(self.grid_prod, 1, wx.EXPAND)
-        sizer.Add(self.grid_part, 1, wx.EXPAND)
-        sizer.Add(self.grid_pdef, 1, wx.EXPAND)
+        sizer_top = wx.BoxSizer(wx.HORIZONTAL)
+        sizer_pdef = self.grid_sizer(self.grid_pdef, self.label_pdef, self.cursor_pdef)
+        sizer_mats = self.grid_sizer(self.grid_mats, self.label_mats, self.cursor_mats)
+        sizer_prod = self.grid_sizer(self.grid_prod, self.label_prod, self.cursor_prod)
+        sizer_part = self.grid_sizer(self.grid_part, self.label_part, self.cursor_part)
+
+        sizer_top.Add(sizer_pdef, 2, wx.EXPAND)
+        sizer_top.Add(sizer_mats, 10, wx.EXPAND)
+        sizer.Add(sizer_top, 8, wx.EXPAND)
+        sizer.Add(sizer_prod, 10, wx.EXPAND)
+        sizer.Add(sizer_part, 10, wx.EXPAND)
         self.SetSizer(sizer)
+
+    def grid_sizer(self, grid, label, cursor_text):
+        """Create a sizer for grid, it's label and cursor text."""
+        sizer_grid = wx.BoxSizer(wx.VERTICAL)
+        sizer_label = wx.BoxSizer(wx.HORIZONTAL)
+        sizer_label.Add(label, 0, wx.RIGHT, BORDER)
+        sizer_label.Add(cursor_text, 0, wx.RIGHT, BORDER)
+        sizer_grid.Add(sizer_label, 0, wx.EXPAND|wx.ALL, BORDER)
+        sizer_grid.Add(grid, 1, wx.EXPAND)
+        return sizer_grid
 
     def on_product_selection(self, evt):
         row = evt.GetRow()
@@ -666,27 +731,27 @@ class GroupPanel(wx.Panel):
 
     def on_cell_changed(self, evt):
         eobj = evt.GetEventObject()
-        if eobj == self.grid_pdef or eobj == self.grid_mats:
-            print("CHANGE IN GRID PDEF")
+        if eobj == self.grid_pdef or eobj == self.grid_mats or eobj == self.grid_prod:
             self.grid_part.GetTable().update_data(None)
-            # grid_part.Update required for products to get updated coded values.
-            self.grid_part.Update()
-            self.grid_prod.GetTable().update_data(None)
-            self.grid_prod.Update()
-
-        elif eobj == self.grid_prod:
-            print("CHANGE IN GRID PROD")
-            self.grid_part.GetTable().update_data(None)
-            self.grid_part.Update()
             self.grid_prod.GetTable().update_data(None)
 
         elif eobj == self.grid_part:
-            print("CHANGE IN GRID PART")
-            self.grid_part.Update()
             self.grid_prod.GetTable().update_data(None)
-            # self.grid_part.GetTable().update_data(None)
 
         evt.Skip()
+
+    def set_fk(self, fk):
+        """Set the foreign key for grids contained in this panel.
+
+        Parameters
+        ----------
+        fk : Iterable
+            The foreign key, usually group_id.
+        """
+        self.grid_pdef.set_fk_value(fk)
+        self.grid_mats.set_fk_value(fk)
+        self.grid_prod.set_fk_value(fk)
+        self.grid_part.set_fk_value(None)
 
 
 if __name__ == '__main__':
