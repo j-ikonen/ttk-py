@@ -566,6 +566,9 @@ class TestGrid(wxg.Grid):
     def delete_selected(self):
         """Delete the selected rows."""
         selected = self.GetSelectedRows()
+        if len(selected) == 0:
+            return
+
         selected.sort(reverse=True)
         if selected[0] == self.GetNumberRows() - 1:
             del selected[0]
@@ -587,7 +590,7 @@ class TestGrid(wxg.Grid):
         col = evt.GetCol()
         label = self.GetTable().GetColLabelValue(col)
         # print()
-        self.cursor_text = "{}, {}".format(row, label)
+        self.cursor_text = "({}, {})".format(row, label)
         evt.Skip()
 
     def on_col_size(self, evt):
@@ -669,6 +672,8 @@ class TestGrid(wxg.Grid):
 BORDER = 5
 PARTS_NO_SELECTION = "Osat - Tuotetta ei ole valittu"
 PARTS_LABEL = "Osat tuotteeseen '{}'"
+PARTS_LABEL_ROW = "Osat tuotteeseen rivillä {}"
+PARTS_LABEL_NO_CODE = "Osat - Rivin {} tuotteella ei ole koodia."
 
 
 class GroupPanel(wx.Panel):
@@ -691,10 +696,13 @@ class GroupPanel(wx.Panel):
         self.cursor_part = wx.StaticText(self)
 
         self.set_fk(["RyhmäID"])
-        # self.SetBackgroundColour((235, 220, 255))
         self.SetBackgroundColour((230, 230, 245))
 
         self.Bind(wxg.EVT_GRID_SELECT_CELL, self.on_product_selection, self.grid_prod)
+        self.Bind(wxg.EVT_GRID_SELECT_CELL, self.update_cursor_text, self.grid_pdef)
+        self.Bind(wxg.EVT_GRID_SELECT_CELL, self.update_cursor_text, self.grid_mats)
+        self.Bind(wxg.EVT_GRID_SELECT_CELL, self.update_cursor_text, self.grid_prod)
+        self.Bind(wxg.EVT_GRID_SELECT_CELL, self.update_cursor_text, self.grid_part)
         self.Bind(wxg.EVT_GRID_CELL_CHANGED, self.on_cell_changed, self.grid_pdef)
         self.Bind(wxg.EVT_GRID_CELL_CHANGED, self.on_cell_changed, self.grid_mats)
         self.Bind(wxg.EVT_GRID_CELL_CHANGED, self.on_cell_changed, self.grid_prod)
@@ -707,6 +715,8 @@ class GroupPanel(wx.Panel):
         sizer_prod = self.grid_sizer(self.grid_prod, self.label_prod, self.cursor_prod)
         sizer_part = self.grid_sizer(self.grid_part, self.label_part, self.cursor_part)
 
+        self.sizer_parts = sizer_part
+
         sizer_top.Add(sizer_pdef, 2, wx.EXPAND)
         sizer_top.Add(sizer_mats, 10, wx.EXPAND)
         sizer.Add(sizer_top, 8, wx.EXPAND)
@@ -718,7 +728,7 @@ class GroupPanel(wx.Panel):
         """Create a sizer for grid, it's label and cursor text."""
         sizer_grid = wx.BoxSizer(wx.VERTICAL)
         sizer_label = wx.BoxSizer(wx.HORIZONTAL)
-        sizer_label.Add(label, 0, wx.RIGHT, BORDER)
+        sizer_label.Add(label, 0, wx.RIGHT, BORDER * 3)
         sizer_label.Add(cursor_text, 0, wx.RIGHT, BORDER)
         sizer_grid.Add(sizer_label, 0, wx.EXPAND|wx.ALL, BORDER)
         sizer_grid.Add(grid, 1, wx.EXPAND)
@@ -728,6 +738,23 @@ class GroupPanel(wx.Panel):
         row = evt.GetRow()
         product_id = self.grid_prod.GetTable().GetPkValue(row)
         self.grid_part.set_fk_value(product_id)
+        try:
+            col = self.grid_prod.GetTable().col_labels.index("Koodi")
+        except ValueError:
+            label = PARTS_LABEL_ROW.format(row)
+        else:
+            try:
+                prod_code = self.grid_prod.GetTable().data[row][col]
+            except IndexError:
+                label = PARTS_NO_SELECTION
+            else:
+                if prod_code is None or prod_code == "":
+                    label = PARTS_LABEL_NO_CODE.format(row)
+                else:
+                    label = PARTS_LABEL.format(prod_code)
+
+        self.label_part.SetLabel(label)
+        self.sizer_parts.Layout()
 
     def on_cell_changed(self, evt):
         eobj = evt.GetEventObject()
@@ -752,6 +779,26 @@ class GroupPanel(wx.Panel):
         self.grid_mats.set_fk_value(fk)
         self.grid_prod.set_fk_value(fk)
         self.grid_part.set_fk_value(None)
+
+    def update_cursor_text(self, evt):
+        eobj = evt.GetEventObject()
+        if eobj == self.grid_pdef:
+            cursor_text = self.grid_pdef.cursor_text
+            self.cursor_pdef.SetLabel(cursor_text)
+
+        elif eobj == self.grid_mats:
+            cursor_text = self.grid_mats.cursor_text
+            self.cursor_mats.SetLabel(cursor_text)
+
+        elif eobj == self.grid_prod:
+            cursor_text = self.grid_prod.cursor_text
+            self.cursor_prod.SetLabel(cursor_text)
+
+        elif eobj == self.grid_part:
+            cursor_text = self.grid_part.cursor_text
+            self.cursor_part.SetLabel(cursor_text)
+
+        evt.Skip()
 
 
 if __name__ == '__main__':
