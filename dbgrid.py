@@ -1,10 +1,7 @@
 """
 TODO
 ----
-    Create a diagram for SetValue logic.
-    Get the value from database in GetValue.
-    Create Parts custom table.
-
+    Save to database context menu option.
 """
 
 import wx
@@ -446,10 +443,7 @@ class GroupProductsTable(DatabaseGridTable):
     def update_data(self, row):
         if super().update_data(row):
             res = self.db.get_oproducts(self.fk_value[0])
-            print("\n")
             for datarow in res:
-                # print("PROD: {}".format(datarow[12]))
-                # print(datarow)
                 self.data.append(list(datarow))
 
             self.GetView().ForceRefresh()
@@ -500,9 +494,7 @@ class GroupPartsTable(DatabaseGridTable):
 
     def update_data(self, row):
         if super().update_data(row):
-
             res = self.db.get_oparts(self.fk_value[0])
-            print("\n")
             for datarow in res:
                 self.data.append(list(datarow))
             self.GetView().ForceRefresh()
@@ -539,7 +531,6 @@ class GroupPredefsTable(DatabaseGridTable):
 
     def update_data(self, row):
         if super().update_data(row):
-
             res = self.db.get_opredefs(self.fk_value[0])
             for datarow in res:
                 self.data.append(list(datarow))
@@ -585,18 +576,31 @@ class TestGrid(wxg.Grid):
         # colwin: wx.Window = self.GetGridColLabelWindow()
         # colwin.SetToolTip("LABEL")
 
+        self.Bind(wx.EVT_KEY_DOWN, self.on_key_down)
         self.Bind(wx.EVT_MENU_RANGE, self.on_col_menu, id=self.col_ids[0], id2=self.col_ids[-1])
+        
+        self.Bind(wx.EVT_MENU, self.on_copy, id=wx.ID_COPY)
+        self.Bind(wx.EVT_MENU, self.on_cut, id=wx.ID_CUT)
+        self.Bind(wx.EVT_MENU, self.on_paste, id=wx.ID_PASTE)
+        self.Bind(wx.EVT_MENU, self.on_undo, id=wx.ID_UNDO)
+        self.Bind(wx.EVT_MENU, self.on_delete, id=wx.ID_DELETE)
+
         self.Bind(wxg.EVT_GRID_EDITOR_SHOWN, self.on_show_editor)
+        self.Bind(wxg.EVT_GRID_SELECT_CELL, self.on_cell_selected)
         self.Bind(wxg.EVT_GRID_CELL_CHANGING, self.on_cell_changing)
         self.Bind(wxg.EVT_GRID_CELL_CHANGED, self.on_cell_changed)
         self.Bind(wxg.EVT_GRID_COL_SIZE, self.on_col_size)
-        self.Bind(wxg.EVT_GRID_CMD_LABEL_RIGHT_CLICK, self.on_label_menu)
         self.Bind(wxg.EVT_GRID_COL_MOVE, self.on_col_move)
-        self.Bind(wxg.EVT_GRID_SELECT_CELL, self.on_cell_selected)
-        self.Bind(wx.EVT_KEY_DOWN, self.on_key_down)
+        self.Bind(wxg.EVT_GRID_CELL_RIGHT_CLICK, self.on_context_menu)
+        self.Bind(wxg.EVT_GRID_CMD_LABEL_RIGHT_CLICK, self.on_label_menu)
+        self.Bind(wxg.EVT_GRID_LABEL_LEFT_CLICK, self.on_label_lclick)
     
     def copy(self):
-        """Copy the selected rows or blocks. Clears the other."""
+        """Copy the selected rows or blocks. Clears the other.
+        
+        parent.copy var in form:
+        Selected block: [ rows in block: [ cols in block: [] ] ]
+        """
         selected = self.GetSelectedRows()
         selected.sort()
         self.copy_rows.clear()
@@ -613,18 +617,18 @@ class TestGrid(wxg.Grid):
             if not has_sel:
                 crd = self.GetGridCursorCoords()
                 value = self.GetTable().GetValue(crd.GetRow(), crd.GetCol())
-                parent.copy.append([[value]])
-            print(parent.copy)
+                parent.copy.append([value])
+            # print(parent.copy)
         else:
             for row in selected:
                 rowdata = self.GetTable().get_rowdata(row)
                 self.copy_rows.append(rowdata)
 
     def delete(self):
-        """Delete the selected rows."""
+        """Delete the selected rows. Return True if deleted something."""
         selected = self.GetSelectedRows()
         if len(selected) == 0:
-            return
+            return False
 
         self.save_state()
         selected.sort(reverse=True)
@@ -637,6 +641,7 @@ class TestGrid(wxg.Grid):
             table.DeleteRows(row, 1)
         self.GetTable().update_data(None)
         self.GetParent().update_depended_grids(self)
+        return True
 
     def paste(self):
         """Paste the copied values to selection.
@@ -668,7 +673,7 @@ class TestGrid(wxg.Grid):
                     c_offset = crd[1]
                     for row, rowdata in enumerate(parent.copy[n]):
                         for col, value in enumerate(rowdata):
-                            print("SET: {}, r,c: {},{}".format(value, row + r_offset, col + c_offset))
+                            # print("SET: {}, r,c: {},{}".format(value, row + r_offset, col + c_offset))
                             table.SetValue(row + r_offset, col + c_offset, value)
 
                 table.update_data(None)
@@ -735,8 +740,8 @@ class TestGrid(wxg.Grid):
 
         # DEL
         if keycode == wx.WXK_DELETE:
-            self.delete()
-            return
+            if self.delete():
+                return
 
         # CTRL+C
         elif keycode == 67 and evt.GetModifiers() == wx.MOD_CONTROL:
@@ -752,9 +757,65 @@ class TestGrid(wxg.Grid):
 
         evt.Skip()
 
+    def on_label_lclick(self, evt):
+        """Set focus on lclick on label."""
+        self.SetFocus()
+        evt.Skip()
+
+    def on_context_menu(self, evt):
+        """Open the context menu for the grid."""
+        menu = wx.Menu()
+        row = evt.GetRow()
+        col = evt.GetCol()
+
+        # Clear selection and set grid cursor to clicked cell if
+        # right click was not in a selected cell.
+        if not self.IsInSelection(row, col):
+            self.ClearSelection()
+            self.SetGridCursor(row, col)
+
+        # if not hasattr(self, "id_copy"):
+        #     self.id_copy = wx.NewIdRef()
+        #     self.id_cut = wx.NewIdRef()
+        #     self.id_paste = wx.NewIdRef()
+        #     self.id_undo = wx.NewIdRef()
+        #     self.id_del = wx.NewIdRef()
+
+        menu.Append(wx.ID_UNDO)
+        menu.Append(wx.ID_CUT)
+        menu.Append(wx.ID_COPY)
+        menu.Append(wx.ID_PASTE)
+        menu.Append(wx.ID_DELETE)
+        self.PopupMenu(menu)
+
+        menu.Destroy()
+        evt.Skip()
+
+    def on_copy(self, evt):
+        """Do action selected in context menu."""
+        self.copy()
+
+    def on_cut(self, evt):
+        """Do action selected in context menu."""
+        # self.cut()
+        pass
+
+    def on_paste(self, evt):
+        """Do action selected in context menu."""
+        self.paste()
+
+    def on_undo(self, evt):
+        """Do action selected in context menu."""
+        self.undo()
+
+    def on_delete(self, evt):
+        """Do action selected in context menu."""
+        self.delete()
+
     def on_label_menu(self, evt):
-        """Open menu to select visible columns."""
-        print("LABEL MENU")
+        """Open menu to select visible columns. Set focus on this grid."""
+        # print("LABEL MENU")
+        self.SetFocus()
         menu = wx.Menu()
         table = self.GetTable()
 
@@ -796,10 +857,12 @@ class TestGrid(wxg.Grid):
 
     def set_fk_value(self, fk):
         """Set the foreign key for the table of this grid."""
+        # Init the history for a new foreign key.
         if fk is not None:
             key = tuple(fk)
             if key not in self.history:
                 self.history[key] = []
+        # Clear copy and grid cursor variables.
         self.copy_rows.clear()
         self.copy_cells.clear()
         self.cursor_text = ""
@@ -899,6 +962,7 @@ class GroupPanel(wx.Panel):
 
         self.label_part.SetLabel(label)
         self.sizer_parts.Layout()   # Moves the labels to new positions
+        evt.Skip()
 
     def on_cell_changed(self, evt):
         """Update the data on dependend grids on entering a value to a cell."""
