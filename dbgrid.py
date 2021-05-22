@@ -238,12 +238,10 @@ class DatabaseGridTable(wxg.GridTableBase):
         self.fk_value = value
 
         oldlen = self.GetNumberRows()
-        # self.is_changed = True
         self.update_data(None)
         self.GetView().ForceRefresh()
         newlen = self.GetNumberRows()
         self.change_number_rows(oldlen, newlen)
-        # print(f"old: {oldlen}, new: {newlen}")
 
     def change_number_rows(self, old, new):
         
@@ -356,10 +354,29 @@ class DatabaseGridTable(wxg.GridTableBase):
         self.GetView().ProcessTableMessage(msg)
         self.GetView().PostSizeEventToParent()
         return True
-    
+
     def get_rowdata(self, row):
         """Return a copy of the data in given row."""
         return [value for value in self.data[row]]
+
+    def get_blockdata(self, block):
+        """Return the data contained in given block."""
+        data = []
+        for row in range(block.GetTopRow(), block.GetBottomRow() + 1):
+            rowdata = []
+            for col in range(block.GetLeftCol(), block.GetRightCol() + 1):
+                rowdata.append(self.GetValue(row, col))
+            data.append(rowdata)
+        return data
+
+    def get_data(self):
+        """Get a copy of the data."""
+        return [[v for v in row] for row in self.data]
+
+    def get_fk_value(self):
+        """Return value of foreign key."""
+        return self.fk_value
+
 
 class GroupMaterialsTable(DatabaseGridTable):
     def __init__(self, db: tb.OfferTables):
@@ -549,7 +566,8 @@ class TestGrid(wxg.Grid):
         self.col_ids = wx.NewIdRef(len(self.labels))
         self.cursor_text = ""
         self.copy_rows = []
-        self.copy_cells = {}    # {CellCoords: GetValue(CellCoords)}
+        self.copy_cells = []
+        self.history = {}
 
         for col in range(self.GetNumberCols()):
             width = table.get_col_width(col)
@@ -569,24 +587,35 @@ class TestGrid(wxg.Grid):
 
         self.Bind(wx.EVT_MENU_RANGE, self.on_col_menu, id=self.col_ids[0], id2=self.col_ids[-1])
         self.Bind(wxg.EVT_GRID_EDITOR_SHOWN, self.on_show_editor)
+        self.Bind(wxg.EVT_GRID_CELL_CHANGING, self.on_cell_changing)
         self.Bind(wxg.EVT_GRID_CELL_CHANGED, self.on_cell_changed)
         self.Bind(wxg.EVT_GRID_COL_SIZE, self.on_col_size)
         self.Bind(wxg.EVT_GRID_CMD_LABEL_RIGHT_CLICK, self.on_label_menu)
         self.Bind(wxg.EVT_GRID_COL_MOVE, self.on_col_move)
         self.Bind(wxg.EVT_GRID_SELECT_CELL, self.on_cell_selected)
         self.Bind(wx.EVT_KEY_DOWN, self.on_key_down)
-        # self.Refresh()
     
     def copy(self):
-        """Copy the selected rows."""
+        """Copy the selected rows or blocks. Clears the other."""
         selected = self.GetSelectedRows()
         selected.sort()
+        self.copy_rows.clear()
+        self.copy_cells.clear()
         if len(selected) == 0:
             selected_blocks = self.GetSelectedBlocks()
+            parent = self.GetParent()
+            parent.copy.clear()
+            has_sel = False
             for block in selected_blocks:
-                print(block)
+                has_sel = True
+                blockdata = self.GetTable().get_blockdata(block)
+                parent.copy.append(blockdata)
+            if not has_sel:
+                crd = self.GetGridCursorCoords()
+                value = self.GetTable().GetValue(crd.GetRow(), crd.GetCol())
+                parent.copy.append([[value]])
+            print(parent.copy)
         else:
-            self.copy_rows.clear()
             for row in selected:
                 rowdata = self.GetTable().get_rowdata(row)
                 self.copy_rows.append(rowdata)
@@ -597,7 +626,9 @@ class TestGrid(wxg.Grid):
         if len(selected) == 0:
             return
 
+        self.save_state()
         selected.sort(reverse=True)
+        # Do not delete the empty last row.
         if selected[0] == self.GetNumberRows() - 1:
             del selected[0]
 
@@ -608,16 +639,66 @@ class TestGrid(wxg.Grid):
         self.GetParent().update_depended_grids(self)
 
     def paste(self):
-        """Paste the copied values to selection."""
-        self.GetTable().append_rows(self.copy_rows, True)
-        self.GetParent().update_depended_grids(self)
-        # self.ForceRefresh()
+        """Paste the copied values to selection.
+
+        Depending on if last copy was on rows or blocks,
+        append all copied rows to end of grid or
+        paste as many blocks as there are selected blocks.
+        """
+        if len(self.copy_rows) > 0:
+            self.save_state()
+            self.GetTable().append_rows(self.copy_rows, True)
+            self.GetParent().update_depended_grids(self)
+        else:
+            parent = self.GetParent()
+            if len(parent.copy) > 0:
+                table: DatabaseGridTable = self.GetTable()
+                self.save_state()
+                coords = [
+                    (block.GetTopRow(), block.GetLeftCol()) 
+                    for block in self.GetSelectedBlocks()
+                ]
+                if len(coords) == 0:
+                    coords = [self.GetGridCursorCoords()]
+
+                for n, crd in enumerate(coords):
+                    if n >= len(parent.copy):
+                        return
+                    r_offset = crd[0]
+                    c_offset = crd[1]
+                    for row, rowdata in enumerate(parent.copy[n]):
+                        for col, value in enumerate(rowdata):
+                            print("SET: {}, r,c: {},{}".format(value, row + r_offset, col + c_offset))
+                            table.SetValue(row + r_offset, col + c_offset, value)
+
+                table.update_data(None)
+
+    def undo(self):
+        """Undo the last action."""
+        table: DatabaseGridTable = self.GetTable()
+        key = tuple(table.get_fk_value())
+        try:
+            data = self.history[key].pop()
+        except IndexError:
+            print("UNDO - No saved data to use.")
+        else:
+            table.DeleteRows(0, self.GetNumberRows() - 1)
+            table.append_rows(data, False)
+
+    def save_state(self):
+        """Save the current data state in table to history."""
+        table: DatabaseGridTable = self.GetTable()
+        self.history[tuple(table.get_fk_value())].append(table.get_data())
+
+    def on_cell_changing(self, evt):
+        """Save the state to history before cell change."""
+        self.save_state()
 
     def on_cell_changed(self, evt):
         """Update the data of this grid on edit."""
         self.GetTable().update_data(None)
         evt.Skip()
-    
+
     def on_cell_selected(self, evt):
         """Change the grid cursor text to new position."""
         row = evt.GetRow()
@@ -655,6 +736,7 @@ class TestGrid(wxg.Grid):
         # DEL
         if keycode == wx.WXK_DELETE:
             self.delete()
+            return
 
         # CTRL+C
         elif keycode == 67 and evt.GetModifiers() == wx.MOD_CONTROL:
@@ -663,7 +745,10 @@ class TestGrid(wxg.Grid):
         # CTRL+V
         elif keycode == 86 and evt.GetModifiers() == wx.MOD_CONTROL:
             self.paste()
-            print("CTRL+V")
+
+        # CTRL+Z
+        elif keycode == 90 and evt.GetModifiers() == wx.MOD_CONTROL:
+            self.undo()
 
         evt.Skip()
 
@@ -711,6 +796,13 @@ class TestGrid(wxg.Grid):
 
     def set_fk_value(self, fk):
         """Set the foreign key for the table of this grid."""
+        if fk is not None:
+            key = tuple(fk)
+            if key not in self.history:
+                self.history[key] = []
+        self.copy_rows.clear()
+        self.copy_cells.clear()
+        self.cursor_text = ""
         self.GetTable().set_fk_value(fk)
 
 
@@ -724,6 +816,8 @@ PARTS_LABEL_NO_CODE = "Osat - Rivin {} tuotteella ei ole koodia."
 class GroupPanel(wx.Panel):
     def __init__(self, parent):
         super().__init__(parent)
+
+        self.copy = []
 
         self.grid_pdef = TestGrid(self, db, "offer_predefs")
         self.grid_mats = TestGrid(self, db, "offer_materials")
