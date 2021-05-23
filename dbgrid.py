@@ -1,7 +1,6 @@
 """
 TODO
 ----
-    Save to database context menu option.
 """
 
 import wx
@@ -374,12 +373,57 @@ class DatabaseGridTable(wxg.GridTableBase):
         """Return value of foreign key."""
         return self.fk_value
 
+    def save_to_db(self, rows, key, value):
+        """Save the given rows to database.
+
+        Parameters
+        ----------
+        rows : list
+            List of row indexes.
+        key : Iterable
+            Key to add to all rows.
+        value : Iterable
+            Value to add to key at all rows.
+
+        Returns
+        -------
+        bool
+            True if successul.
+        """
+        if self.dbtablename is not None:
+            todb = [
+                [self.data[row][self.col_keys.index(k)] for k in self.save_keys] + value
+                    for row in rows
+            ]
+            return self.db.insert(
+                self.dbtablename,
+                self.save_keys + key,
+                todb,
+                True
+            )
+        else:
+            return False
+
+    def can_save_to_db(self):
+        """Return True if this table can save the data to a database."""
+        return False if self.dbtablename is None else True
+
+    def find_value(self, key, find_key, find_value):
+        """Return a value at col key and row where col find_key has value find_value."""
+        col = self.col_keys.index(key)
+        fcol = self.col_keys.index(find_key)
+        for rowdata in self.data:
+            print("{} == {} ?".format(rowdata[fcol], find_value))
+            if rowdata[fcol] == find_value:
+                return rowdata[col]
+        return None
 
 class GroupMaterialsTable(DatabaseGridTable):
     def __init__(self, db: tb.OfferTables):
         super().__init__(db)
 
         self.tablename = "offer_materials"
+        self.dbtablename = "materials"
         setup = db.get_columns(self.tablename)
         self.pk = ["id"]
         self.fk = ["group_id"]
@@ -393,7 +437,20 @@ class GroupMaterialsTable(DatabaseGridTable):
         self.unique = []
         self.read_only = []
         self.cant_update = [13]
-        self.dbcols = [n for n in range(13)]
+        self.dbcols = [n for n in range(13)]    # offer_materials
+        self.save_keys = [
+            "code",        
+            "category",    
+            "desc",        
+            "prod",        
+            "thickness",   
+            "unit",        
+            "cost",        
+            "add_cost",    
+            "edg_cost",    
+            "loss",        
+            "discount" 
+        ]                  # materials
 
         for n, val in enumerate(setup):
             if val[tb.UNIQUE] == 1:
@@ -431,7 +488,18 @@ class GroupProductsTable(DatabaseGridTable):
         # self.ro_dependency = [8, 9, 10, 11, 12]
         self.cant_update = [13]
         self.dbcols = [n for n in range(12)]
-
+        self.dbtablename = "products"
+        self.save_keys = [
+            "code",
+            "category",
+            "desc",
+            "prod",
+            "inst_unit",
+            "width",
+            "height",
+            "depth",
+            "work_time"
+        ]
         for n, val in enumerate(setup):
             if val[tb.UNIQUE] == 1:
                 self.unique.append(n)
@@ -473,16 +541,28 @@ class GroupPartsTable(DatabaseGridTable):
         self.aeval = Interpreter()
         self.parse_done = False
         self.dbcols = [n for n in range(14)]
-        self.code2col = {
-            "määrä": 4,
-            "leveys": 8,
-            "pituus": 9,
-            "mpaksuus": 15,
-            "mhinta": 16,
-            "tleveys": 17,
-            "tkorkeus": 18,
-            "tsyvyys": 19
-        }
+        self.dbtablename = "parts"
+        self.save_keys = [
+            "code",
+            "part",
+            "desc",
+            "default_mat",
+            "width",
+            "length",
+            "code_width",
+            "code_length",
+            "cost"
+        ]
+        # self.code2col = {
+        #     "määrä": 4,
+        #     "leveys": 8,
+        #     "pituus": 9,
+        #     "mpaksuus": 15,
+        #     "mhinta": 16,
+        #     "tleveys": 17,
+        #     "tkorkeus": 18,
+        #     "tsyvyys": 19
+        # }
 
         for n, val in enumerate(setup):
             if val[tb.UNIQUE] == 1:
@@ -690,6 +770,22 @@ class TestGrid(wxg.Grid):
             table.DeleteRows(0, self.GetNumberRows() - 1)
             table.append_rows(data, False)
 
+    def save(self):
+        """Save the selected items to database."""
+        selected = self.GetSelectedRows()
+        if len(selected) == 0:
+            return False
+
+        table: DatabaseGridTable = self.GetTable()
+        if table.tablename == "offer_parts":
+            key = ["product_code"]
+            value = [self.GetParent().find("code", "id", table.fk_value)]
+        else:
+            key = None
+            value = None
+        if not table.save_to_db(selected, key, value):
+            print("Error in saving to database.")
+
     def save_state(self):
         """Save the current data state in table to history."""
         table: DatabaseGridTable = self.GetTable()
@@ -767,6 +863,7 @@ class TestGrid(wxg.Grid):
         menu = wx.Menu()
         row = evt.GetRow()
         col = evt.GetCol()
+        table = self.GetTable()
 
         # Clear selection and set grid cursor to clicked cell if
         # right click was not in a selected cell.
@@ -774,18 +871,24 @@ class TestGrid(wxg.Grid):
             self.ClearSelection()
             self.SetGridCursor(row, col)
 
-        # if not hasattr(self, "id_copy"):
-        #     self.id_copy = wx.NewIdRef()
-        #     self.id_cut = wx.NewIdRef()
-        #     self.id_paste = wx.NewIdRef()
-        #     self.id_undo = wx.NewIdRef()
-        #     self.id_del = wx.NewIdRef()
+        if not hasattr(self, "id_todb"):
+            self.id_todb = wx.NewIdRef()
+            self.Bind(wx.EVT_MENU, self.on_save, id=self.id_todb)
 
+        # item = wx.MenuItem(menu, wx.ID_UNDO, "", "Undo the previous action.")
+        # menu.Append(item)
         menu.Append(wx.ID_UNDO)
         menu.Append(wx.ID_CUT)
         menu.Append(wx.ID_COPY)
         menu.Append(wx.ID_PASTE)
-        menu.Append(wx.ID_DELETE)
+        menu.AppendSeparator()
+        menu.Append(wx.ID_DELETE, "Poista\tDelete")
+        
+        # Only add db items if the grid table has database table.
+        if table.can_save_to_db():
+            menu.AppendSeparator()
+            menu.Append(self.id_todb, "Tallenna", "Tallenna valinta tietokantaan")
+
         self.PopupMenu(menu)
 
         menu.Destroy()
@@ -803,6 +906,10 @@ class TestGrid(wxg.Grid):
     def on_paste(self, evt):
         """Do action selected in context menu."""
         self.paste()
+
+    def on_save(self, evt):
+        """Do action selected in context menu."""
+        self.save()
 
     def on_undo(self, evt):
         """Do action selected in context menu."""
@@ -1015,7 +1122,9 @@ class GroupPanel(wx.Panel):
             self.cursor_part.SetLabel(cursor_text)
 
         evt.Skip()
-        
+
+    def find(self, key, find_key, find_value):
+        return self.grid_prod.GetTable().find_value(key, find_key, find_value[0])
 
 if __name__ == '__main__':
     app = wx.App()

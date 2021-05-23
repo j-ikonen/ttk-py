@@ -244,6 +244,7 @@ sql_create_table_offer_materials = """
             ON UPDATE CASCADE
     )
 """
+
 columns_omats = [
     ("offer_materials", "id", "ID", "string", 0, 80, 1, 1),
     ("offer_materials", "group_id", "RyhmäID", "string", 1, 80, 1, 1),
@@ -425,12 +426,12 @@ sql_create_table_materials = """
         category    TEXT,
         desc        TEXT,
         prod        TEXT,
-        unit        TEXT,
         thickness   INTEGER,
-        loss        REAL,
+        unit        TEXT,
         cost        REAL,
-        edg_cost    REAL,
         add_cost    REAL,
+        edg_cost    REAL,
+        loss        REAL,
         discount    REAL
     )
 """
@@ -444,15 +445,14 @@ sql_create_table_products = """
         width       INTEGER,
         height      INTEGER,
         depth       INTEGER,
-        work_time   REAL,
-        work_cost   REAL
+        work_time   REAL
     )
 """
 sql_create_table_parts = """
     CREATE TABLE IF NOT EXISTS parts (
-        code            TEXT NOT NULL,
+        part            TEXT,
+        code            TEXT,
         product_code    TEXT,
-        category        TEXT,
         desc            TEXT,
         default_mat     TEXT,
         width           INTEGER,
@@ -461,7 +461,7 @@ sql_create_table_parts = """
         code_length     TEXT,
         cost            REAL,
 
-        PRIMARY KEY (code, product_code),
+        PRIMARY KEY (part, product_code),
         FOREIGN KEY (product_code)
             REFERENCES offer_products (code)
             ON DELETE CASCADE
@@ -538,7 +538,8 @@ class OfferTables:
         # for table, sql in sql_create_table.items():
             # cur.execute("""DROP TABLE IF EXISTS {};""".format(table))
             # self.create_table(sql)
-
+        # cur.execute("""DROP TABLE IF EXISTS parts;""")
+        # self.create_table(sql_create_table_parts)
         # self.insert("columns", columns_keys, columns_omats, True)
         # self.insert("columns", columns_keys, columns_oproducts, True)
         # self.insert("columns", columns_keys, columns_oparts, True)
