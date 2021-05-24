@@ -1,3 +1,6 @@
+"""Dialog for searching and opening an offer."""
+
+
 import wx
 import wx.dataview as dv
 

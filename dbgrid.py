@@ -679,7 +679,7 @@ class GroupPredefsTable(DatabaseGridTable):
             self.GetView().ForceRefresh()
 
 
-class TestGrid(wxg.Grid):
+class DbGrid(wxg.Grid):
     def __init__(self, parent, db, name):
         super().__init__(parent, style=wx.WANTS_CHARS|wx.HD_ALLOW_REORDER)
 
@@ -1103,15 +1103,16 @@ PARTS_LABEL_NO_CODE = "Osat - Rivin {} tuotteella ei ole koodia."
 
 
 class GroupPanel(wx.Panel):
-    def __init__(self, parent):
+    def __init__(self, parent, db):
         super().__init__(parent)
 
         self.copy = []
+        self.group_pk = None
 
-        self.grid_pdef = TestGrid(self, db, "offer_predefs")
-        self.grid_mats = TestGrid(self, db, "offer_materials")
-        self.grid_prod = TestGrid(self, db, "offer_products")
-        self.grid_part = TestGrid(self, db, "offer_parts")
+        self.grid_pdef = DbGrid(self, db, "offer_predefs")
+        self.grid_mats = DbGrid(self, db, "offer_materials")
+        self.grid_prod = DbGrid(self, db, "offer_products")
+        self.grid_part = DbGrid(self, db, "offer_parts")
 
         self.label_pdef = wx.StaticText(self, label="Esimääritykset")
         self.label_mats = wx.StaticText(self, label="Materiaalit")
@@ -1208,6 +1209,18 @@ class GroupPanel(wx.Panel):
         elif grid == self.grid_part:
             self.grid_prod.GetTable().update_data(None)
 
+    def set_pk(self, pk):
+        """Primary key of offer_groups, foreign key of the grids in this panel."""
+        if pk is None:
+            self.group_pk = None
+            self.set_fk(None)
+        else:
+            self.group_pk = [pk]
+            self.set_fk([pk])
+
+    def get_pk(self):
+        return self.group_pk[0]
+
     def set_fk(self, fk):
         """Set the foreign key for grids contained in this panel.
 
@@ -1251,7 +1264,7 @@ if __name__ == '__main__':
 
     frame = wx.Frame(None, size=(1500, 800))
     db = tb.OfferTables()
-    panel = GroupPanel(frame)
+    panel = GroupPanel(frame, db)
     frame.Show()
 
     app.MainLoop()

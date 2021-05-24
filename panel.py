@@ -20,7 +20,8 @@ from wx.core import TextEntryDialog
 from database_panel import DatabasePanel
 from offer_dialog import OfferDialog
 from tree_panel import TreePanel
-from grouppage import GroupPage
+# from grouppage import GroupPage
+from dbgrid import GroupPanel
 from offerpage import OfferPage
 import table as tb
 
@@ -43,12 +44,7 @@ class Panel(wx.Panel):
         super().__init__(parent)
 
         self.tables: tb.OfferTables = tables
-        self.open_offers = [
-            self.tables.offer_data[0][0],
-            self.tables.offer_data[1][0],
-            self.tables.offer_data[2][0],
-            self.tables.offer_data[3][0]
-        ]
+        self.open_offers = []
         self.active_offer = None
         self.active_group = None
 
@@ -72,7 +68,7 @@ class Panel(wx.Panel):
         self.Bind(dv.EVT_DATAVIEW_ITEM_CONTEXT_MENU, self.on_tree_context_menu, self.treepanel.tree)
 
         self.page_offer = OfferPage(self.book, self.tables)
-        self.page_group = GroupPage(self.book, self.tables)
+        self.page_group = GroupPanel(self.book, self.tables)
         self.page_db = DatabasePanel(self.book, self.tables)
 
         self.page_db.SetBackgroundColour((220, 220, 255))
@@ -157,7 +153,7 @@ class Panel(wx.Panel):
                     self.page_group.set_pk(None)
 
             # Selection changed group.
-            if len(data) > 1 and self.page_group.pk_val != data[1]:
+            if len(data) > 1 and self.page_group.get_pk() != data[1]:
                 self.page_group.set_pk(data[1])
 
                 self.page_db.set_move_to_id("materials", data[1])

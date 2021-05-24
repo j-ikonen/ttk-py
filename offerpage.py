@@ -2,7 +2,6 @@ import wx
 
 import table as tb
 from objectgrid import ObjectGrid
-from grid import BaseGrid, FieldCountGrid
 
 
 TXT_NAME = "Tarjous: {}"
@@ -23,7 +22,7 @@ class OfferPage(wx.Panel):
         self.txt_name = wx.StaticText(self, label=TXT_NAME_NO_SEL, size=(180, -1))
         self.btn_edit_name = wx.Button(self, label=BTN_EDIT_NAME)
         self.grid_client = ObjectGrid(self, tables, "client")
-        self.grid_fc = FieldCountGrid(self, tables)
+        # self.grid_fc = FieldCountGrid(self, tables)
 
         self.Bind(wx.EVT_SIZE, self.on_size)
         self.Bind(wx.EVT_BUTTON, self.on_btn_name, self.btn_edit_name)
@@ -38,7 +37,7 @@ class OfferPage(wx.Panel):
         sizer_label.Add(self.txt_name, 0, wx.RIGHT, BORDER)
         sizer_label.Add(self.btn_edit_name, 0, wx.RIGHT, BORDER)
 
-        sizer_fc.Add(self.grid_fc, 1, wx.EXPAND)
+        # sizer_fc.Add(self.grid_fc, 1, wx.EXPAND)
         sizer_client.Add(self.grid_client, 1, wx.EXPAND|wx.RIGHT, BORDER)
         sizer_client.Add(sizer_fc, 1, wx.EXPAND)
 
@@ -59,7 +58,7 @@ class OfferPage(wx.Panel):
         """Refresh the page with new values from tables."""
         if self.pk_val is None:
             self.txt_name.SetLabel(TXT_NAME_NO_SEL)
-            self.grid_fc.clear_content()
+            # self.grid_fc.clear_content()
             self.grid_client.ClearGrid()
         else:
             name = self.tables.get(
@@ -69,8 +68,8 @@ class OfferPage(wx.Panel):
                 [self.pk_val]
             )
             self.txt_name.SetLabel(name[0])
-            fcdata = self.tables.get_fieldcount(self.pk_val)
-            self.grid_fc.set_content(fcdata)
+            # fcdata = self.tables.get_fieldcount(self.pk_val)
+            # self.grid_fc.set_content(fcdata)
 
     def refresh_client(self):
         """Refresh the data in client grid."""
@@ -104,7 +103,7 @@ class OfferPage(wx.Panel):
                 self.tables.update_one(
                     "offers",
                     "name",
-                    "id",
+                    ["id"],
                     [name, self.pk_val]
                 )
                 self.GetGrandParent().GetParent().refresh_tree()
