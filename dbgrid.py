@@ -782,15 +782,12 @@ class TestGrid(wxg.Grid):
                     return
                 r_offset = crd[0]
                 c_offset = crd[1]
-                new_rows = self.GetNumberRows() - len(parent.copy[n]) + r_offset
-                if new_rows > 0:
-                    pass
                 for row, rowdata in enumerate(parent.copy[n]):
                     for col, value in enumerate(rowdata):
                         in_row = row + r_offset
                         in_col = col + c_offset
                         if in_col < self.GetNumberCols():
-                            table.SetValue(in_row, col + in_col)
+                            table.SetValue(in_row, in_col, value)
                         else:
                             print("Part of selection is out of bounds of the grid.")
                         table.update_data(None)
