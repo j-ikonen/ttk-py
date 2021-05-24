@@ -236,7 +236,7 @@ sql_create_table_offer_materials = """
         discount    REAL DEFAULT 0.0,
         tot_cost    REAL
             GENERATED ALWAYS AS
-            ((cost + edg_cost + add_cost) * (1 + loss) * (1 - discount))
+            ((cost * (1 + loss) + edg_cost + add_cost) * (1 - discount))
             STORED,
 
         FOREIGN KEY (group_id) REFERENCES offer_groups (id)
@@ -481,7 +481,7 @@ sql_create_table = {
     "products": sql_create_table_products,
     "parts": sql_create_table_parts
 }
-sql_insert_general = """INSERT INTO {table} ({columns}) VALUES ({qm})"""
+sql_insert_general = """INSERT{replace}INTO {table} ({columns}) VALUES ({qm})"""
 
 sql_insert_default_fcmults = """INSERT INTO fcmults (unit) VALUES (?)"""
 sql_insert_default_offers = """INSERT INTO offers (id) VALUES (?)"""
@@ -598,7 +598,7 @@ class OfferTables:
         except sqlite3.Error as e:
             print(e)
 
-    def insert(self, table: str, columns: Iterable, values: Iterable, many: bool=False):
+    def insert(self, table: str, columns: Iterable, values: Iterable, many: bool=False, replace: bool=False):
         """Insert values into a table.
 
         Parameters
@@ -611,6 +611,8 @@ class OfferTables:
             Values for insertion matching the column names.
         many : bool
             True if inserting multiple rows.
+        replace : bool
+            True if this should replace existing entry.
 
         Returns
         -------
@@ -619,7 +621,8 @@ class OfferTables:
         """
         cols = ','.join(columns)
         qms = ','.join(['?'] * len(columns))
-        sql = sql_insert_general.format(table=table, columns=cols, qm=qms)
+        replace_str = " OR REPLACE " if replace else " "
+        sql = sql_insert_general.format(replace=replace_str, table=table, columns=cols, qm=qms)
         try:
             if many:
                 self.cur.executemany(sql, values)

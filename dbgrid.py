@@ -3,6 +3,7 @@ TODO
 ----
 """
 
+from dialog import ConfirmDialog
 import wx
 import wx.grid as wxg
 from bson.objectid import ObjectId
@@ -194,6 +195,16 @@ class DatabaseGridTable(wxg.GridTableBase):
         for idx in self.pk_column:
             try:
                 pk_val.append(self.data[row][idx])
+            except IndexError:
+                return None
+        return pk_val
+
+    def get_dbpk_value(self, row):
+        pk_val = []
+        for key in self.dbpk:
+            col = self.col_keys.index(key)
+            try:
+                pk_val.append(self.data[row][col])
             except IndexError:
                 return None
         return pk_val
@@ -390,6 +401,8 @@ class DatabaseGridTable(wxg.GridTableBase):
 
     def save_to_db(self, rows, key, value):
         """Save the given rows to database.
+        
+        Open confirm dialog for replace if row exists.
 
         Parameters
         ----------
@@ -406,16 +419,39 @@ class DatabaseGridTable(wxg.GridTableBase):
             True if successul.
         """
         if self.dbtablename is not None:
-            todb = [
-                [self.data[row][self.col_keys.index(k)] for k in self.save_keys] + value
-                    for row in rows
-            ]
-            return self.db.insert(
-                self.dbtablename,
-                self.save_keys + key,
-                todb,
-                True
-            )
+            keys = self.save_keys
+            if key is not None:
+                keys += key
+
+            
+            todb = []
+            for row in rows:
+                res = self.db.get(
+                    self.dbtablename,
+                    self.dbpk,
+                    self.dbpk,
+                    self.get_dbpk_value(row)
+                )
+                isok = True
+                if len(res) > 0:
+                    msg = ("Koodi '{}' löytyy tietokannasta.".format(res[0])
+                          +" Korvataanko valitulla rivillä?")
+                    title = "Korvataanko?"
+                    with ConfirmDialog(self.GetView(), title, msg) as dlg:
+                        if dlg.ShowModal() != wx.ID_OK:
+                            isok = False
+
+                if isok:
+                    datarow = []
+                    for k in self.save_keys:
+                        datarow.append(self.data[row][self.col_keys.index(k)])
+
+                    if value is not None:
+                        datarow.append(value)
+                    
+                    todb.append(datarow)
+
+            return self.db.insert(self.dbtablename, keys, todb, True, True)
         else:
             return False
 
@@ -455,6 +491,7 @@ class GroupMaterialsTable(DatabaseGridTable):
         self.read_only = []
         self.cant_update = [13]
         self.dbcols = [n for n in range(13)]    # offer_materials
+        self.dbpk = ["code"]
         self.save_keys = [
             "code",        
             "category",    
@@ -508,6 +545,7 @@ class GroupProductsTable(DatabaseGridTable):
         self.cant_update = [13]
         self.dbcols = [n for n in range(12)]
         self.dbtablename = "products"
+        self.dbpk = ["code"]
         self.save_keys = [
             "code",
             "category",
@@ -563,6 +601,7 @@ class GroupPartsTable(DatabaseGridTable):
         self.parse_done = False
         self.dbcols = [n for n in range(14)]
         self.dbtablename = "parts"
+        self.dbpk = ["part", "product_code"]
         self.save_keys = [
             "code",
             "part",
@@ -792,8 +831,6 @@ class TestGrid(wxg.Grid):
                             print("Part of selection is out of bounds of the grid.")
                         table.update_data(None)
 
-            # table.update_data(None)
-
     def can_undo(self):
         """Return true if an action can be undone."""
         return (True 
@@ -938,6 +975,7 @@ class TestGrid(wxg.Grid):
         row = evt.GetRow()
         col = evt.GetCol()
         table = self.GetTable()
+        no_row_selected = len(self.GetSelectedRows()) == 0
 
         # Clear selection and set grid cursor to clicked cell if
         # right click was not in a selected cell.
@@ -962,7 +1000,10 @@ class TestGrid(wxg.Grid):
         # Only add db items if the grid table has database table.
         if table.can_save_to_db():
             menu.AppendSeparator()
-            menu.Append(self.id_todb, "Tallenna", "Tallenna valinta tietokantaan")
+            mi_save = menu.Append(self.id_todb, "Tallenna", "Tallenna valinta tietokantaan")
+
+            if no_row_selected:
+                mi_save.Enable(False)
 
         if not self.can_undo():
             mi_undo.Enable(False)
@@ -970,7 +1011,7 @@ class TestGrid(wxg.Grid):
         if not self.can_paste():
             mi_paste.Enable(False)
 
-        if len(self.GetSelectedRows()) == 0:
+        if no_row_selected:
             mi_delete.Enable(False)
 
         self.PopupMenu(menu)
