@@ -957,7 +957,7 @@ class OfferTables:
         return self.update(sql, (val, table, col))
 
     def get_visible(self, table):
-        """Return list of visible column indexes.
+        """Return list booleans signifying visibility of the columns.
 
         Parameters
         ----------
@@ -965,13 +965,13 @@ class OfferTables:
             Name of table.
         """
         sql = """
-            SELECT col_idx
+            SELECT col_idx, visible
             FROM columns
-            WHERE tablename = (?) AND visible = 1
+            WHERE tablename = (?)
             ORDER BY col_idx ASC
         """
         data = self.select(sql, (table,))
-        return [c[0] for c in data]
+        return [False if r[1] == 0 else True for r in data]
 
 
 if __name__ == '__main__':

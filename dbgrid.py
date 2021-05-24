@@ -19,6 +19,7 @@ class DatabaseGridTable(wxg.GridTableBase):
         self.data = []
         self.is_changed = True
         self.tablename = None
+        self.dbtablename = None
         self.pk = []
         self.fk = []
         self.fk_value = None
@@ -26,6 +27,7 @@ class DatabaseGridTable(wxg.GridTableBase):
         self.columns = []
         self.col_keys = []
         self.col_labels = []
+        self.col_visible = []
         self.col_types = []
         self.col_widths = []
         self.unique = []
@@ -38,14 +40,15 @@ class DatabaseGridTable(wxg.GridTableBase):
         return len(self.data) + 1
 
     def GetNumberCols(self):
-        return len(self.columns)
-    
+        return len(self.col_labels)
+
     def GetDataCol(self, col):
-        return self.columns[col]
+        # return col
+        return col
 
     def IsEmptyCell(self, row, col):
         try:
-            value = self.data[row][self.columns[col]]
+            value = self.data[row][col]
         except IndexError:
             return True
 
@@ -56,7 +59,7 @@ class DatabaseGridTable(wxg.GridTableBase):
 
     def GetValue(self, row, col):
         try:
-            return self.data[row][self.columns[col]]
+            return self.data[row][col]
         except IndexError:
             return ""
 
@@ -67,26 +70,26 @@ class DatabaseGridTable(wxg.GridTableBase):
             return
 
         # Can not set a value if value is a dublicate in a unique column.
-        datacol = self.GetDataCol(col)
-        if datacol in self.unique and self.is_dublicate(datacol, value):
+        # col = self.GetDataCol(col)
+        if col in self.unique and self.is_dublicate(col, value):
             print(f"Column {self.GetColLabelValue(col)} is unique, " +
                   f"'{value}' already exists.")
 
         # Set the value to db if possible.
-        elif datacol not in self.cant_update:
+        elif col not in self.cant_update:
             pkval = self.GetPkValue(row)
 
             # Update requires a valid existing primary key.
             if pkval is not None:
                 self.db.update_one(
                     self.tablename,
-                    self.col_keys[datacol],
+                    self.col_keys[col],
                     self.pk,
                     [value] + pkval
                 )
             # No pk value in the row so insert new row to db.
             else:
-                self.append_new_row(datacol, value)
+                self.append_new_row(col, value)
 
     def is_dublicate(self, col, value):
         """Return True if the column contains the value."""
@@ -171,10 +174,10 @@ class DatabaseGridTable(wxg.GridTableBase):
         self.GetView().PostSizeEventToParent()
 
     def GetColLabelValue(self, col):
-        return self.col_labels[self.columns[col]]
+        return self.col_labels[col]
     
     def GetTypeName(self, row, col):
-        return self.col_types[self.columns[col]]
+        return self.col_types[col]
     
     def CanGetValueAs(self, row, col, type_name):
         col_type = self.GetTypeName(row, col).split(":")[0]
@@ -268,11 +271,10 @@ class DatabaseGridTable(wxg.GridTableBase):
             ["tablename", "key"],
             [self.tablename, self.col_keys[datacol]]
         )
-        return width
+        return width[0]
 
     def set_col_width(self, col, width):
         datacol = self.GetDataCol(col)
-        # self.col_widths[datacol] = width
         self.db.update_one(
             "columns",
             "width",
@@ -287,25 +289,41 @@ class DatabaseGridTable(wxg.GridTableBase):
         return self.db.get_visible(self.tablename)
 
     def get_visible_columns(self):
-        return self.columns
+        return self.col_visible
+    # def get_visible_columns(self):
+    #     return self.columns
 
     def show_column(self, col):
-        self.columns.append(col)
-        self.AppendCols(1)
-        self.db.set_visible(self.tablename, col, True)
-        self.GetView().ForceRefresh()
-        # self.GetView().Refresh()
-        # self.GetView().Update()
-        return self.get_col_width(self.GetNumberCols() - 1)[0]
+        # self.columns.append(col)
+        # self.AppendCols(1)
+        if self.db.set_visible(self.tablename, col, True):
+            width = self.get_col_width(col)
+            if width == 0:
+                width = 60
+            self.col_visible[col] = True
+            self.GetView().SetColSize(col, width)
+        # self.GetView().ForceRefresh()
+            return width
 
     def hide_column(self, col):
-        gridcol = self.columns.index(col)
-        del self.columns[gridcol]
-        self.DeleteCols(gridcol, 1)
-        self.db.set_visible(self.tablename, col, False)
-        self.GetView().ForceRefresh()
-        # self.GetView().Refresh()
-        # self.GetView().Update()
+        # gridcol = self.columns.index(col)
+        # del self.columns[gridcol]
+        if self.db.set_visible(self.tablename, col, False):
+            self.GetView().HideCol(col)
+            self.col_visible[col] = False
+        # self.DeleteCols(gridcol, 1)
+        # self.GetView().ForceRefresh()
+
+    def is_col_visible(self, col):
+        return self.col_visible[col]
+
+    def set_visibility(self):
+        """Set the visibility status of a list of columns."""
+        for col in range(self.GetNumberCols()):
+            if self.col_visible[col]:
+                self.show_column(col)
+            else:
+                self.hide_column(col)
 
     def DeleteRows(self, pos, numRows):
         """Delete the rows and their data."""
@@ -324,12 +342,10 @@ class DatabaseGridTable(wxg.GridTableBase):
             numRows
         )
         self.GetView().ProcessTableMessage(msg)
-        # self.GetView().ForceRefresh()
         self.GetView().PostSizeEventToParent()
         return True
 
     def DeleteCols(self, pos, numCols):
-        # return super().DeleteCols(pos=pos, numCols=numCols)
         msg = wxg.GridTableMessage(
             self,
             wxg.GRIDTABLE_NOTIFY_COLS_DELETED,
@@ -341,7 +357,6 @@ class DatabaseGridTable(wxg.GridTableBase):
         return True
     
     def AppendCols(self, numCols):
-        # return super().AppendCols(numCols=numCols)
         msg = wxg.GridTableMessage(
             self,
             wxg.GRIDTABLE_NOTIFY_COLS_APPENDED,
@@ -429,7 +444,9 @@ class GroupMaterialsTable(DatabaseGridTable):
         self.fk = ["group_id"]
         self.fk_value = None
         self.pk_column = [0]
-        self.columns = self.get_visible()
+        # self.columns = self.get_visible()
+        self.columns = [n for n in range(len(setup))]
+        self.col_visible = self.get_visible()
         self.col_keys = [val[tb.KEY] for val in setup]
         self.col_labels = [val[tb.LABEL] for val in setup]
         self.col_types = [val[tb.TYPE] for val in setup]
@@ -478,7 +495,9 @@ class GroupProductsTable(DatabaseGridTable):
         self.fk = ["group_id"]
         self.fk_value = None
         self.pk_column = [0]
-        self.columns = self.get_visible()
+        # self.columns = self.get_visible()
+        self.columns = [n for n in range(len(setup))]
+        self.col_visible = self.get_visible()
         self.col_keys = [val[tb.KEY] for val in setup]
         self.col_labels = [val[tb.LABEL] for val in setup]
         self.col_types = [val[tb.TYPE] for val in setup]
@@ -527,7 +546,9 @@ class GroupPartsTable(DatabaseGridTable):
         self.fk = ["product_id"]
         self.fk_value = None
         self.pk_column = [0]
-        self.columns = self.get_visible()
+        # self.columns = self.get_visible()
+        self.columns = [n for n in range(len(setup))]
+        self.col_visible = self.get_visible()
         self.col_keys = [val[tb.KEY] for val in setup]
         self.col_labels = [val[tb.LABEL] for val in setup]
         self.col_types = [val[tb.TYPE] for val in setup]
@@ -590,7 +611,9 @@ class GroupPredefsTable(DatabaseGridTable):
         self.fk = ["group_id"]
         self.fk_value = None
         self.pk_column = [0]
-        self.columns = self.get_visible()
+        # self.columns = self.get_visible()
+        self.columns = [n for n in range(len(setup))]
+        self.col_visible = self.get_visible()
         self.col_keys = [val[tb.KEY] for val in setup]
         self.col_labels = [val[tb.LABEL] for val in setup]
         self.col_types = [val[tb.TYPE] for val in setup]
@@ -640,9 +663,10 @@ class TestGrid(wxg.Grid):
         self.copy_cells = []
         self.history = {}
 
-        for col in range(self.GetNumberCols()):
-            width = table.get_col_width(col)
-            self.SetColSize(col, width[0])
+        # for col in range(self.GetNumberCols()):
+        #     width = table.get_col_width(col)
+        #     self.SetColSize(col, width)
+        table.set_visibility()
 
         self.SetRowLabelSize(35)
         self.EnableDragColMove(True)
@@ -706,20 +730,26 @@ class TestGrid(wxg.Grid):
 
     def delete(self):
         """Delete the selected rows. Return True if deleted something."""
-        selected = self.GetSelectedRows()
-        if len(selected) == 0:
+        if self.IsSelection():
+            self.save_state()
+        else:
             return False
 
-        self.save_state()
-        selected.sort(reverse=True)
-        # Do not delete the empty last row.
-        if selected[0] == self.GetNumberRows() - 1:
-            del selected[0]
-
+        selected = self.GetSelectedRows()
         table = self.GetTable()
-        for row in selected:
-            table.DeleteRows(row, 1)
-        self.GetTable().update_data(None)
+        if len(selected) == 0:
+            self.clear_selected()
+
+        else:
+            selected.sort(reverse=True)
+            # Do not delete the empty last row.
+            if selected[0] == self.GetNumberRows() - 1:
+                del selected[0]
+
+            for row in selected:
+                table.DeleteRows(row, 1)
+
+        table.update_data(None)
         self.GetParent().update_depended_grids(self)
         return True
 
@@ -730,33 +760,34 @@ class TestGrid(wxg.Grid):
         append all copied rows to end of grid or
         paste as many blocks as there are selected blocks.
         """
-        if len(self.copy_rows) > 0:
+        parent = self.GetParent()
+        if len(parent.copy) > 0:
+            table: DatabaseGridTable = self.GetTable()
             self.save_state()
-            self.GetTable().append_rows(self.copy_rows, True)
-            self.GetParent().update_depended_grids(self)
-        else:
-            parent = self.GetParent()
-            if len(parent.copy) > 0:
-                table: DatabaseGridTable = self.GetTable()
-                self.save_state()
-                coords = [
-                    (block.GetTopRow(), block.GetLeftCol()) 
-                    for block in self.GetSelectedBlocks()
-                ]
-                if len(coords) == 0:
-                    coords = [self.GetGridCursorCoords()]
+            coords = [
+                (block.GetTopRow(), block.GetLeftCol()) 
+                for block in self.GetSelectedBlocks()
+            ]
+            if len(coords) == 0:
+                coords = [self.GetGridCursorCoords()]
 
-                for n, crd in enumerate(coords):
-                    if n >= len(parent.copy):
-                        return
-                    r_offset = crd[0]
-                    c_offset = crd[1]
-                    for row, rowdata in enumerate(parent.copy[n]):
-                        for col, value in enumerate(rowdata):
-                            # print("SET: {}, r,c: {},{}".format(value, row + r_offset, col + c_offset))
-                            table.SetValue(row + r_offset, col + c_offset, value)
+            for n, crd in enumerate(coords):
+                if n >= len(parent.copy):
+                    return
+                r_offset = crd[0]
+                c_offset = crd[1]
+                for row, rowdata in enumerate(parent.copy[n]):
+                    for col, value in enumerate(rowdata):
+                        # print("SET: {}, r,c: {},{}".format(value, row + r_offset, col + c_offset))
+                        table.SetValue(row + r_offset, col + c_offset, value)
 
-                table.update_data(None)
+            table.update_data(None)
+
+    def can_undo(self):
+        """Return true if an action can be undone."""
+        return (True 
+            if len(self.history[tuple(self.GetTable().get_fk_value())]) > 0
+            else False)
 
     def undo(self):
         """Undo the last action."""
@@ -786,6 +817,24 @@ class TestGrid(wxg.Grid):
         if not table.save_to_db(selected, key, value):
             print("Error in saving to database.")
 
+    def select_all(self):
+        """Select all but the last empty row."""
+        self.ClearSelection()
+        for row in range(self.GetNumberRows() - 1):
+            self.SelectRow(row, True)
+
+    def clear_selected(self):
+        """Clear the values from selected cells. Return true if something was deleted."""
+        blocks = self.GetSelectedBlocks()
+        did_del = False
+        for b in blocks:
+            if not did_del:
+                did_del = True
+            for row in range(b.GetTopRow(), b.GetBottomRow() + 1):
+                for col in range(b.GetLeftCol(), b.GetRightCol() + 1):
+                    self.SetCellValue(row, col, "")
+        return did_del
+
     def save_state(self):
         """Save the current data state in table to history."""
         table: DatabaseGridTable = self.GetTable()
@@ -794,6 +843,7 @@ class TestGrid(wxg.Grid):
     def on_cell_changing(self, evt):
         """Save the state to history before cell change."""
         self.save_state()
+        evt.Skip()
 
     def on_cell_changed(self, evt):
         """Update the data of this grid on edit."""
@@ -806,6 +856,7 @@ class TestGrid(wxg.Grid):
         col = evt.GetCol()
         label = self.GetTable().GetColLabelValue(col)
         self.cursor_text = "({}, {})".format(row, label)
+        # print("{}, {}".format(row, col))
         evt.Skip()
 
     def on_col_size(self, evt):
@@ -819,6 +870,8 @@ class TestGrid(wxg.Grid):
     def on_col_move(self, evt):
         """Save the new order."""
         col = evt.GetCol()
+        if not self.GetTable().is_col_visible(col):
+            evt.Veto()
         pos = self.GetColPos(col)
         wx.CallAfter(self.col_moved, col, pos)
         evt.Skip()
@@ -851,6 +904,10 @@ class TestGrid(wxg.Grid):
         elif keycode == 90 and evt.GetModifiers() == wx.MOD_CONTROL:
             self.undo()
 
+        # CTRL+A
+        elif keycode == 65 and evt.GetModifiers() == wx.MOD_CONTROL:
+            self.select_all()
+
         evt.Skip()
 
     def on_label_lclick(self, evt):
@@ -858,8 +915,16 @@ class TestGrid(wxg.Grid):
         self.SetFocus()
         evt.Skip()
 
+    def can_paste(self):
+        """Return true if a copy exists."""
+        if len(self.GetParent().copy) > 0:
+            return True
+        else:
+            return False
+
     def on_context_menu(self, evt):
         """Open the context menu for the grid."""
+        self.SetFocus()
         menu = wx.Menu()
         row = evt.GetRow()
         col = evt.GetCol()
@@ -877,17 +942,27 @@ class TestGrid(wxg.Grid):
 
         # item = wx.MenuItem(menu, wx.ID_UNDO, "", "Undo the previous action.")
         # menu.Append(item)
-        menu.Append(wx.ID_UNDO)
+
+        mi_undo: wx.MenuItem = menu.Append(wx.ID_UNDO)
         menu.Append(wx.ID_CUT)
         menu.Append(wx.ID_COPY)
-        menu.Append(wx.ID_PASTE)
+        mi_paste = menu.Append(wx.ID_PASTE)
         menu.AppendSeparator()
-        menu.Append(wx.ID_DELETE, "Poista\tDelete")
-        
+        mi_delete = menu.Append(wx.ID_DELETE, "Poista\tDelete")
+
         # Only add db items if the grid table has database table.
         if table.can_save_to_db():
             menu.AppendSeparator()
             menu.Append(self.id_todb, "Tallenna", "Tallenna valinta tietokantaan")
+
+        if not self.can_undo():
+            mi_undo.Enable(False)
+
+        if not self.can_paste():
+            mi_paste.Enable(False)
+
+        if len(self.GetSelectedRows()) == 0:
+            mi_delete.Enable(False)
 
         self.PopupMenu(menu)
 
@@ -921,35 +996,32 @@ class TestGrid(wxg.Grid):
 
     def on_label_menu(self, evt):
         """Open menu to select visible columns. Set focus on this grid."""
-        # print("LABEL MENU")
         self.SetFocus()
         menu = wx.Menu()
         table = self.GetTable()
 
         for n, colid in enumerate(self.col_ids):
             menu.AppendCheckItem(colid, self.labels[n], "Muuta sarakkeen näkyvyyttä")
-        
-        columns = table.get_visible_columns()
-        for col in columns:
-            menu.Check(self.col_ids[col], True)
-        
+
+        is_visible = table.get_visible_columns()
+        for col, vis in enumerate(is_visible):
+            menu.Check(self.col_ids[col], vis)
+
         self.PopupMenu(menu)
         menu.Destroy()
         evt.Skip()
-    
+
     def on_col_menu(self, evt):
         """Show or hide the checked column."""
         is_checked = evt.IsChecked()
         col = self.col_ids.index(evt.GetId())
         table = self.GetTable()
+
         if is_checked:
-            w = table.show_column(col)
-            gridcol = table.columns.index(col)
-            self.SetColSize(gridcol, w)
+            table.show_column(col)
         else:
             table.hide_column(col)
 
-        self.PostSizeEventToParent()
         evt.Skip()
 
     def on_show_editor(self, evt):
@@ -969,9 +1041,7 @@ class TestGrid(wxg.Grid):
             key = tuple(fk)
             if key not in self.history:
                 self.history[key] = []
-        # Clear copy and grid cursor variables.
-        self.copy_rows.clear()
-        self.copy_cells.clear()
+        # Clear grid cursor variables before setting new values.
         self.cursor_text = ""
         self.GetTable().set_fk_value(fk)
 
@@ -1125,6 +1195,7 @@ class GroupPanel(wx.Panel):
 
     def find(self, key, find_key, find_value):
         return self.grid_prod.GetTable().find_value(key, find_key, find_value[0])
+
 
 if __name__ == '__main__':
     app = wx.App()
