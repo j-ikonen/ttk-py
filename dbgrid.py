@@ -670,6 +670,7 @@ class TestGrid(wxg.Grid):
 
         self.SetRowLabelSize(35)
         self.EnableDragColMove(True)
+        # self.EnableDragRowSize(False)
         # self.SetBackgroundColour((220, 200, 255))
         # self.SetLabelBackgroundColour((220, 200, 255))
         self.SetLabelBackgroundColour((225, 225, 255))
@@ -698,7 +699,7 @@ class TestGrid(wxg.Grid):
         self.Bind(wxg.EVT_GRID_CELL_RIGHT_CLICK, self.on_context_menu)
         self.Bind(wxg.EVT_GRID_CMD_LABEL_RIGHT_CLICK, self.on_label_menu)
         self.Bind(wxg.EVT_GRID_LABEL_LEFT_CLICK, self.on_label_lclick)
-    
+
     def copy(self):
         """Copy the selected rows or blocks. Clears the other.
         
@@ -727,6 +728,11 @@ class TestGrid(wxg.Grid):
             for row in selected:
                 rowdata = self.GetTable().get_rowdata(row)
                 self.copy_rows.append(rowdata)
+
+    def cut(self):
+        """Cut the selected cells."""
+        self.copy()
+        self.delete()
 
     def delete(self):
         """Delete the selected rows. Return True if deleted something."""
@@ -776,12 +782,20 @@ class TestGrid(wxg.Grid):
                     return
                 r_offset = crd[0]
                 c_offset = crd[1]
+                new_rows = self.GetNumberRows() - len(parent.copy[n]) + r_offset
+                if new_rows > 0:
+                    pass
                 for row, rowdata in enumerate(parent.copy[n]):
                     for col, value in enumerate(rowdata):
-                        # print("SET: {}, r,c: {},{}".format(value, row + r_offset, col + c_offset))
-                        table.SetValue(row + r_offset, col + c_offset, value)
+                        in_row = row + r_offset
+                        in_col = col + c_offset
+                        if in_col < self.GetNumberCols():
+                            table.SetValue(in_row, col + in_col)
+                        else:
+                            print("Part of selection is out of bounds of the grid.")
+                        table.update_data(None)
 
-            table.update_data(None)
+            # table.update_data(None)
 
     def can_undo(self):
         """Return true if an action can be undone."""
@@ -856,7 +870,6 @@ class TestGrid(wxg.Grid):
         col = evt.GetCol()
         label = self.GetTable().GetColLabelValue(col)
         self.cursor_text = "({}, {})".format(row, label)
-        # print("{}, {}".format(row, col))
         evt.Skip()
 
     def on_col_size(self, evt):
@@ -875,7 +888,6 @@ class TestGrid(wxg.Grid):
         pos = self.GetColPos(col)
         wx.CallAfter(self.col_moved, col, pos)
         evt.Skip()
-        # print("NEW COLUMN ORDER FOR id: {}, old_pos: {}".format(col, pos))
 
     def col_moved(self, col_id, old_pos):
         pass
@@ -975,8 +987,7 @@ class TestGrid(wxg.Grid):
 
     def on_cut(self, evt):
         """Do action selected in context menu."""
-        # self.cut()
-        pass
+        self.cut()
 
     def on_paste(self, evt):
         """Do action selected in context menu."""
