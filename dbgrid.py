@@ -36,6 +36,7 @@ class DatabaseGridTable(wxg.GridTableBase):
         self.ro_dependency = []
         self.cant_update = []
         self.dbcols = []
+        self.use_oid = True
 
     def GetNumberRows(self):
         return len(self.data) + 1
@@ -66,8 +67,8 @@ class DatabaseGridTable(wxg.GridTableBase):
 
     def SetValue(self, row, col, value):
         # Can not set a value if foreign key is not defined.
-        if self.fk_value is None:
-            print(f"Foreign key {self.fk} is not defined.")
+        if self.fk_value is None and self.fk is not None:
+            print(f"Foreign key {self.fk} does not have a value.")
             return
 
         # Can not set a value if value is a dublicate in a unique column.
@@ -116,13 +117,25 @@ class DatabaseGridTable(wxg.GridTableBase):
         bool
             True on successful insert, else otherwise.
         """
-        new_id = [str(ObjectId())]
+        if self.use_oid:
+            new_id = [str(ObjectId())]
+
+        if self.pk == [self.col_keys[col]] and not self.use_oid:
+            keys = self.pk
+            values = [value]
+        elif self.fk is None and self.use_oid:
+            keys = self.pk + [self.col_keys[col]]
+            values = new_id + [value]
+        elif self.use_oid:
+            keys = self.pk + self.fk + [self.col_keys[col]]
+            values = new_id + self.fk_value + [value]
+        else:
+            print(f"Did not initiate with private key column '{self.col_labels[col]}'")
+            return False
+
         try:
-            success = self.db.insert(
-                self.tablename,
-                self.pk + self.fk + [self.col_keys[col]],
-                new_id + self.fk_value + [value]
-            )
+            success = self.db.insert(self.tablename, keys, values)
+
         except KeyError as e:
             print(f"KeyError: {e} in DatabaseGridTable.append_new_row\n" +
                   f"Column {col} not defined properly for insert.\n" +
@@ -229,11 +242,13 @@ class DatabaseGridTable(wxg.GridTableBase):
 
     def update_data(self, row):
         """Return True if update is ok do do."""
-        if self.fk_value is None:
+        if self.fk_value is None and self.fk is not None:
             return False
 
         self.Clear()
+        rows = len(self.data)
         self.data.clear()
+        self.change_number_rows(rows, 0)
         # print(f"Updating {type(self)}")
         return True
 
@@ -492,19 +507,7 @@ class GroupMaterialsTable(DatabaseGridTable):
         self.cant_update = [13]
         self.dbcols = [n for n in range(13)]    # offer_materials
         self.dbpk = ["code"]
-        self.save_keys = [
-            "code",        
-            "category",    
-            "desc",        
-            "prod",        
-            "thickness",   
-            "unit",        
-            "cost",        
-            "add_cost",    
-            "edg_cost",    
-            "loss",        
-            "discount" 
-        ]                  # materials
+        self.save_keys = [tb.materials_keys]    # materials
 
         for n, val in enumerate(setup):
             if val[tb.UNIQUE] == 1:
@@ -521,6 +524,7 @@ class GroupMaterialsTable(DatabaseGridTable):
             for datarow in res:
                 self.data.append(list(datarow))
         self.GetView().ForceRefresh()
+
 
 class GroupProductsTable(DatabaseGridTable):
     def __init__(self, db: tb.OfferTables):
@@ -602,17 +606,7 @@ class GroupPartsTable(DatabaseGridTable):
         self.dbcols = [n for n in range(14)]
         self.dbtablename = "parts"
         self.dbpk = ["part", "product_code"]
-        self.save_keys = [
-            "code",
-            "part",
-            "desc",
-            "default_mat",
-            "width",
-            "length",
-            "code_width",
-            "code_length",
-            "cost"
-        ]
+        self.save_keys = tb.parts_keys
         # self.code2col = {
         #     "määrä": 4,
         #     "leveys": 8,
@@ -679,8 +673,56 @@ class GroupPredefsTable(DatabaseGridTable):
             self.GetView().ForceRefresh()
 
 
+class GenTable(DatabaseGridTable):
+    def __init__(self, db: tb.OfferTables, tablename):
+        super().__init__(db)
+
+        self.tablename = tablename
+        setup = db.get_columns(self.tablename)
+        self.pk = ["code"]
+        self.fk = None
+        self.fk_value = None
+        self.pk_column = [0]
+        # self.columns = self.get_visible()
+        self.columns = [n for n in range(len(setup))]
+        self.col_visible = self.get_visible()
+        self.col_keys = [val[tb.KEY] for val in setup]
+        self.col_labels = [val[tb.LABEL] for val in setup]
+        self.col_types = [val[tb.TYPE] for val in setup]
+        self.col_widths = [val[tb.WIDTH] for val in setup]
+        self.unique = []
+        self.read_only = []
+        self.cant_update = []
+        self.dbcols = [n for n in range(len(setup))]
+        self.last_conditions = {}
+        self.use_oid = False
+
+        for n, val in enumerate(setup):
+            if val[tb.UNIQUE] == 1:
+                self.unique.append(n)
+            if val[tb.READ_ONLY] == 1:
+                self.read_only.append(n)
+
+        # self.fk_value = ["uusi ryhmä"]
+
+    def update_data(self, conditions):
+        if super().update_data(None):
+            if conditions is None:
+                conditions = self.last_conditions
+            if len(conditions) > 0:
+                res = self.db.get_with_conditions(self.tablename, self.col_keys, conditions)
+                self.last_conditions = conditions
+                for datarow in res:
+                    print(datarow)
+                    self.data.append(list(datarow))
+                self.GetView().ForceRefresh()
+
+                newlen = len(self.data)
+                self.change_number_rows(0, newlen)
+
+
 class DbGrid(wxg.Grid):
-    def __init__(self, parent, db, name):
+    def __init__(self, parent, db, name, save_history=1):
         super().__init__(parent, style=wx.WANTS_CHARS|wx.HD_ALLOW_REORDER)
 
         table = None
@@ -692,6 +734,8 @@ class DbGrid(wxg.Grid):
             table = GroupPartsTable(db)
         elif name == "offer_predefs":
             table = GroupPredefsTable(db)
+        else:
+            table = GenTable(db, name)
 
         self.SetTable(table, True)
         self.read_only = table.read_only
@@ -701,6 +745,7 @@ class DbGrid(wxg.Grid):
         self.copy_rows = []
         self.copy_cells = []
         self.history = {}
+        self.save_history = save_history
 
         # for col in range(self.GetNumberCols()):
         #     width = table.get_col_width(col)
@@ -885,8 +930,9 @@ class DbGrid(wxg.Grid):
 
     def save_state(self):
         """Save the current data state in table to history."""
-        table: DatabaseGridTable = self.GetTable()
-        self.history[tuple(table.get_fk_value())].append(table.get_data())
+        if self.save_history != 0:
+            table: DatabaseGridTable = self.GetTable()
+            self.history[tuple(table.get_fk_value())].append(table.get_data())
 
     def on_cell_changing(self, evt):
         """Save the state to history before cell change."""

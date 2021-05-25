@@ -167,6 +167,7 @@ INDEX = 4
 WIDTH = 5
 UNIQUE = 6
 READ_ONLY = 7
+VISIBLE = 7
 
 sql_create_table_offers = """
     CREATE TABLE IF NOT EXISTS offers (
@@ -183,6 +184,32 @@ sql_create_table_offers = """
         info        TEXT
     )
 """
+columns_offers = [
+    ("offers", "id", "ID", "string", 0, 45, 1, 1),
+    ("offers", "name", "Tarjouksen nimi", "string", 1, 55, 0, 0),
+    ("offers", "firstname", "Etunimi", "string", 2, 55, 0, 0),
+    ("offers", "lastname", "Sukunimi", "string", 3, 55, 0, 0),
+    ("offers", "company", "Yritys.", "string", 4, 55, 0, 0),
+    ("offers", "phone", "Puh", "string", 5, 55, 0, 0),
+    ("offers", "email", "Sähköposti", "string", 6, 55, 0, 0),
+    ("offers", "address", "Lähiosoite", "string", 7, 55, 0, 0),
+    ("offers", "postcode", "Postinumero", "string", 8, 55, 0, 0),
+    ("offers", "postarea", "Postitoimipaikka", "string", 9, 55, 0, 0),
+    ("offers", "info", "Lisätiedot", "string", 10, 55, 0, 0)
+]
+offers_keys = [
+    "id",        
+    "name",      
+    "firstname", 
+    "lastname",  
+    "company",   
+    "phone",     
+    "email",     
+    "address",   
+    "postcode",  
+    "postarea",  
+    "info"     
+]
 sql_create_table_offer_groups = """
     CREATE TABLE IF NOT EXISTS offer_groups (
         id          TEXT PRIMARY KEY,
@@ -228,6 +255,7 @@ sql_create_table_offer_materials = """
         desc        TEXT,
         prod        TEXT,
         thickness   INTEGER,
+        is_stock    TEXT DEFAULT 'varasto',
         unit        TEXT,
         cost        REAL DEFAULT 0.0,
         add_cost    REAL DEFAULT 0.0,
@@ -244,7 +272,6 @@ sql_create_table_offer_materials = """
             ON UPDATE CASCADE
     )
 """
-
 columns_omats = [
     ("offer_materials", "id", "ID", "string", 0, 80, 1, 1),
     ("offer_materials", "group_id", "RyhmäID", "string", 1, 80, 1, 1),
@@ -253,13 +280,14 @@ columns_omats = [
     ("offer_materials", "desc", "Kuvaus", "string", 4, 80, 0, 0),
     ("offer_materials", "prod", "Valmistaja", "string", 5, 60, 0, 0),
     ("offer_materials", "thickness", "Paksuus", "long", 6, 60, 0, 0),
-    ("offer_materials", "unit", "Hintayksikkö", "choice:€/m2,€/kpl", 7, 60, 0, 0),
-    ("offer_materials", "cost", "Hinta", "double:6,2", 8, 60, 0, 0),
-    ("offer_materials", "add_cost", "Lisähinta", "double:6,2", 9, 60, 0, 0),
-    ("offer_materials", "edg_cost", "R.Nauhan hinta", "double:6,2", 10, 60, 0, 0),
-    ("offer_materials", "loss", "Hukka", "double:6,2", 11, 60, 0, 0),
-    ("offer_materials", "discount", "Alennus", "double:6,2", 12, 60, 0, 0),
-    ("offer_materials", "tot_cost", "Kokonaishinta", "double:6,2", 13, 60, 0, 1)
+    ("offer_materials", "is_stock", "Onko varasto", "choice:varasto,tilaus,tarkista", 7, 45, 0, 0),
+    ("offer_materials", "unit", "Hintayksikkö", "choice:€/m2,€/kpl", 8, 60, 0, 0),
+    ("offer_materials", "cost", "Hinta", "double:6,2", 9, 60, 0, 0),
+    ("offer_materials", "add_cost", "Lisähinta", "double:6,2", 10, 60, 0, 0),
+    ("offer_materials", "edg_cost", "R.Nauhan hinta", "double:6,2", 11, 60, 0, 0),
+    ("offer_materials", "loss", "Hukka", "double:6,2", 12, 60, 0, 0),
+    ("offer_materials", "discount", "Alennus", "double:6,2", 13, 60, 0, 0),
+    ("offer_materials", "tot_cost", "Kokonaishinta", "double:6,2", 14, 60, 0, 1)
 ]
 select_omaterials = """SELECT * FROM offer_materials WHERE group_id=(?)"""
 sql_create_table_offer_products = """
@@ -435,6 +463,35 @@ sql_create_table_materials = """
         discount    REAL
     )
 """
+columns_mats = [
+    ("materials", "code", "Koodi", "string", 0, 60, 0, 0),
+    ("materials", "category", "Tuoteryhmä", "string", 1, 60, 0, 0),
+    ("materials", "desc", "Kuvaus", "string", 2, 80, 0, 0),
+    ("materials", "prod", "Valmistaja", "string", 3, 60, 0, 0),
+    ("materials", "thickness", "Paksuus", "long", 4, 60, 0, 0),
+    ("materials", "unit", "Hintayksikkö", "choice:€/m2,€/kpl", 5, 60, 0, 0),
+    ("materials", "cost", "Hinta", "double:6,2", 6, 60, 0, 0),
+    ("materials", "add_cost", "Lisähinta", "double:6,2", 7, 60, 0, 0),
+    ("materials", "edg_cost", "R.Nauhan hinta", "double:6,2", 8, 60, 0, 0),
+    ("materials", "loss", "Hukka", "double:6,2", 9, 60, 0, 0),
+    ("materials", "discount", "Alennus", "double:6,2", 10, 60, 0, 0),
+    ("materials", "is_stock", "Onko varasto", "choice:varasto,tilaus,tarkista", 11, 45, 0, 0)
+]
+materials_keys = [
+    "code",      
+    "category",  
+    "desc",      
+    "prod",      
+    "thickness", 
+    "unit",      
+    "cost",      
+    "add_cost",  
+    "edg_cost",  
+    "loss",      
+    "discount",
+    "is_stock"
+]
+
 sql_create_table_products = """
     CREATE TABLE IF NOT EXISTS products (
         code        TEXT PRIMARY KEY,
@@ -448,18 +505,42 @@ sql_create_table_products = """
         work_time   REAL
     )
 """
+columns_products = [
+    ("products", "code", "Koodi", "string", 0, 60, 0, 0),
+    ("products", "category", "Tuoteryhmä", "string", 1, 60, 0, 0),
+    ("products", "desc", "Kuvaus", "string", 2, 80, 0, 0),
+    ("products", "prod", "Valmistaja", "string", 3, 60, 0, 0),
+    ("products", "inst_unit", "As.Yksikkö", "double:6,2", 4, 45, 0, 0),
+    ("products", "width", "Leveys", "long", 5, 45, 0, 0),
+    ("products", "height", "Korkeus", "long", 6, 45, 0, 0),
+    ("products", "depth", "Syvyys", "long", 7, 45, 0, 0),
+    ("products", "work_time", "Työaika", "double:6,2", 8, 45, 0, 0)
+]
+products_keys = [
+    "code",        
+    "category",    
+    "desc",        
+    "prod",        
+    "inst_unit",   
+    "width",       
+    "height",      
+    "depth",       
+    "work_time"
+]
 sql_create_table_parts = """
     CREATE TABLE IF NOT EXISTS parts (
         part            TEXT,
         code            TEXT,
         product_code    TEXT,
+        count           INTEGER DEFAULT 1,
         desc            TEXT,
         default_mat     TEXT,
         width           INTEGER,
         length          INTEGER,
+        cost            REAL,
         code_width      TEXT,
         code_length     TEXT,
-        cost            REAL,
+        code_cost       TEXT,
 
         PRIMARY KEY (part, product_code),
         FOREIGN KEY (product_code)
@@ -468,6 +549,33 @@ sql_create_table_parts = """
             ON UPDATE CASCADE
     )
 """
+columns_parts = [
+    ("parts", "part", "Osa", "string", 0, 60, 0, 0),
+    ("parts", "code", "Koodi", "string", 1, 60, 0, 0),
+    ("parts", "product_code", "Tuote Koodi", "string", 2, 60, 0, 0),
+    ("parts", "count", "Määrä", "long", 3, 45, 0, 0),
+    ("parts", "desc", "Kuvaus", "string", 4, 80, 0, 0),
+    ("parts", "default_mat", "Oletus materiaali", "string", 5, 45, 0, 0),
+    ("parts", "width", "Leveys", "long", 6, 45, 0, 1),
+    ("parts", "length", "Pituus", "long", 7, 45, 0, 1),
+    ("parts", "cost", "Hinta", "double:6,2", 8, 45, 0, 1),
+    ("parts", "code_width", "Koodi Leveys", "string", 9, 120, 0, 0),
+    ("parts", "code_length", "Koodi Pituus", "string", 10, 120, 0, 0),
+    ("parts", "code_cost", "Koodi Hinta", "string", 11, 120, 0, 0)
+]
+parts_keys = [
+    "part",          
+    "code",          
+    "product_code",
+    "count",
+    "desc",          
+    "default_mat",   
+    "width",         
+    "length",        
+    "code_width",    
+    "code_length",   
+    "cost"
+]
 sql_create_table = {
     "variables": sql_create_table_variables,
     "columns": sql_create_table_columns,
@@ -538,13 +646,18 @@ class OfferTables:
         # for table, sql in sql_create_table.items():
             # cur.execute("""DROP TABLE IF EXISTS {};""".format(table))
             # self.create_table(sql)
+
         # cur.execute("""DROP TABLE IF EXISTS parts;""")
         # self.create_table(sql_create_table_parts)
+
         # self.insert("columns", columns_keys, columns_omats, True)
         # self.insert("columns", columns_keys, columns_oproducts, True)
         # self.insert("columns", columns_keys, columns_oparts, True)
         # self.insert("columns", columns_keys, columns_opredefs, True)
-
+        # self.insert("columns", columns_keys, columns_parts, True, True)
+        self.insert("columns", columns_keys, columns_mats, True, True)
+        # self.insert("columns", columns_keys, columns_products, True, True)
+        # self.insert("columns", columns_keys, columns_offers, True, True)
         self.con.commit()
 
     def insert_from_csv(self, table, file):
@@ -688,6 +801,29 @@ class OfferTables:
             return self.cur.fetchall()
         else:
             return self.cur.fetchone()
+
+    def get_with_conditions(self, table, keys, conditions):
+        """Return rows found with given conditions.
+
+        Parameters
+        ----------
+        table : str
+            Name of the table.
+        keys : Iterable
+            List of column keys to get.
+        conditions : dict
+            Condtions in format: {key: [operator, value]}
+        """
+        values = []
+        s = ""
+        for n, (key, val) in enumerate(conditions.items()):
+            s += key + " " + val[0] + " (?)"
+            values.append(val[1])
+            if n != len(conditions) - 1:
+                s += " AND "
+        sql = sql_select_general.format(columns=','.join(keys), table=table, cond=s)
+        print(sql)
+        return self.select(sql, values)
 
     def get_omaterials(self, group_id: str):
         try:

@@ -1,6 +1,7 @@
 import wx
 
 import table as tb
+from dbgrid import DbGrid
 
 
 TITLE = "Hae tietokannasta"
@@ -15,6 +16,7 @@ class SearchPanel(wx.Panel):
     def __init__(self, parent, db: tb.OfferTables, table: str="offers"):
         super().__init__(parent)
 
+        self.db: tb.OfferTables = db
         self.table_labels = [
             "Tarjoukset",
             "Materiaalit",
@@ -27,22 +29,47 @@ class SearchPanel(wx.Panel):
             "products",
             "parts"
         ]
-        self.cond_labels = [["ID", "Nimi"], [], [], []]
-        self.cond_keys = [["id", "name"], [], [], []]
-        self.op_labels = ["=", "like", "!=", ">", "<", ">=", "<=", "!>", "!<"]
+        self.cond_labels = [[], [], [], []]
+        self.col_widths = [[], [], [], []]
+        self.cond_keys = [
+            tb.offers_keys,
+            tb.materials_keys,
+            tb.products_keys,
+            tb.parts_keys
+        ]
+        self.grids = []
+        self.columns = []
+        for n in range(len(self.cond_keys)):
+            columns = self.db.get_columns(self.tables[n])
+            # print(columns)
+            self.columns.append(columns)
+            for key in self.cond_keys[n]:
+                for col in columns:
+                    if col[tb.KEY] == key:
+                        self.cond_labels[n].append(col[tb.LABEL])
+                        self.col_widths[n].append(col[tb.WIDTH])
+                        break
+
+        self.op_labels = ["like", "=", "!=", ">", "<", ">=", "<=", "!>", "!<"]
         self.cond_sizers = []
 
-        self.db: tb.OfferTables = db
         title = wx.StaticText(self, label=TITLE)
         self.choice_table = wx.Choice(self, size=(85, -1), choices=self.table_labels)
         self.btn_add_condition = wx.Button(self, label=BTN_AC)
         self.btn_search = wx.Button(self, label=BTN_SEARCH)
         self.btn_show_cond = wx.Button(self, label=SEARCH_COND)
+        for n, tablename in enumerate(self.tables):
+            grid = DbGrid(self, self.db, tablename, 0)
+            self.grids.append(grid)
+            grid.Show(False)
+
+        # self.lc_search = dv.DataViewListCtrl(self, style=dv.DV_ROW_LINES|dv.DV_MULTIPLE)
 
         self.Bind(wx.EVT_CHOICE, self.on_table_choice, self.choice_table)
         self.Bind(wx.EVT_BUTTON, self.on_add_condition, self.btn_add_condition)
         self.Bind(wx.EVT_BUTTON, self.on_search, self.btn_search)
         self.Bind(wx.EVT_BUTTON, self.on_show_conditions, self.btn_show_cond)
+        # self.Bind(dv.EVT_DATAVIEW_ITEM_CONTEXT_MENU, self.on_dv_menu, self.lc_search)
 
         sizer_top = wx.BoxSizer(wx.HORIZONTAL)
         # self.sizer_conditions = wx.StaticBoxSizer(wx.VERTICAL, self, SEARCH_COND)
@@ -63,6 +90,8 @@ class SearchPanel(wx.Panel):
             sizer.Add(box_sizer, 0, wx.ALL, BORDER)
         # sizer.Add(self.sizer_conditions, 0, wx.ALL, BORDER)
 
+        for grid in self.grids:
+            sizer.Add(grid, 1, wx.EXPAND|wx.ALL, BORDER)
         self.SetSizer(sizer)
         self.set_table_choice(self.tables.index(table))
         self.Layout()
@@ -94,9 +123,14 @@ class SearchPanel(wx.Panel):
         sizer_table.Add(sizer_con, 0, wx.LEFT|wx.BOTTOM|wx.RIGHT, BORDER)
 
         op_choice.SetSelection(0)
+        key_choice.SetSelection(0)
         self.Thaw()
 
         self.Bind(wx.EVT_BUTTON, self.on_btn_del, btn_del)
+
+    def on_dv_menu(self, evt):
+        """Open the dataview item context menu."""
+        print("DV CONTEXT MENU")
 
     def on_btn_del(self, evt):
         """Delete the search condition row."""
@@ -122,8 +156,16 @@ class SearchPanel(wx.Panel):
                 else:
                     box.Show(True)
 
+            for n, grid in enumerate(self.grids):
+                if sel == n:
+                    grid.Show(True)
+                else:
+                    grid.Show(False)
+
             self.Layout()
             self.Thaw()
+
+        self.on_search(None)
 
     def on_add_condition(self, evt):
         """Add a search condition line."""
@@ -155,11 +197,26 @@ class SearchPanel(wx.Panel):
                 key = self.cond_keys[sel][key_idx]
                 op = choice_op.GetStringSelection()
                 value = text_ctrl.GetValue()
+                if op == 'like':
+                    value = "%" + value + "%"
+                if key not in conditions:
+                    conditions[key] = [op, value]
 
-                conditions[key] = [op, value]
+        self.grids[sel].GetTable().update_data(conditions)
 
-        for k, v in conditions.items():
-            print("{}: {}".format(k, v))
+        # if len(conditions) > 0:
+        #     data = self.db.get_with_conditions(self.get_table(), conditions)
+
+            # self.lc_search.DeleteAllItems()
+            # for row in data:
+            #     srow = [tb.type2str(val) for val in row]
+            #     self.lc_search.AppendItem(srow)
+
+        # for k, v in conditions.items():
+        #     print("{}: {}".format(k, v))
+        # print("")
+        # for row in data:
+        #     print(row)
 
     def on_show_conditions(self, evt):
         """Show or hide search conditions."""
@@ -168,6 +225,7 @@ class SearchPanel(wx.Panel):
             return
         box: wx.StaticBox = self.cond_sizers[sel].GetStaticBox()
         box.Show(not box.IsShown())
+        self.Layout()
 
     def table_selection(self):
         """Return the index of selected item in table choice window."""
