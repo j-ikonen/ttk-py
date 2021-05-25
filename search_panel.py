@@ -1,3 +1,14 @@
+"""
+TODO
+    Add parts grid to show together with a selected product.
+        Visibility with product.
+        Has foreign key.
+        Update foreign key on product selection.
+    Add search result limit and search result page browsing.
+    Add search result count.
+    
+"""
+
 import wx
 
 import table as tb
