@@ -1,12 +1,9 @@
 """
 TODO
-    Add parts grid to show together with a selected product.
-        Visibility with product.
-        Has foreign key.
-        Update foreign key on product selection.
+    Change parts with product to calc codes with def materials from db.
     Add search result limit and search result page browsing.
     Add search result count.
-    
+
 """
 
 import wx
@@ -49,7 +46,9 @@ class SearchPanel(wx.Panel):
             tb.parts_keys
         ]
         self.grids = []
+        self.child_grids = {}
         self.columns = []
+        self.copy = []
         for n in range(len(self.cond_keys)):
             columns = self.db.get_columns(self.tables[n])
             # print(columns)
@@ -69,9 +68,16 @@ class SearchPanel(wx.Panel):
         self.btn_add_condition = wx.Button(self, label=BTN_AC)
         self.btn_search = wx.Button(self, label=BTN_SEARCH)
         self.btn_show_cond = wx.Button(self, label=SEARCH_COND)
+        product_grid = None
         for n, tablename in enumerate(self.tables):
             grid = DbGrid(self, self.db, tablename, 0)
             self.grids.append(grid)
+            if tablename == "products":
+                product_grid = grid
+                child_grid = DbGrid(self, self.db, "products.parts", 0)
+                self.child_grids[tablename] = child_grid
+                child_grid.GetTable().fk = ["product_code"]
+                child_grid.Show(False)
             grid.Show(False)
 
         # self.lc_search = dv.DataViewListCtrl(self, style=dv.DV_ROW_LINES|dv.DV_MULTIPLE)
@@ -80,6 +86,7 @@ class SearchPanel(wx.Panel):
         self.Bind(wx.EVT_BUTTON, self.on_add_condition, self.btn_add_condition)
         self.Bind(wx.EVT_BUTTON, self.on_search, self.btn_search)
         self.Bind(wx.EVT_BUTTON, self.on_show_conditions, self.btn_show_cond)
+        self.Bind(wx.grid.EVT_GRID_SELECT_CELL, self.on_product_selection, product_grid)
         # self.Bind(dv.EVT_DATAVIEW_ITEM_CONTEXT_MENU, self.on_dv_menu, self.lc_search)
 
         sizer_top = wx.BoxSizer(wx.HORIZONTAL)
@@ -103,6 +110,10 @@ class SearchPanel(wx.Panel):
 
         for grid in self.grids:
             sizer.Add(grid, 1, wx.EXPAND|wx.ALL, BORDER)
+
+        for parent_key, grid in self.child_grids.items():
+            sizer.Add(grid, 1, wx.EXPAND|wx.ALL, BORDER)
+
         self.SetSizer(sizer)
         self.set_table_choice(self.tables.index(table))
         self.Layout()
@@ -139,10 +150,6 @@ class SearchPanel(wx.Panel):
 
         self.Bind(wx.EVT_BUTTON, self.on_btn_del, btn_del)
 
-    def on_dv_menu(self, evt):
-        """Open the dataview item context menu."""
-        print("DV CONTEXT MENU")
-
     def on_btn_del(self, evt):
         """Delete the search condition row."""
         sel = self.table_selection()
@@ -154,6 +161,21 @@ class SearchPanel(wx.Panel):
         self.cond_sizers[sel].Remove(sizer) # Destroy the now empty sizer.
 
         self.Layout()
+
+    def on_product_selection(self, evt):
+        """Update the parts grid with selected products parts."""
+        sel = self.table_selection()
+        if sel is None:
+            return
+
+        parent_table = self.get_table()
+        parent_grid = self.grids[self.tables.index(parent_table)]
+        part_grid: DbGrid = self.child_grids[parent_table]
+        row = evt.GetRow()
+        fk_val = parent_grid.GetCellValue(row, 0)
+
+        part_grid.set_fk_value([fk_val])
+        evt.Skip()
 
     def on_table_choice(self, evt):
         """Change the panel to search from chosen table."""
@@ -172,6 +194,12 @@ class SearchPanel(wx.Panel):
                     grid.Show(True)
                 else:
                     grid.Show(False)
+            
+            for grid in self.child_grids.values():
+                grid.Show(False)
+
+            if self.tables[sel] in self.child_grids:
+                self.child_grids[self.tables[sel]].Show(True)
 
             self.Layout()
             self.Thaw()
@@ -214,20 +242,6 @@ class SearchPanel(wx.Panel):
                     conditions[key] = [op, value]
 
         self.grids[sel].GetTable().update_data(conditions)
-
-        # if len(conditions) > 0:
-        #     data = self.db.get_with_conditions(self.get_table(), conditions)
-
-            # self.lc_search.DeleteAllItems()
-            # for row in data:
-            #     srow = [tb.type2str(val) for val in row]
-            #     self.lc_search.AppendItem(srow)
-
-        # for k, v in conditions.items():
-        #     print("{}: {}".format(k, v))
-        # print("")
-        # for row in data:
-        #     print(row)
 
     def on_show_conditions(self, evt):
         """Show or hide search conditions."""

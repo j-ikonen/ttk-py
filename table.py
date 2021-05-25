@@ -572,9 +572,10 @@ parts_keys = [
     "default_mat",   
     "width",         
     "length",        
+    "cost",
     "code_width",    
-    "code_length",   
-    "cost"
+    "code_length",
+    "code_cost"
 ]
 sql_create_table = {
     "variables": sql_create_table_variables,
@@ -655,7 +656,7 @@ class OfferTables:
         # self.insert("columns", columns_keys, columns_oparts, True)
         # self.insert("columns", columns_keys, columns_opredefs, True)
         # self.insert("columns", columns_keys, columns_parts, True, True)
-        self.insert("columns", columns_keys, columns_mats, True, True)
+        # self.insert("columns", columns_keys, columns_mats, True, True)
         # self.insert("columns", columns_keys, columns_products, True, True)
         # self.insert("columns", columns_keys, columns_offers, True, True)
         self.con.commit()
@@ -923,6 +924,11 @@ class OfferTables:
             return []
 
         return self.cur.fetchall()
+
+    def get_parts(self, keys, product_code: str):
+        """Return the parts with given product code."""
+        sql = """SELECT {} FROM parts WHERE product_code=(?)""".format(",".join(keys))
+        return self.select(sql, (product_code,))
 
     select_get_columns = """SELECT * FROM columns WHERE tablename=(?) ORDER BY col_idx ASC"""
     def get_columns(self, table):
