@@ -661,7 +661,7 @@ class OfferTables:
         cols = ','.join(columns)
         conditions = ""
         for col in match_columns:
-            conditions += col + operator + "?"
+            conditions += col + " " + operator + " (?)"
             if col != match_columns[-1]:
                 conditions += " AND "
 

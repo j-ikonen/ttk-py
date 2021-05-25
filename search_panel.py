@@ -12,7 +12,7 @@ BORDER = 5
 
 
 class SearchPanel(wx.Panel):
-    def __init__(self, parent, db: tb.OfferTables):
+    def __init__(self, parent, db: tb.OfferTables, table: str="offers"):
         super().__init__(parent)
 
         self.table_labels = [
@@ -21,12 +21,16 @@ class SearchPanel(wx.Panel):
             "Tuotteet",
             "Osat"
         ]
+        self.tables = [
+            "offers",
+            "materials",
+            "products",
+            "parts"
+        ]
+        self.cond_labels = [[], [], [], []]
+        self.op_labels = ["=", "like", "!=", ">", "<", ">=", "<=", "!>", "!<"]
         self.conditions = {}
-        self.cond_labels = []
-        self.cond_choices = []
-        self.cond_texts = []
-        self.cond_op = []
-        self.op_labels = []
+        self.cond_sizers = []
 
         self.db: tb.OfferTables = db
         title = wx.StaticText(self, label=TITLE)
@@ -40,10 +44,9 @@ class SearchPanel(wx.Panel):
         self.Bind(wx.EVT_BUTTON, self.on_search, self.btn_search)
         self.Bind(wx.EVT_BUTTON, self.on_show_conditions, self.btn_show_cond)
 
-        self.set_table_choice(0)
 
         sizer_top = wx.BoxSizer(wx.HORIZONTAL)
-        self.sizer_conditions = wx.StaticBoxSizer(wx.VERTICAL, self, SEARCH_COND)
+        # self.sizer_conditions = wx.StaticBoxSizer(wx.VERTICAL, self, SEARCH_COND)
         sizer = wx.BoxSizer(wx.VERTICAL)
 
         sizer_top.Add(title, 0, wx.RIGHT, BORDER)
@@ -53,32 +56,94 @@ class SearchPanel(wx.Panel):
         sizer_top.Add(self.btn_show_cond, 0, wx.RIGHT, BORDER)
 
         sizer.Add(sizer_top, 0, wx.ALL, BORDER)
-        sizer.Add(self.sizer_conditions, 0, wx.ALL, BORDER)
+        for n in range(len(self.table_labels)):
+            box_sizer = wx.StaticBoxSizer(wx.VERTICAL, self, SEARCH_COND)
+            box_sizer.AddSpacer(BORDER)
+            self.cond_sizers.append(box_sizer)
+            self.add_condition(n)
+            sizer.Add(box_sizer, 0, wx.ALL, BORDER)
+        # sizer.Add(self.sizer_conditions, 0, wx.ALL, BORDER)
 
         self.SetSizer(sizer)
+        self.set_table_choice(self.tables.index(table))
+        self.Layout()
 
-    def add_condition(self):
-        box: wx.StaticBox = self.sizer_conditions.GetStaticBox()
-        key_choice = wx.Choice(box, size=(100, -1), choices=self.cond_labels)
-        op_choice = wx.Choice(box, size=(65, -1), choices=self.op_labels)
-        text = wx.TextCtrl(box, size=(120, -1))
+    def get_table(self):
+        """Return the selected table name or None if nothing is selected."""
+        sel = self.table_selection()
+        if sel == None:
+            return None
+        return self.tables[sel]
+
+    def add_condition(self, table: int):
+        """Add a condition to search condition box in table index."""
+        sizer_table = self.cond_sizers[table]
+        box: wx.StaticBox = sizer_table.GetStaticBox()
+
+        self.Freeze()   # Prevent flicker when creating the new windows.
+
         btn_del = wx.Button(box, label=BTN_DC)
+        key_choice = wx.Choice(box, size=(120, -1), choices=self.cond_labels[table])
+        op_choice = wx.Choice(box, size=(45, -1), choices=self.op_labels)
+        text = wx.TextCtrl(box, size=(200, -1))
+
         sizer_con = wx.BoxSizer(wx.HORIZONTAL)
         sizer_con.Add(btn_del, 0, wx.RIGHT, BORDER)
         sizer_con.Add(key_choice, 0, wx.RIGHT, BORDER)
         sizer_con.Add(op_choice, 0, wx.RIGHT, BORDER)
         sizer_con.Add(text, 0, wx.RIGHT, BORDER)
-        return sizer_con
+        sizer_table.Add(sizer_con, 0, wx.LEFT|wx.BOTTOM|wx.RIGHT, BORDER)
+
+        self.Thaw()
+
+        self.Bind(wx.EVT_CHOICE, self.on_choice_key, key_choice)
+        self.Bind(wx.EVT_CHOICE, self.on_choice_op, op_choice)
+        self.Bind(wx.EVT_TEXT_ENTER, self.on_text_enter, text)
+        self.Bind(wx.EVT_BUTTON, self.on_btn_del, btn_del)
+
+
+    def on_choice_key(self, evt):
+        """."""
+        print("on choice key")
+
+    def on_choice_op(self, evt):
+        """."""
+        print("on choice op")
+
+    def on_text_enter(self, evt):
+        """."""
+        print("on text enter")
+
+    def on_btn_del(self, evt):
+        """Delete the search condition row."""
+        sel = self.table_selection()
+        if sel is None:
+            return
+
+        sizer = evt.GetEventObject().GetContainingSizer()   # Get sizer that has button
+        sizer.Clear(True)   # Destroy the windows in the sizer.
+        self.cond_sizers[sel].Remove(sizer) # Destroy the now empty sizer.
+
+        self.Layout()
 
     def on_table_choice(self, evt):
         """Change the panel to search from chosen table."""
-        print("table choice")
+        sel = self.table_selection()
+        if sel is not None:
+            for n, sizer in enumerate(self.cond_sizers):
+                box: wx.StaticBox = sizer.GetStaticBox()
+                if n != sel:
+                    box.Show(False)
+                else:
+                    box.Show(True)
+        self.Layout()
 
     def on_add_condition(self, evt):
         """Add a search condition line."""
-        print("add condition")
-        sizer = self.add_condition()
-        self.sizer_conditions.Add(sizer, 0, wx.RIGHT|wx.LEFT|wx.TOP, BORDER)
+        sel = self.table_selection()
+        if sel is None:
+            return
+        self.add_condition(sel)
         self.Layout()
 
     def on_search(self, evt):
@@ -87,10 +152,13 @@ class SearchPanel(wx.Panel):
 
     def on_show_conditions(self, evt):
         """Show or hide search conditions."""
-        box: wx.StaticBox = self.sizer_conditions.GetStaticBox()
+        sel = self.table_selection()
+        if sel is None:
+            return
+        box: wx.StaticBox = self.cond_sizers[sel].GetStaticBox()
         box.Show(not box.IsShown())
 
-    def get_table_choice(self):
+    def table_selection(self):
         """Return the index of selected item in table choice window."""
         selection = self.choice_table.GetSelection()
         if selection == wx.NOT_FOUND:
@@ -101,6 +169,7 @@ class SearchPanel(wx.Panel):
     def set_table_choice(self, table_idx):
         """Set the index of selected item in table choice window."""
         self.choice_table.SetSelection(table_idx)
+        self.on_table_choice(None)
 
 
 if __name__ == '__main__':
