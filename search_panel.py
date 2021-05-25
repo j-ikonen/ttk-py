@@ -27,9 +27,9 @@ class SearchPanel(wx.Panel):
             "products",
             "parts"
         ]
-        self.cond_labels = [[], [], [], []]
+        self.cond_labels = [["ID", "Nimi"], [], [], []]
+        self.cond_keys = [["id", "name"], [], [], []]
         self.op_labels = ["=", "like", "!=", ">", "<", ">=", "<=", "!>", "!<"]
-        self.conditions = {}
         self.cond_sizers = []
 
         self.db: tb.OfferTables = db
@@ -43,7 +43,6 @@ class SearchPanel(wx.Panel):
         self.Bind(wx.EVT_BUTTON, self.on_add_condition, self.btn_add_condition)
         self.Bind(wx.EVT_BUTTON, self.on_search, self.btn_search)
         self.Bind(wx.EVT_BUTTON, self.on_show_conditions, self.btn_show_cond)
-
 
         sizer_top = wx.BoxSizer(wx.HORIZONTAL)
         # self.sizer_conditions = wx.StaticBoxSizer(wx.VERTICAL, self, SEARCH_COND)
@@ -94,25 +93,10 @@ class SearchPanel(wx.Panel):
         sizer_con.Add(text, 0, wx.RIGHT, BORDER)
         sizer_table.Add(sizer_con, 0, wx.LEFT|wx.BOTTOM|wx.RIGHT, BORDER)
 
+        op_choice.SetSelection(0)
         self.Thaw()
 
-        self.Bind(wx.EVT_CHOICE, self.on_choice_key, key_choice)
-        self.Bind(wx.EVT_CHOICE, self.on_choice_op, op_choice)
-        self.Bind(wx.EVT_TEXT_ENTER, self.on_text_enter, text)
         self.Bind(wx.EVT_BUTTON, self.on_btn_del, btn_del)
-
-
-    def on_choice_key(self, evt):
-        """."""
-        print("on choice key")
-
-    def on_choice_op(self, evt):
-        """."""
-        print("on choice op")
-
-    def on_text_enter(self, evt):
-        """."""
-        print("on text enter")
 
     def on_btn_del(self, evt):
         """Delete the search condition row."""
@@ -130,13 +114,16 @@ class SearchPanel(wx.Panel):
         """Change the panel to search from chosen table."""
         sel = self.table_selection()
         if sel is not None:
+            self.Freeze()
             for n, sizer in enumerate(self.cond_sizers):
                 box: wx.StaticBox = sizer.GetStaticBox()
                 if n != sel:
                     box.Show(False)
                 else:
                     box.Show(True)
-        self.Layout()
+
+            self.Layout()
+            self.Thaw()
 
     def on_add_condition(self, evt):
         """Add a search condition line."""
@@ -148,7 +135,31 @@ class SearchPanel(wx.Panel):
 
     def on_search(self, evt):
         """Search from database with conditions."""
-        print("search")
+        sel = self.table_selection()
+        if sel is None:
+            return
+
+        conditions = {}
+        sboxs = self.cond_sizers[sel]
+        n = 1
+        while n < sboxs.GetItemCount():
+            sizer = sboxs.GetItem(n).GetSizer()
+            n += 1
+
+            choice_key: wx.Choice = sizer.GetItem(1).GetWindow()
+            choice_op: wx.Choice = sizer.GetItem(2).GetWindow()
+            text_ctrl: wx.TextCtrl = sizer.GetItem(3).GetWindow()
+
+            key_idx = choice_key.GetSelection()
+            if key_idx != wx.NOT_FOUND:
+                key = self.cond_keys[sel][key_idx]
+                op = choice_op.GetStringSelection()
+                value = text_ctrl.GetValue()
+
+                conditions[key] = [op, value]
+
+        for k, v in conditions.items():
+            print("{}: {}".format(k, v))
 
     def on_show_conditions(self, evt):
         """Show or hide search conditions."""
