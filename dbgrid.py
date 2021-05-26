@@ -583,8 +583,6 @@ class GroupProductsTable(DatabaseGridTable):
                 self.data.append(list(datarow))
 
             self.GetView().ForceRefresh()
-            # newlen = len(self.data)
-            # self.change_number_rows(0, newlen)
 
 
 class GroupPartsTable(DatabaseGridTable):
@@ -606,10 +604,6 @@ class GroupPartsTable(DatabaseGridTable):
         self.unique = []
         self.read_only = []
         self.cant_update = []
-        self.coded = [11, 12, 13]
-        self.coded_tar = [8, 9, 10]
-        self.aeval = Interpreter()
-        self.parse_done = False
         self.dbcols = [n for n in range(14)]
         self.dbtablename = "parts"
         self.dbpk = ["part", "product_code"]

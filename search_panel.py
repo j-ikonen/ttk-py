@@ -1,6 +1,5 @@
 """
 TODO
-    Change parts with product to calc codes with def materials from db.
     Add search result limit and search result page browsing.
     Add search result count.
 

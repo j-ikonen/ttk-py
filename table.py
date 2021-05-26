@@ -537,9 +537,6 @@ sql_create_table_parts = """
         count           INTEGER DEFAULT 1,
         desc            TEXT,
         default_mat     TEXT,
-        width           INTEGER,
-        length          INTEGER,
-        cost            REAL,
         code_width      TEXT,
         code_length     TEXT,
         code_cost       TEXT,
@@ -558,24 +555,18 @@ columns_parts = [
     ("parts", "count", "Määrä", "long", 3, 45, 0, 0),
     ("parts", "desc", "Kuvaus", "string", 4, 80, 0, 0),
     ("parts", "default_mat", "Oletus materiaali", "string", 5, 45, 0, 0),
-    ("parts", "width", "Leveys", "long", 6, 45, 0, 1),
-    ("parts", "length", "Pituus", "long", 7, 45, 0, 1),
-    ("parts", "cost", "Hinta", "double:6,2", 8, 45, 0, 1),
-    ("parts", "code_width", "Koodi Leveys", "string", 9, 120, 0, 0),
-    ("parts", "code_length", "Koodi Pituus", "string", 10, 120, 0, 0),
-    ("parts", "code_cost", "Koodi Hinta", "string", 11, 120, 0, 0)
+    ("parts", "code_width", "Koodi Leveys", "string", 6, 120, 0, 0),
+    ("parts", "code_length", "Koodi Pituus", "string", 7, 120, 0, 0),
+    ("parts", "code_cost", "Koodi Hinta", "string", 8, 120, 0, 0)
 ]
 parts_keys = [
-    "part",          
-    "code",          
+    "part",
+    "code",
     "product_code",
     "count",
-    "desc",          
-    "default_mat",   
-    "width",         
-    "length",        
-    "cost",
-    "code_width",    
+    "desc",
+    "default_mat",
+    "code_width",
     "code_length",
     "code_cost"
 ]
@@ -644,7 +635,7 @@ class OfferTables:
 
     def __init__(self) -> None:
         """."""
-        cur = self.create_connection("ttk.db")
+        self.create_connection("ttk.db")
 
         # for table, sql in sql_create_table.items():
             # cur.execute("""DROP TABLE IF EXISTS {};""".format(table))
