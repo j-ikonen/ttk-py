@@ -998,8 +998,8 @@ class OfferTables:
             return False
         return True
 
-    sql_delete_general = """DELETE FROM {table} WHERE {match}=({qm})"""
-    def delete(self, table, match_columns: Iterable, values: Iterable, many=False):
+    sql_delete_general = """DELETE FROM {table} WHERE {match}"""
+    def delete(self, table, match_columns: Iterable, values: Iterable):
         """Delete rows matching the columns and values specified.
 
         Parameters
@@ -1016,18 +1016,19 @@ class OfferTables:
         bool
             True on success, False otherwise.
         """
+        match = ""
+        for col in match_columns:
+            match += col + "=(?)"
+            if col != match_columns[-1]:
+                match += " AND "
         
         sql = self.sql_delete_general.format(
             table=table,
-            match=','.join(match_columns),
-            qm=','.join(['?'] * len(match_columns))
+            match=match
         )
 
         try:
-            if many:
-                self.cur.executemany(sql, values)
-            else:
-                self.cur.execute(sql, values)
+            self.cur.execute(sql, values)
             self.con.commit()
         except sqlite3.Error as e:
             print("OfferTables.delete\n\t{}".format(e))

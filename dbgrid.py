@@ -3,6 +3,7 @@ TODO
 ----
 """
 
+from types import resolve_bases
 from dialog import ConfirmDialog
 import wx
 import wx.grid as wxg
@@ -163,14 +164,22 @@ class DatabaseGridTable(wxg.GridTableBase):
             True to replace id for appending copied rows.
         """
         dbkeys = [key for n, key in enumerate(self.col_keys) if n in self.dbcols]
+        self.fk
         values = []
         for rowdata in data:
             rowvals = []
             for col in self.dbcols:
+                key = self.col_keys[col]
+                value = rowdata[col]
                 if col in self.pk_column and replace_id:
                     rowvals.append(str(ObjectId()))
+                elif key in self.fk:
+                    rowvals.append(self.fk_value[self.fk.index(key)])
+                elif col in self.pk_column and self.fk is None:
+                    value = "m" + value
                 else:
-                    rowvals.append(rowdata[col])
+                    rowvals.append(value)
+                # Allow moving given rows to same grid with changed foreign key.
             values.append(rowvals)
 
         self.db.insert(self.tablename, dbkeys, values, True)
@@ -249,10 +258,8 @@ class DatabaseGridTable(wxg.GridTableBase):
             return False
 
         self.Clear()
-        # rows = len(self.data)
         self.data.clear()
-        # self.change_number_rows(rows, 0)
-        # print(f"Updating {type(self)}")
+        print("grid cleared in update_data")
         return True
 
     def set_fk_value(self, value):
@@ -264,15 +271,17 @@ class DatabaseGridTable(wxg.GridTableBase):
             List of foreign keys for this table.
         """
         self.fk_value = value
+        self.update_data_with_row_change(None)
 
+    def update_data_with_row_change(self, var):
+        """Do self.update_data and update the row count to match."""
         oldlen = self.GetNumberRows()
-        self.update_data(None)
+        self.update_data(var)
         self.GetView().ForceRefresh()
         newlen = self.GetNumberRows()
         self.change_number_rows(oldlen, newlen)
 
     def change_number_rows(self, old, new):
-        
         if new > old:
             msg = wxg.GridTableMessage(
                 self,
@@ -445,14 +454,19 @@ class DatabaseGridTable(wxg.GridTableBase):
 
             todb = []
             for row in rows:
+                dbpkval = self.get_dbpk_value(row)
+                # print(self.dbtablename)
+                # print(self.dbpk)
+                # print(dbpkval)
                 res = self.db.get(
                     self.dbtablename,
                     self.dbpk,
                     self.dbpk,
-                    self.get_dbpk_value(row)
+                    dbpkval
                 )
+                # print(res)
                 isok = True
-                if len(res) > 0 and not no_confirm:
+                if res is not None and len(res) > 0 and not no_confirm:
                     msg = ("Koodi '{}' löytyy tietokannasta.".format(res[0])
                           +" Korvataanko valitulla rivillä?")
                     title = "Korvataanko?"
@@ -681,7 +695,7 @@ class PartsTable(DatabaseGridTable):
         self.cant_update = []
         self.aeval = Interpreter()
         self.parse_done = False
-        self.dbcols = [n for n in range(14)]
+        self.dbcols = [n for n in range(len(setup))]
         self.dbtablename = "parts"
         self.dbpk = ["part", "product_code"]
         self.save_keys = tb.parts_keys
@@ -776,9 +790,11 @@ class GenTable(DatabaseGridTable):
                     print(datarow)
                     self.data.append(list(datarow))
                 self.GetView().ForceRefresh()
+                # self.GetView().Update()
+                print("LEN: {}".format(self.GetNumberRows()))
 
-                newlen = len(self.data)
-                self.change_number_rows(0, newlen)
+                # newlen = len(self.data)
+                # self.change_number_rows(0, newlen)
 
 
 class DbGrid(wxg.Grid):
@@ -855,12 +871,12 @@ class DbGrid(wxg.Grid):
         """
         selected = self.GetSelectedRows()
         selected.sort()
+        parent = self.GetParent()
+        parent.copy.clear()
         self.copy_rows.clear()
         self.copy_cells.clear()
         if len(selected) == 0:
             selected_blocks = self.GetSelectedBlocks()
-            parent = self.GetParent()
-            parent.copy.clear()
             has_sel = False
             for block in selected_blocks:
                 has_sel = True
@@ -870,7 +886,7 @@ class DbGrid(wxg.Grid):
                 crd = self.GetGridCursorCoords()
                 value = self.GetTable().GetValue(crd.GetRow(), crd.GetCol())
                 parent.copy.append([value])
-            # print(parent.copy)
+            print(parent.copy)
         else:
             for row in selected:
                 rowdata = self.GetTable().get_rowdata(row)
@@ -939,6 +955,11 @@ class DbGrid(wxg.Grid):
                             print("Part of selection is out of bounds of the grid.")
                         table.update_data(None)
 
+        elif len(self.copy_rows) > 0:
+            table: DatabaseGridTable = self.GetTable()
+            table.append_rows(self.copy_rows, False)
+            table.update_data_with_row_change(None)
+
     def can_undo(self):
         """Return true if an action can be undone."""
         return (True 
@@ -961,17 +982,12 @@ class DbGrid(wxg.Grid):
         """Save the selected items to database."""
         if save_all:
             selected = [n for n in range(self.GetNumberRows() - 1)]
-            # print("\nSELECTED ROWS FOR SAVE: {}".format(selected))
         else:
             selected = self.GetSelectedRows()
             if len(selected) == 0:
                 return False
 
         table: DatabaseGridTable = self.GetTable()
-        # if table.tablename == "offer_parts":
-        #     key = ["product_code"]
-        #     value = [self.GetParent().find("code", "id", table.fk_value)]
-        # else:
         key = None
         value = None
         if not table.save_to_db(selected, key, value, save_all):
@@ -1208,6 +1224,31 @@ class DbGrid(wxg.Grid):
         # Clear grid cursor variables before setting new values.
         self.cursor_text = ""
         self.GetTable().set_fk_value(fk)
+
+    def set_primary_key(self, pk):
+        """Set the value of the primary key.
+        
+        Must be called after init if pk != "code".
+        
+        Parameters
+        ----------
+        pk : Iterable
+            Primary key as a list.
+        """
+        self.GetTable().pk = pk
+
+    def set_foreign_key(self, fk):
+        """Set the value of the foreign key.
+        
+        Must be called after init if using GenTable and a table with foreign key.
+        
+        Parameters
+        ----------
+        fk : Iterable
+            Primary key as a list.
+        """
+        self.GetTable().fk = fk
+
 
 
 BORDER = 5

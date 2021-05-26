@@ -1,5 +1,6 @@
 """
 TODO
+    Fix copy of product.
     Add search result limit and search result page browsing.
     Add search result count.
 
@@ -75,8 +76,10 @@ class SearchPanel(wx.Panel):
                 product_grid = grid
                 child_grid = DbGrid(self, self.db, "products.parts", 0)
                 self.child_grids[tablename] = child_grid
-                child_grid.GetTable().fk = ["product_code"]
+                child_grid.set_foreign_key(["product_code"])
                 child_grid.Show(False)
+            if tablename == "offers":
+                grid.set_primary_key(["ID"])
             grid.Show(False)
 
         # self.lc_search = dv.DataViewListCtrl(self, style=dv.DV_ROW_LINES|dv.DV_MULTIPLE)
@@ -116,6 +119,14 @@ class SearchPanel(wx.Panel):
         self.SetSizer(sizer)
         self.set_table_choice(self.tables.index(table))
         self.Layout()
+
+    def update_depended_grids(self, grid):
+        """Update dependend grids."""
+        table = self.get_table()
+        sel = self.table_selection()
+        if table == "products":
+            self.child_grids["products"].GetTable().update_data_with_row_change(None)
+        self.grids[sel].GetTable().update_data_with_row_change(None)
 
     def get_table(self):
         """Return the selected table name or None if nothing is selected."""
@@ -240,7 +251,7 @@ class SearchPanel(wx.Panel):
                 if key not in conditions:
                     conditions[key] = [op, value]
 
-        self.grids[sel].GetTable().update_data(conditions)
+        self.grids[sel].GetTable().update_data_with_row_change(conditions)
 
     def on_show_conditions(self, evt):
         """Show or hide search conditions."""
