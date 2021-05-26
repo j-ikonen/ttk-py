@@ -400,6 +400,7 @@ columns_oparts = [
     ("offer_parts", "pr.width", "Tuote leveys", "long", 17, 35, 0, 1),
     ("offer_parts", "pr.height", "Tuote korkeus", "long", 18, 35, 0, 1),
     ("offer_parts", "pr.depth", "Tuote syvyys", "long", 19, 35, 0, 1),
+    ("offer_parts", "product_code", "Tuote Koodi", "string", 20, 35, 0, 1),
 ]
 select_oparts = """
     SELECT
@@ -427,7 +428,8 @@ select_oparts = """
         m.tot_cost,
         pr.width,
         pr.height,
-        pr.depth
+        pr.depth,
+        pr.code as product_code
 
     FROM offer_parts pa
         INNER JOIN offer_products pr
@@ -788,7 +790,7 @@ class OfferTables:
         try:
             self.cur.execute(sql, values)
             self.con.commit()
-        except sqlite3.Error as e:
+        except (sqlite3.Error, ValueError) as e:
             print("OfferTables.get\n\t{}".format(e))
             print("\tsql: {}".format(sql))
             print("\ttable: {}".format(table))

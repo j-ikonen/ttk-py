@@ -219,6 +219,9 @@ class DatabaseGridTable(wxg.GridTableBase):
             try:
                 pk_val.append(self.data[row][col])
             except IndexError:
+                print("pk_val: {}, row: {}, col: {}, key: {}".format(
+                    pk_val, row, col, key
+                ))
                 return None
         return pk_val
 
@@ -233,7 +236,7 @@ class DatabaseGridTable(wxg.GridTableBase):
             return super().GetValueAsLong(row, col)
         except TypeError:
             return 0
-    
+
     def GetValueAsBool(self, row, col):
         try:
             return super().GetValueAsBool(row, col)
@@ -414,7 +417,7 @@ class DatabaseGridTable(wxg.GridTableBase):
         """Return value of foreign key."""
         return self.fk_value
 
-    def save_to_db(self, rows, key, value):
+    def save_to_db(self, rows, key, value, no_confirm=False):
         """Save the given rows to database.
         
         Open confirm dialog for replace if row exists.
@@ -427,6 +430,8 @@ class DatabaseGridTable(wxg.GridTableBase):
             Key to add to all rows.
         value : Iterable
             Value to add to key at all rows.
+        no_confirm : bool
+            If true does not ask confirmation on replace.
 
         Returns
         -------
@@ -438,7 +443,6 @@ class DatabaseGridTable(wxg.GridTableBase):
             if key is not None:
                 keys += key
 
-            
             todb = []
             for row in rows:
                 res = self.db.get(
@@ -448,7 +452,7 @@ class DatabaseGridTable(wxg.GridTableBase):
                     self.get_dbpk_value(row)
                 )
                 isok = True
-                if len(res) > 0:
+                if len(res) > 0 and not no_confirm:
                     msg = ("Koodi '{}' löytyy tietokannasta.".format(res[0])
                           +" Korvataanko valitulla rivillä?")
                     title = "Korvataanko?"
@@ -637,7 +641,6 @@ class GroupPredefsTable(DatabaseGridTable):
         self.fk = ["group_id"]
         self.fk_value = None
         self.pk_column = [0]
-        # self.columns = self.get_visible()
         self.columns = [n for n in range(len(setup))]
         self.col_visible = self.get_visible()
         self.col_keys = [val[tb.KEY] for val in setup]
@@ -646,7 +649,6 @@ class GroupPredefsTable(DatabaseGridTable):
         self.col_widths = [val[tb.WIDTH] for val in setup]
         self.unique = []
         self.read_only = []
-        # self.ro_dependency = [8, 9, 10, 11, 12]
         self.cant_update = []
         self.dbcols = [n for n in range(4)]
 
@@ -656,16 +658,12 @@ class GroupPredefsTable(DatabaseGridTable):
             if val[tb.READ_ONLY] == 1:
                 self.read_only.append(n)
 
-        # self.fk_value = ["uusi ryhmä"]
-
     def update_data(self, row):
         if super().update_data(row):
             res = self.db.get_opredefs(self.fk_value[0])
             for datarow in res:
                 self.data.append(list(datarow))
             self.GetView().ForceRefresh()
-            newlen = len(self.data)
-            self.change_number_rows(0, newlen)
 
 
 class PartsTable(DatabaseGridTable):
@@ -706,8 +704,6 @@ class PartsTable(DatabaseGridTable):
             for datarow in res:
                 self.data.append(list(datarow))
             self.GetView().ForceRefresh()
-            # newlen = len(self.data)
-            # self.change_number_rows(0, newlen)
 
     def append_new_row(self, col, value):
         """Append a new row by inserting it to database.
@@ -745,6 +741,7 @@ class PartsTable(DatabaseGridTable):
 
             return success
 
+
 class GenTable(DatabaseGridTable):
     def __init__(self, db: tb.OfferTables, tablename):
         super().__init__(db)
@@ -755,7 +752,6 @@ class GenTable(DatabaseGridTable):
         self.fk = None
         self.fk_value = None
         self.pk_column = [0]
-        # self.columns = self.get_visible()
         self.columns = [n for n in range(len(setup))]
         self.col_visible = self.get_visible()
         self.col_keys = [val[tb.KEY] for val in setup]
@@ -775,8 +771,6 @@ class GenTable(DatabaseGridTable):
             if val[tb.READ_ONLY] == 1:
                 self.read_only.append(n)
 
-        # self.fk_value = ["uusi ryhmä"]
-
     def update_data(self, conditions):
         if super().update_data(None):
             if conditions is None:
@@ -794,7 +788,7 @@ class GenTable(DatabaseGridTable):
 
 
 class DbGrid(wxg.Grid):
-    def __init__(self, parent, db, name, save_history=1):
+    def __init__(self, parent, db, name, save_history=1, save_with=None):
         super().__init__(parent, style=wx.WANTS_CHARS|wx.HD_ALLOW_REORDER)
 
         table = None
@@ -814,14 +808,13 @@ class DbGrid(wxg.Grid):
         self.SetTable(table, True)
         self.read_only = table.read_only
         self.labels = table.get_all_column_labels()
-        # self.col_ids = None
-        # if len(self.labels) > 0:
         self.col_ids = wx.NewIdRef(len(self.labels))
         self.cursor_text = ""
         self.copy_rows = []
         self.copy_cells = []
         self.history = {}
         self.save_history = save_history
+        self.save_with = save_with
 
         # for col in range(self.GetNumberCols()):
         #     width = table.get_col_width(col)
@@ -970,21 +963,27 @@ class DbGrid(wxg.Grid):
             table.DeleteRows(0, self.GetNumberRows() - 1)
             table.append_rows(data, False)
 
-    def save(self):
+    def save(self, save_all=False):
         """Save the selected items to database."""
-        selected = self.GetSelectedRows()
-        if len(selected) == 0:
-            return False
+        if save_all:
+            selected = [n for n in range(self.GetNumberRows() - 1)]
+            # print("\nSELECTED ROWS FOR SAVE: {}".format(selected))
+        else:
+            selected = self.GetSelectedRows()
+            if len(selected) == 0:
+                return False
 
         table: DatabaseGridTable = self.GetTable()
-        if table.tablename == "offer_parts":
-            key = ["product_code"]
-            value = [self.GetParent().find("code", "id", table.fk_value)]
-        else:
-            key = None
-            value = None
-        if not table.save_to_db(selected, key, value):
+        # if table.tablename == "offer_parts":
+        #     key = ["product_code"]
+        #     value = [self.GetParent().find("code", "id", table.fk_value)]
+        # else:
+        key = None
+        value = None
+        if not table.save_to_db(selected, key, value, save_all):
             print("Error in saving to database.")
+        elif self.save_with is not None:
+            self.save_with(True)    # Run the save of another grid on success if defined.
 
     def select_all(self):
         """Select all but the last empty row."""
@@ -1233,8 +1232,8 @@ class GroupPanel(wx.Panel):
 
         self.grid_pdef = DbGrid(self, db, "offer_predefs")
         self.grid_mats = DbGrid(self, db, "offer_materials")
-        self.grid_prod = DbGrid(self, db, "offer_products")
         self.grid_part = DbGrid(self, db, "offer_parts")
+        self.grid_prod = DbGrid(self, db, "offer_products", save_with=self.grid_part.save)
 
         self.label_pdef = wx.StaticText(self, label="Esimääritykset")
         self.label_mats = wx.StaticText(self, label="Materiaalit")
