@@ -173,10 +173,10 @@ class DatabaseGridTable(wxg.GridTableBase):
                 value = rowdata[col]
                 if col in self.pk_column and replace_id:
                     rowvals.append(str(ObjectId()))
-                elif key in self.fk:
+                elif self.fk is not None and key in self.fk:
                     rowvals.append(self.fk_value[self.fk.index(key)])
                 elif col in self.pk_column and self.fk is None:
-                    value = "m" + value
+                    rowvals.append("m" + value)
                 else:
                     rowvals.append(value)
                 # Allow moving given rows to same grid with changed foreign key.
@@ -815,6 +815,7 @@ class DbGrid(wxg.Grid):
         else:
             table = GenTable(db, name)
 
+        self.db: tb.OfferTables = db
         self.SetTable(table, True)
         self.read_only = table.read_only
         self.labels = table.get_all_column_labels()
@@ -958,6 +959,23 @@ class DbGrid(wxg.Grid):
         elif len(self.copy_rows) > 0:
             table: DatabaseGridTable = self.GetTable()
             table.append_rows(self.copy_rows, False)
+
+            old_ids = [row[0] for row in self.copy_rows]
+            copydata = [[v for v in r] for r in self.copy_rows]
+            for row in copydata:
+                row[0] = str(ObjectId())
+            new_ids = [row[0] for row in copydata]
+
+            if table.tablename == "products":
+                for n, new_id in enumerate(new_ids):
+                    old_id = old_ids[0]
+                    self.db.copy_parts("parts", old_id, new_id)
+
+            elif table.tablename == "offer_products":
+                for n, new_id in enumerate(new_ids):
+                    old_id = old_ids[0]
+                    self.db.copy_parts("offer_parts", old_id, new_id)
+
             table.update_data_with_row_change(None)
 
     def can_undo(self):

@@ -402,6 +402,22 @@ columns_oparts = [
     ("offer_parts", "pr.depth", "Tuote syvyys", "long", 19, 35, 0, 1),
     ("offer_parts", "product_code", "Tuote Koodi", "string", 20, 35, 0, 1),
 ]
+oparts_keys = [
+    "id",          
+    "product_id",  
+    "part",        
+    "code",        
+    "count",       
+    "desc",        
+    "use_predef",  
+    "default_mat", 
+    "width",       
+    "length",      
+    "cost",        
+    "code_width",  
+    "code_length", 
+    "code_cost"
+]
 select_oparts = """
     SELECT
         pa.id,
@@ -1111,6 +1127,29 @@ class OfferTables:
         """
         data = self.select(sql, (table,))
         return [False if r[1] == 0 else True for r in data]
+
+    def copy_parts(self, table: str, old_id: str, new_id: str):
+        """Copy parts of given product id to a new product id."""
+        if table == "offer_parts":
+            keys = oparts_keys
+            mcol = "product_id"
+        elif table == "parts":
+            keys = parts_keys
+            mcol = "product_code"
+        else:
+            print("OfferTables.copy_oparts - Invalid table '{}'".format(table))
+            return False
+        sql = """
+            INSERT OR REPLACE INTO {table} ({keys})
+            SELECT {kwid}
+            FROM {table}
+            WHERE {m} = (?)
+        """
+        keystr = ",".join(keys)
+        keys_w_fk = [key if key != mcol else "(?)" for key in keys]
+        sel = ",".join(keys_w_fk)
+        sql = sql.format(table=table, keys=keystr, kwid=sel, m=mcol)
+        return self.update(sql, [new_id, old_id])
 
 
 if __name__ == '__main__':
