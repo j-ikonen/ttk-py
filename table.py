@@ -12,6 +12,7 @@ from typing import Iterable
 from operator import itemgetter
 
 from bson.objectid import ObjectId
+import csv
 
 
 TYPES = {
@@ -61,16 +62,6 @@ def type2str(value):
         return strvalue.replace('.', ',')
     return strvalue
 
-code2col = {
-    "määrä": 4,
-    "leveys": 8,
-    "pituus": 9,
-    "mpaksuus": 15,
-    "mhinta": 16,
-    "tleveys": 17,
-    "tkorkeus": 18,
-    "tsyvyys": 19
-}
 from asteval import Interpreter
 aeval = Interpreter()
 
@@ -137,19 +128,23 @@ sql_create_table_variables = """
 """
 sql_create_table_columns = """
     CREATE TABLE IF NOT EXISTS columns (
+        columns_id  INTEGER PRIMARY KEY,
         tablename   TEXT,
         key         TEXT,
         label       TEXT,
         type        TEXT,
         col_idx     INTEGER,
-        width       INTEGER,
-        is_unique   INTEGER,
-        ro          INTEGER,
+        width       INTEGER DEFAULT 55,
+        is_unique   INTEGER DEFAULT 0,
+        ro          INTEGER DEFAULT 0,
         visible     INTEGER DEFAULT 1,
-        PRIMARY KEY (tablename, key)
+        UNIQUE (tablename, key)
     )
 """
-columns_keys = [
+pk_columns = ["columns_id"]
+fk_columns = []
+keys_columns = [
+    "columns_id",
     "tablename",
     "key",
     "label",
@@ -157,7 +152,8 @@ columns_keys = [
     "col_idx",
     "width",
     "is_unique",
-    "ro"
+    "ro",
+    "visible"
 ]
 TABLE = 0
 KEY = 1
@@ -171,8 +167,8 @@ VISIBLE = 7
 
 sql_create_table_offers = """
     CREATE TABLE IF NOT EXISTS offers (
-        id          TEXT PRIMARY KEY,
-        name        TEXT DEFAULT 'Uusi Tarjous',
+        offer_id    INTEGER PRIMARY KEY,
+        name        TEXT UNIQUE,
         firstname   TEXT,
         lastname    TEXT,
         company     TEXT,
@@ -184,8 +180,10 @@ sql_create_table_offers = """
         info        TEXT
     )
 """
+pk_offers = ["offer_id"]
+fk_offers = []
 columns_offers = [
-    ("offers", "id", "ID", "string", 0, 45, 1, 1),
+    ("offers", "offer_id", "ID", "string", 0, 45, 1, 1),
     ("offers", "name", "Tarjouksen nimi", "string", 1, 55, 0, 0),
     ("offers", "firstname", "Etunimi", "string", 2, 55, 0, 0),
     ("offers", "lastname", "Sukunimi", "string", 3, 55, 0, 0),
@@ -197,8 +195,8 @@ columns_offers = [
     ("offers", "postarea", "Postitoimipaikka", "string", 9, 55, 0, 0),
     ("offers", "info", "Lisätiedot", "string", 10, 55, 0, 0)
 ]
-offers_keys = [
-    "id",        
+keys_offers = [
+    "offer_id",        
     "name",      
     "firstname", 
     "lastname",  
@@ -211,45 +209,58 @@ offers_keys = [
     "info"     
 ]
 sql_create_table_offer_groups = """
-    CREATE TABLE IF NOT EXISTS offer_groups (
-        id          TEXT PRIMARY KEY,
-        offer_id    TEXT NOT NULL,
-        name        TEXT DEFAULT 'Uusi Ryhmä',
+    CREATE TABLE IF NOT EXISTS groups (
+        group_id    INTEGER PRIMARY KEY,
+        offer_id    INTEGER NOT NULL,
+        name        TEXT,
 
         FOREIGN KEY (offer_id)
-            REFERENCES offers (id)
+            REFERENCES offers (offer_id)
             ON DELETE CASCADE
-            ON UPDATE CASCADE
+            ON UPDATE CASCADE,
+        UNIQUE (offer_id, name)
     )
 """
-sql_create_table_offer_predefs = """
-    CREATE TABLE IF NOT EXISTS offer_predefs (
-        id          TEXT PRIMARY KEY,
-        group_id    TEXT NOT NULL,
+pk_groups = ["group_id"]
+fk_groups = ["offer_id"]
+keys_groups = ["group_id", "offer_id", "name"]
+columns_groups = [
+    ("groups", "group_id", "RyhmäID", "long", 0, 25, 1, 1, 0),
+    ("groups", "offer_id", "TarjousID", "long", 0, 25, 1, 1, 0),
+    ("groups", "name", "Ryhmän nimi", "string", 0, 80, 1, 0, 1)
+]
+sql_create_table_group_predefs = """
+    CREATE TABLE IF NOT EXISTS group_predefs (
+        gpd_id      INTEGER PRIMARY KEY,
+        group_id    INTEGER NOT NULL,
         part        TEXT,
         material    TEXT,
 
         FOREIGN KEY (group_id)
             REFERENCES offer_groups (id)
             ON DELETE CASCADE
-            ON UPDATE CASCADE
+            ON UPDATE CASCADE,
+        UNIQUE(group_id, part)
     )
 """
-columns_opredefs = [
-    ("offer_predefs", "id", "ID", "string", 0, 25, 1, 1),
-    ("offer_predefs", "group_id", "RyhmäID", "string", 1, 25, 1, 1),
-    ("offer_predefs", "part", "Osa", "string", 2, 60, 0, 0),
-    ("offer_predefs", "material", "Materiaali", "string", 3, 60, 0, 0)
+pk_gpd = ["gpd_id"]
+fk_gpd = ["offer_id"]
+keys_gpd = [
+    "gpd_id",
+    "group_id",
+    "part",
+    "material"
 ]
-select_opredefs = """
-    SELECT id, group_id, part, material
-    FROM offer_predefs
-    WHERE group_id=(?)
-"""
-sql_create_table_offer_materials = """
-    CREATE TABLE IF NOT EXISTS offer_materials (
-        id          TEXT PRIMARY KEY,
-        group_id    TEXT NOT NULL,
+columns_gpd = [
+    ("group_predefs", "gpd_id", "ID", "long", 0, 25, 1, 1),
+    ("group_predefs", "group_id", "RyhmäID", "long", 1, 25, 1, 1),
+    ("group_predefs", "part", "Osa", "string", 2, 60, 0, 0),
+    ("group_predefs", "material", "Materiaali", "string", 3, 60, 0, 0)
+]
+sql_create_table_group_materials = """
+    CREATE TABLE IF NOT EXISTS group_materials (
+        gm_id       INTEGER PRIMARY KEY,
+        group_id    INTEGER NOT NULL,
         category    TEXT,
         code        TEXT,
         desc        TEXT,
@@ -269,11 +280,14 @@ sql_create_table_offer_materials = """
 
         FOREIGN KEY (group_id) REFERENCES offer_groups (id)
             ON DELETE CASCADE
-            ON UPDATE CASCADE
+            ON UPDATE CASCADE,
+        UNIQUE(group_id, code)
     )
 """
-omaterials_keys_select = [
-    "id",        
+pk_gm = ["gm_id"]
+fk_gm = ["group_id"]
+keys_gm = [
+    "gm_id",        
     "group_id",  
     "category",  
     "code",      
@@ -289,29 +303,28 @@ omaterials_keys_select = [
     "discount",
     "tot_cost"
 ]
-omaterials_keys_insert = omaterials_keys_select[:-1]
-columns_omats = [
-    ("offer_materials", "id", "ID", "string", 0, 80, 1, 1),
-    ("offer_materials", "group_id", "RyhmäID", "string", 1, 80, 1, 1),
-    ("offer_materials", "category", "Tuoteryhmä", "string", 2, 60, 0, 0),
-    ("offer_materials", "code", "Koodi", "string", 3, 60, 0, 0),
-    ("offer_materials", "desc", "Kuvaus", "string", 4, 80, 0, 0),
-    ("offer_materials", "prod", "Valmistaja", "string", 5, 60, 0, 0),
-    ("offer_materials", "thickness", "Paksuus", "long", 6, 60, 0, 0),
-    ("offer_materials", "is_stock", "Onko varasto", "choice:varasto,tilaus,tarkista", 7, 45, 0, 0),
-    ("offer_materials", "unit", "Hintayksikkö", "choice:€/m2,€/kpl", 8, 60, 0, 0),
-    ("offer_materials", "cost", "Hinta", "double:6,2", 9, 60, 0, 0),
-    ("offer_materials", "add_cost", "Lisähinta", "double:6,2", 10, 60, 0, 0),
-    ("offer_materials", "edg_cost", "R.Nauhan hinta", "double:6,2", 11, 60, 0, 0),
-    ("offer_materials", "loss", "Hukka", "double:6,2", 12, 60, 0, 0),
-    ("offer_materials", "discount", "Alennus", "double:6,2", 13, 60, 0, 0),
-    ("offer_materials", "tot_cost", "Kokonaishinta", "double:6,2", 14, 60, 0, 1)
+columns_gm = [
+    ("group_materials", "gm_id", "MateriaaliID", "long", 0, 80, 1, 1),
+    ("group_materials", "group_id", "RyhmäID", "long", 1, 80, 1, 1),
+    ("group_materials", "category", "Tuoteryhmä", "string", 2, 60, 0, 0),
+    ("group_materials", "code", "Koodi", "string", 3, 60, 0, 0),
+    ("group_materials", "desc", "Kuvaus", "string", 4, 80, 0, 0),
+    ("group_materials", "prod", "Valmistaja", "string", 5, 60, 0, 0),
+    ("group_materials", "thickness", "Paksuus", "long", 6, 60, 0, 0),
+    ("group_materials", "is_stock", "Onko varasto", "choice:varasto,tilaus,tarkista", 7, 45, 0, 0),
+    ("group_materials", "unit", "Hintayksikkö", "choice:€/m2,€/kpl", 8, 60, 0, 0),
+    ("group_materials", "cost", "Hinta", "double:6,2", 9, 60, 0, 0),
+    ("group_materials", "add_cost", "Lisähinta", "double:6,2", 10, 60, 0, 0),
+    ("group_materials", "edg_cost", "R.Nauhan hinta", "double:6,2", 11, 60, 0, 0),
+    ("group_materials", "loss", "Hukka", "double:6,2", 12, 60, 0, 0),
+    ("group_materials", "discount", "Alennus", "double:6,2", 13, 60, 0, 0),
+    ("group_materials", "tot_cost", "Kokonaishinta", "double:6,2", 14, 60, 0, 1)
 ]
-select_omaterials = """SELECT {} FROM offer_materials WHERE group_id=(?)""".format(",".join(omaterials_keys_select))
-sql_create_table_offer_products = """
-    CREATE TABLE IF NOT EXISTS offer_products (
-        id          TEXT PRIMARY KEY,
-        group_id    TEXT NOT NULL,
+# select_omaterials = """SELECT {} FROM group_materials WHERE group_id=(?)""".format(",".join(omaterials_keys_select))
+sql_create_table_group_products = """
+    CREATE TABLE IF NOT EXISTS group_products (
+        gp_id       INTEGER PRIMARY KEY,
+        group_id    INTEGER NOT NULL,
         category    TEXT,
         code        TEXT,
         count       INTEGER DEFAULT 1,
@@ -326,28 +339,45 @@ sql_create_table_offer_products = """
         FOREIGN KEY (group_id)
             REFERENCES offer_groups (id)
             ON DELETE CASCADE
-            ON UPDATE CASCADE
+            ON UPDATE CASCADE,
+        UNIQUE(group_id, code)
     )
 """
-columns_oproducts = [
-    ("offer_products", "id", "ID", "string", 0, 80, 1, 1),
-    ("offer_products", "group_id", "RyhmäID", "string", 1, 80, 1, 1),
-    ("offer_products", "category", "Tuoteryhmä", "string", 2, 60, 0, 0),
-    ("offer_products", "code", "Koodi", "string", 3, 60, 0, 0),
-    ("offer_products", "count", "Määrä", "long", 4, 45, 0, 0),
-    ("offer_products", "desc", "Kuvaus", "string", 5, 80, 0, 0),
-    ("offer_products", "prod", "Valmistaja", "string", 6, 60, 0, 0),
-    ("offer_products", "inst_unit", "As.Yksikkö", "double:6,2", 7, 45, 0, 0),
-    ("offer_products", "width", "Leveys", "long", 8, 45, 0, 0),
-    ("offer_products", "height", "Korkeus", "long", 9, 45, 0, 0),
-    ("offer_products", "depth", "Syvyys", "long", 10, 45, 0, 0),
-    ("offer_products", "work_time", "Työaika", "double:6,2", 11, 45, 0, 0),
-    ("offer_products", "part_cost", "Osahinta", "double:6,2", 12, 45, 0, 1),
-    ("offer_products", "tot_cost", "Kokonaishinta", "double:6,2", 13, 45, 0, 1),
+pk_gp = ["gp_id"]
+fk_gp = ["group_id"]
+keys_gp = [
+    "gp_id",      
+    "group_id",   
+    "category",   
+    "code",       
+    "count",      
+    "desc",       
+    "prod",       
+    "inst_unit",  
+    "width",      
+    "height",     
+    "depth",      
+    "work_time"
 ]
-select_oproducts = """
+columns_gp = [
+    ("group_products", "gp_id", "TuoteID", "long", 0, 80, 1, 1),
+    ("group_products", "group_id", "RyhmäID", "long", 1, 80, 1, 1),
+    ("group_products", "category", "Tuoteryhmä", "string", 2, 60, 0, 0),
+    ("group_products", "code", "Koodi", "string", 3, 60, 0, 0),
+    ("group_products", "count", "Määrä", "long", 4, 45, 0, 0),
+    ("group_products", "desc", "Kuvaus", "string", 5, 80, 0, 0),
+    ("group_products", "prod", "Valmistaja", "string", 6, 60, 0, 0),
+    ("group_products", "inst_unit", "As.Yksikkö", "double:6,2", 7, 45, 0, 0),
+    ("group_products", "width", "Leveys", "long", 8, 45, 0, 0),
+    ("group_products", "height", "Korkeus", "long", 9, 45, 0, 0),
+    ("group_products", "depth", "Syvyys", "long", 10, 45, 0, 0),
+    ("group_products", "work_time", "Työaika", "double:6,2", 11, 45, 0, 0),
+    ("group_products", "part_cost", "Osahinta", "double:6,2", 12, 45, 0, 1),
+    ("group_products", "tot_cost", "Kokonaishinta", "double:6,2", 13, 45, 0, 1),
+]
+select_gp = """
     SELECT
-        pr.id,
+        pr.gp_id,
         pr.group_id,
         pr.category,
         pr.code,
@@ -367,17 +397,17 @@ select_oproducts = """
                 WHERE key="work_cost"
             )
         ) tot_cost
-    FROM offer_products AS pr
+    FROM group_products AS pr
     LEFT JOIN (
-        SELECT pa.product_id, SUM(pa.cost) AS part_cost
-        FROM offer_parts AS pa
-        GROUP BY pa.product_id) pa ON pr.id=pa.product_id
+        SELECT pa.gp_id, SUM(pa.cost) AS part_cost
+        FROM group_parts AS pa
+        GROUP BY pa.gp_id) pa ON pr.id=pa.gp_id
     WHERE pr.group_id=(?)
     """
-sql_create_table_offer_parts = """
-    CREATE TABLE IF NOT EXISTS offer_parts (
-        id          TEXT PRIMARY KEY,
-        product_id  TEXT NOT NULL,
+sql_create_table_group_parts = """
+    CREATE TABLE IF NOT EXISTS group_parts (
+        gpa_id      INTEGER PRIMARY KEY,
+        gp_id       INTEGER NOT NULL,
         part        TEXT,
         code        TEXT,
         count       INTEGER DEFAULt 1,
@@ -394,35 +424,48 @@ sql_create_table_offer_parts = """
         FOREIGN KEY (product_id)
             REFERENCES offer_products (id)
             ON DELETE CASCADE
-            ON UPDATE CASCADE
+            ON UPDATE CASCADE,
+        UNIQUE(gp_id, part)
     )
 """
-columns_oparts = [
-    ("offer_parts", "id", "ID", "string", 0, 80, 1, 1),
-    ("offer_parts", "product_id", "TuoteID", "string", 1, 80, 1, 1),
-    ("offer_parts", "part", "Osa", "string", 2, 60, 0, 0),
-    ("offer_parts", "code", "Koodi", "string", 3, 60, 0, 0),
-    ("offer_parts", "count", "Määrä", "long", 4, 45, 0, 0),
-    ("offer_parts", "desc", "Kuvaus", "string", 5, 80, 0, 0),
-    ("offer_parts", "use_predef", "Käytä esimääritystä", "bool", 6, 45, 0, 0),
-    ("offer_parts", "default_mat", "Oletus materiaali", "string", 7, 45, 0, 0),
-    ("offer_parts", "width", "Leveys", "long", 8, 45, 0, 1),
-    ("offer_parts", "length", "Pituus", "long", 9, 45, 0, 1),
-    ("offer_parts", "cost", "Hinta", "double:6,2", 10, 45, 0, 1),
-    ("offer_parts", "code_width", "Koodi Leveys", "string", 11, 120, 0, 0),
-    ("offer_parts", "code_length", "Koodi Pituus", "string", 12, 120, 0, 0),
-    ("offer_parts", "code_cost", "Koodi Hinta", "string", 13, 120, 0, 0),
-    ("offer_parts", "used_mat", "Käyt. Mat.", "string", 14, 55, 0, 1),
-    ("offer_parts", "m.thickness", "Paksuus", "long", 15, 35, 0, 1),
-    ("offer_parts", "m.tot_cost", "Mat. Hinta", "double:6,2", 16, 35, 0, 1),
-    ("offer_parts", "pr.width", "Tuote leveys", "long", 17, 35, 0, 1),
-    ("offer_parts", "pr.height", "Tuote korkeus", "long", 18, 35, 0, 1),
-    ("offer_parts", "pr.depth", "Tuote syvyys", "long", 19, 35, 0, 1),
-    ("offer_parts", "product_code", "Tuote Koodi", "string", 20, 35, 0, 1),
+pk_gpa = ["gpa_id"]
+fk_gpa = ["gp_id"]
+columns_gpa = [
+    ("group_parts", "gpa_id", "OsaID", "string", 0, 80, 1, 1),
+    ("group_parts", "gp_id", "TuoteID", "string", 1, 80, 1, 1),
+    ("group_parts", "part", "Osa", "string", 2, 60, 0, 0),
+    ("group_parts", "code", "Koodi", "string", 3, 60, 0, 0),
+    ("group_parts", "count", "Määrä", "long", 4, 45, 0, 0),
+    ("group_parts", "desc", "Kuvaus", "string", 5, 80, 0, 0),
+    ("group_parts", "use_predef", "Käytä esimääritystä", "bool", 6, 45, 0, 0),
+    ("group_parts", "default_mat", "Oletus materiaali", "string", 7, 45, 0, 0),
+    ("group_parts", "width", "Leveys", "long", 8, 45, 0, 1),
+    ("group_parts", "length", "Pituus", "long", 9, 45, 0, 1),
+    ("group_parts", "cost", "Hinta", "double:6,2", 10, 45, 0, 1),
+    ("group_parts", "code_width", "Koodi Leveys", "string", 11, 120, 0, 0),
+    ("group_parts", "code_length", "Koodi Pituus", "string", 12, 120, 0, 0),
+    ("group_parts", "code_cost", "Koodi Hinta", "string", 13, 120, 0, 0),
+    ("group_parts", "used_mat", "Käyt. Mat.", "string", 14, 55, 0, 1),
+    ("group_parts", "m.thickness", "Paksuus", "long", 15, 35, 0, 1),
+    ("group_parts", "m.tot_cost", "Mat. Hinta", "double:6,2", 16, 35, 0, 1),
+    ("group_parts", "pr.width", "Tuote leveys", "long", 17, 35, 0, 1),
+    ("group_parts", "pr.height", "Tuote korkeus", "long", 18, 35, 0, 1),
+    ("group_parts", "pr.depth", "Tuote syvyys", "long", 19, 35, 0, 1),
+    ("group_parts", "product_code", "Tuote Koodi", "string", 20, 35, 0, 1),
 ]
-oparts_keys = [
-    "id",          
-    "product_id",  
+code2col = {
+    "määrä": 4,
+    "leveys": 8,
+    "pituus": 9,
+    "mpaksuus": 15,
+    "mhinta": 16,
+    "tleveys": 17,
+    "tkorkeus": 18,
+    "tsyvyys": 19
+}
+keys_gpa = [
+    "gpa_id",          
+    "gp_id",  
     "part",        
     "code",        
     "count",       
@@ -438,8 +481,8 @@ oparts_keys = [
 ]
 select_oparts = """
     SELECT
-        pa.id,
-        pa.product_id,
+        pa.gpa_id,
+        pa.gp_id,
         pa.part,
         pa.code,
         pa.count,
@@ -465,14 +508,14 @@ select_oparts = """
         pr.depth,
         pr.code as product_code
 
-    FROM offer_parts pa
-        INNER JOIN offer_products pr
-            ON pa.product_id=pr.id
+    FROM group_parts pa
+        INNER JOIN group_products pr
+            ON pa.gp_id=pr.id
 
-        LEFT JOIN offer_predefs d
+        LEFT JOIN group_predefs d
             ON pr.group_id=d.group_id AND pa.part=d.part
 
-        LEFT JOIN offer_materials m
+        LEFT JOIN group_materials m
             ON (
                 CASE
                     WHEN pa.use_predef=0 THEN
@@ -482,11 +525,12 @@ select_oparts = """
                     END
                 ) = m.code
 
-    WHERE pa.product_id=(?)
+    WHERE pa.gp_id=(?)
 """
 sql_create_table_materials = """
     CREATE TABLE IF NOT EXISTS materials (
-        code        TEXT PRIMARY KEY,
+        material_id INTEGER PRIMARY KEY,
+        code        TEXT UNIQUE,
         category    TEXT,
         desc        TEXT,
         prod        TEXT,
@@ -499,21 +543,25 @@ sql_create_table_materials = """
         discount    REAL
     )
 """
+pk_material = ["material_id"]
+fk_material = []
 columns_mats = [
-    ("materials", "code", "Koodi", "string", 0, 60, 0, 0),
-    ("materials", "category", "Tuoteryhmä", "string", 1, 60, 0, 0),
-    ("materials", "desc", "Kuvaus", "string", 2, 80, 0, 0),
-    ("materials", "prod", "Valmistaja", "string", 3, 60, 0, 0),
-    ("materials", "thickness", "Paksuus", "long", 4, 60, 0, 0),
-    ("materials", "unit", "Hintayksikkö", "choice:€/m2,€/kpl", 5, 60, 0, 0),
-    ("materials", "cost", "Hinta", "double:6,2", 6, 60, 0, 0),
-    ("materials", "add_cost", "Lisähinta", "double:6,2", 7, 60, 0, 0),
-    ("materials", "edg_cost", "R.Nauhan hinta", "double:6,2", 8, 60, 0, 0),
-    ("materials", "loss", "Hukka", "double:6,2", 9, 60, 0, 0),
-    ("materials", "discount", "Alennus", "double:6,2", 10, 60, 0, 0),
-    ("materials", "is_stock", "Onko varasto", "choice:varasto,tilaus,tarkista", 11, 45, 0, 0)
+    ("materials", "material_id", "MateriaaliID", "long", 0, 60, 1, 1),
+    ("materials", "code", "Koodi", "string", 1, 60, 0, 0),
+    ("materials", "category", "Tuoteryhmä", "string", 2, 60, 0, 0),
+    ("materials", "desc", "Kuvaus", "string", 3, 80, 0, 0),
+    ("materials", "prod", "Valmistaja", "string", 4, 60, 0, 0),
+    ("materials", "thickness", "Paksuus", "long", 5, 60, 0, 0),
+    ("materials", "unit", "Hintayksikkö", "choice:€/m2,€/kpl", 6, 60, 0, 0),
+    ("materials", "cost", "Hinta", "double:6,2", 7, 60, 0, 0),
+    ("materials", "add_cost", "Lisähinta", "double:6,2", 8, 60, 0, 0),
+    ("materials", "edg_cost", "R.Nauhan hinta", "double:6,2", 9, 60, 0, 0),
+    ("materials", "loss", "Hukka", "double:6,2", 10, 60, 0, 0),
+    ("materials", "discount", "Alennus", "double:6,2", 11, 60, 0, 0),
+    ("materials", "is_stock", "Onko varasto", "choice:varasto,tilaus,tarkista", 12, 45, 0, 0)
 ]
-materials_keys = [
+keys_materials = [
+    "material_id",
     "code",      
     "category",  
     "desc",      
@@ -530,7 +578,8 @@ materials_keys = [
 
 sql_create_table_products = """
     CREATE TABLE IF NOT EXISTS products (
-        code        TEXT PRIMARY KEY,
+        product_id INTEGER PRIMARY KEY,
+        code        TEXT UNIQUE,
         category    TEXT,
         desc        TEXT,
         prod        TEXT,
@@ -541,18 +590,21 @@ sql_create_table_products = """
         work_time   REAL
     )
 """
+pk_products = ["product_id"]
+fk_products = []
 columns_products = [
-    ("products", "code", "Koodi", "string", 0, 60, 0, 0),
-    ("products", "category", "Tuoteryhmä", "string", 1, 60, 0, 0),
-    ("products", "desc", "Kuvaus", "string", 2, 80, 0, 0),
-    ("products", "prod", "Valmistaja", "string", 3, 60, 0, 0),
-    ("products", "inst_unit", "As.Yksikkö", "double:6,2", 4, 45, 0, 0),
-    ("products", "width", "Leveys", "long", 5, 45, 0, 0),
-    ("products", "height", "Korkeus", "long", 6, 45, 0, 0),
-    ("products", "depth", "Syvyys", "long", 7, 45, 0, 0),
-    ("products", "work_time", "Työaika", "double:6,2", 8, 45, 0, 0)
+    ("products", "product_id", "TuoteID", "long", 0, 60, 0, 0),
+    ("products", "code", "Koodi", "string", 1, 60, 0, 0),
+    ("products", "category", "Tuoteryhmä", "string", 2, 60, 0, 0),
+    ("products", "desc", "Kuvaus", "string", 3, 80, 0, 0),
+    ("products", "prod", "Valmistaja", "string", 4, 60, 0, 0),
+    ("products", "inst_unit", "As.Yksikkö", "double:6,2", 5, 45, 0, 0),
+    ("products", "width", "Leveys", "long", 6, 45, 0, 0),
+    ("products", "height", "Korkeus", "long", 7, 45, 0, 0),
+    ("products", "depth", "Syvyys", "long", 8, 45, 0, 0),
+    ("products", "work_time", "Työaika", "double:6,2", 9, 45, 0, 0)
 ]
-products_keys = [
+keys_products = [
     "code",        
     "category",    
     "desc",        
@@ -565,9 +617,10 @@ products_keys = [
 ]
 sql_create_table_parts = """
     CREATE TABLE IF NOT EXISTS parts (
+        part_id         INTEGER PRIMARY KEY,
+        product_id      INTEGER,
         part            TEXT,
         code            TEXT,
-        product_code    TEXT,
         count           INTEGER DEFAULT 1,
         desc            TEXT,
         default_mat     TEXT,
@@ -575,25 +628,28 @@ sql_create_table_parts = """
         code_length     TEXT,
         code_cost       TEXT,
 
-        PRIMARY KEY (part, product_code),
-        FOREIGN KEY (product_code)
-            REFERENCES offer_products (code)
+        UNIQUE (part, product_id),
+        FOREIGN KEY (product_id)
+            REFERENCES products (product_id)
             ON DELETE CASCADE
             ON UPDATE CASCADE
     )
 """
+pk_parts = ["part_id"]
+fk_parts = ["product_id"]
 columns_parts = [
-    ("parts", "part", "Osa", "string", 0, 60, 0, 0),
-    ("parts", "code", "Koodi", "string", 1, 60, 0, 0),
-    ("parts", "product_code", "Tuote Koodi", "string", 2, 60, 0, 0),
-    ("parts", "count", "Määrä", "long", 3, 45, 0, 0),
-    ("parts", "desc", "Kuvaus", "string", 4, 80, 0, 0),
-    ("parts", "default_mat", "Oletus materiaali", "string", 5, 45, 0, 0),
-    ("parts", "code_width", "Koodi Leveys", "string", 6, 120, 0, 0),
-    ("parts", "code_length", "Koodi Pituus", "string", 7, 120, 0, 0),
-    ("parts", "code_cost", "Koodi Hinta", "string", 8, 120, 0, 0)
+    ("parts", "part_id", "OsaID", "long", 0, 60, 0, 1),
+    ("parts", "product_id", "TuoteID", "long", 1, 60, 0, 1),
+    ("parts", "part", "Osa", "string", 2, 60, 0, 0),
+    ("parts", "code", "Koodi", "string", 3, 60, 0, 0),
+    ("parts", "count", "Määrä", "long", 4, 45, 0, 0),
+    ("parts", "desc", "Kuvaus", "string", 5, 80, 0, 0),
+    ("parts", "default_mat", "Oletus materiaali", "string", 6, 45, 0, 0),
+    ("parts", "code_width", "Koodi Leveys", "string", 7, 120, 0, 0),
+    ("parts", "code_length", "Koodi Pituus", "string", 8, 120, 0, 0),
+    ("parts", "code_cost", "Koodi Hinta", "string", 9, 120, 0, 0)
 ]
-parts_keys = [
+keys_parts = [
     "part",
     "code",
     "product_code",
@@ -608,58 +664,35 @@ sql_create_table = {
     "variables": sql_create_table_variables,
     "columns": sql_create_table_columns,
     "offers": sql_create_table_offers,
-    "offer_groups": sql_create_table_offer_groups,
-    "offer_predefs": sql_create_table_offer_predefs,
-    "offer_materials": sql_create_table_offer_materials,
-    "offer_products": sql_create_table_offer_products,
-    "offer_parts": sql_create_table_offer_parts,
+    "groups": sql_create_table_offer_groups,
+    "group_predefs": sql_create_table_group_predefs,
+    "group_materials": sql_create_table_group_materials,
+    "group_products": sql_create_table_group_products,
+    "group_parts": sql_create_table_group_parts,
     "materials": sql_create_table_materials,
     "products": sql_create_table_products,
     "parts": sql_create_table_parts
 }
 sql_insert_general = """INSERT{replace}INTO {table} ({columns}) VALUES ({qm})"""
-
-sql_insert_default_fcmults = """INSERT INTO fcmults (unit) VALUES (?)"""
-sql_insert_default_offers = """INSERT INTO offers (id) VALUES (?)"""
-sql_insert_default_offer_groups = """INSERT INTO offer_groups (id, offer_id) VALUES (?,?)"""
-sql_insert_default_offer_predefs = """INSERT INTO offer_predefs (id, group_id) VALUES (?,?)"""
-sql_insert_default_offer_materials = """INSERT INTO offer_materials (id, group_id) VALUES (?,?)"""
-sql_insert_default_offer_products = """INSERT INTO offer_products (id, group_id) VALUES (?,?)"""
-sql_insert_default_offer_parts = """INSERT INTO offer_parts (id, product_id) VALUES (?,?)"""
-sql_insert_default_materials = """INSERT INTO materials (code) VALUES (?)"""
-sql_insert_default_products = """INSERT INTO products (code) VALUES (?)"""
-sql_insert_default_parts = """INSERT INTO parts (code, product_code) VALUES (?,?)"""
-
-sql_insert_default = {
-    "fcmults": sql_insert_default_fcmults,
-    "offers": sql_insert_default_offers,
-    "offer_groups": sql_insert_default_offer_groups,
-    "offer_predefs": sql_insert_default_offer_predefs,
-    "offer_materials": sql_insert_default_offer_materials,
-    "offer_products": sql_insert_default_offer_products,
-    "offer_parts": sql_insert_default_offer_parts,
-    "materials": sql_insert_default_materials,
-    "products": sql_insert_default_products,
-    "parts": sql_insert_default_parts
-}
+sql_insert_fk = """INSERT INTO {table} ({fk}) VALUES (?)"""
 
 sql_select_general = """SELECT {columns} FROM {table} WHERE {cond}"""
+sql_update_general = """UPDATE {table} SET {key}=(?) WHERE {pk}=(?)"""
+sql_delete_general = """DELETE FROM {table} WHERE {key}=(?)"""
 
 # ****************************************************************
 #  Get Treelist Queries
 # ****************************************************************
 sql_select_offernames_sorted = """
-    SELECT name, id FROM offers
-    WHERE id=?
+    SELECT name, offer_id FROM offers
+    WHERE offer_id=?
 """
 sql_select_groupnames_sorted = """
-    SELECT name, offer_id, id FROM offer_groups
+    SELECT name, offer_id, group_id FROM groups
     WHERE offer_id=?
     ORDER BY name ASC
 """
 
-
-import csv
 
 class OfferTables:
     con = None
@@ -671,21 +704,25 @@ class OfferTables:
         """."""
         self.create_connection("ttk.db")
 
-        # for table, sql in sql_create_table.items():
-            # cur.execute("""DROP TABLE IF EXISTS {};""".format(table))
-            # self.create_table(sql)
+        OfferTables.cur.execute("""DROP TABLE IF EXISTS offer_groups;""")
+        OfferTables.cur.execute("""DROP TABLE IF EXISTS offer_materials;""")
+        OfferTables.cur.execute("""DROP TABLE IF EXISTS offer_products;""")
+        OfferTables.cur.execute("""DROP TABLE IF EXISTS offer_parts;""")
+        for table, sql in sql_create_table.items():
+            OfferTables.cur.execute("""DROP TABLE IF EXISTS {};""".format(table))
+            self.create_table(sql)
 
         # cur.execute("""DROP TABLE IF EXISTS parts;""")
         # self.create_table(sql_create_table_parts)
 
-        # self.insert("columns", columns_keys, columns_omats, True)
-        # self.insert("columns", columns_keys, columns_oproducts, True)
-        # self.insert("columns", columns_keys, columns_oparts, True)
-        # self.insert("columns", columns_keys, columns_opredefs, True)
-        # self.insert("columns", columns_keys, columns_parts, True, True)
-        # self.insert("columns", columns_keys, columns_mats, True, True)
-        # self.insert("columns", columns_keys, columns_products, True, True)
-        # self.insert("columns", columns_keys, columns_offers, True, True)
+        self.insert("columns", keys_columns, columns_gm, True)
+        self.insert("columns", keys_columns, columns_gp, True)
+        self.insert("columns", keys_columns, columns_gpa, True)
+        self.insert("columns", keys_columns, columns_gpd, True)
+        self.insert("columns", keys_columns, columns_parts, True, True)
+        self.insert("columns", keys_columns, columns_mats, True, True)
+        self.insert("columns", keys_columns, columns_products, True, True)
+        self.insert("columns", keys_columns, columns_offers, True, True)
         self.con.commit()
 
     def insert_from_csv(self, table, file):
@@ -774,6 +811,13 @@ class OfferTables:
             print(e)
             return False
         return True
+    
+    def insert_fk(self, table: str, fk: str, value):
+        """Insert a new row with foreign key. Return False if not successful."""
+        sql = sql_insert_fk.format(table=table, fk=fk)
+        success = self.select(sql, (value,))
+        return success
+
 
     def get(self, table: str, columns: Iterable, match_columns: Iterable,
             values: Iterable, many=False, operator='='):
@@ -853,28 +897,29 @@ class OfferTables:
         print(sql)
         return self.select(sql, values)
 
-    def get_omaterials(self, group_id: str):
-        try:
-            self.cur.execute(select_omaterials, (group_id,))
-            self.con.commit()
-        except sqlite3.Error as e:
-            print("OfferTables.get_omaterials\n\t{}".format(e))
-            return []
+    # def get_omaterials(self, group_id: str):
+    #     try:
+    #         self.cur.execute(select_omaterials, (group_id,))
+    #         self.con.commit()
+    #     except sqlite3.Error as e:
+    #         print("OfferTables.get_omaterials\n\t{}".format(e))
+    #         return []
 
-        return self.cur.fetchall()
-    
-    def get_oproducts(self, group_id: str):
-        self.update_parts(group_id)
-        try:
-            self.cur.execute(select_oproducts, (group_id,))
-            self.con.commit()
-        except sqlite3.Error as e:
-            print("OfferTables.get_oproducts\n\t{}".format(e))
-            return []
-        # print("select oproducts")
-        return self.cur.fetchall()
+    #     return self.cur.fetchall()
+
+    # def get_oproducts(self, group_id: str):
+    #     self.update_parts(group_id)
+    #     try:
+    #         self.cur.execute(select_oproducts, (group_id,))
+    #         self.con.commit()
+    #     except sqlite3.Error as e:
+    #         print("OfferTables.get_oproducts\n\t{}".format(e))
+    #         return []
+    #     # print("select oproducts")
+    #     return self.cur.fetchall()
 
     def select(self, sql, values):
+        """General function for sql that returns values."""
         try:
             self.cur.execute(sql, values)
             self.con.commit()
@@ -885,6 +930,7 @@ class OfferTables:
         return self.cur.fetchall()
 
     def update(self, sql, values, many=False):
+        """General function for sql that does not return values."""
         try:
             if many:
                 self.cur.executemany(sql, values)
@@ -899,16 +945,16 @@ class OfferTables:
     def update_parts(self, group_id: str, products=None):
         """Update the offer parts table to get up to date coded values."""
         update_parts = """
-            UPDATE offer_parts
+            UPDATE group_parts
             SET width = (?),
                 length = (?),
                 cost = (?)
 
-            WHERE id = (?)
+            WHERE gpa_id = (?)
         """
         select_oproduct_ids = """
-            SELECT id
-            FROM offer_products
+            SELECT gp_id
+            FROM group_products
             WHERE group_id = (?)
         """
         if products is None:
@@ -942,20 +988,20 @@ class OfferTables:
         self.update_parts("", [(product_id,)])
         return self.select(select_oparts, (product_id,))
 
-    def get_opredefs(self, group_id: str):
-        try:
-            self.cur.execute(select_opredefs, (group_id,))
-            self.con.commit()
-        except sqlite3.Error as e:
-            print("OfferTables.get_oparts\n\t{}".format(e))
-            return []
+    # def get_opredefs(self, group_id: str):
+    #     try:
+    #         self.cur.execute(select_gpd, (group_id,))
+    #         self.con.commit()
+    #     except sqlite3.Error as e:
+    #         print("OfferTables.get_oparts\n\t{}".format(e))
+    #         return []
 
-        return self.cur.fetchall()
+    #     return self.cur.fetchall()
 
-    def get_parts(self, keys, product_code: str):
-        """Return the parts with given product code."""
-        sql = """SELECT {} FROM parts WHERE product_code=(?)""".format(",".join(keys))
-        return self.select(sql, (product_code,))
+    # def get_parts(self, keys, product_code: str):
+    #     """Return the parts with given product code."""
+    #     sql = """SELECT {} FROM parts WHERE product_code=(?)""".format(",".join(keys))
+    #     return self.select(sql, (product_code,))
 
     select_get_columns = """SELECT * FROM columns WHERE tablename=(?) ORDER BY col_idx ASC"""
     def get_columns(self, table):
@@ -979,14 +1025,14 @@ class OfferTables:
             return []
         return self.cur.fetchall()
 
-    def get_column_setup(self, table, keys):
-        """Return a dictionary with column setup for keys from table."""
-        cols = self.table_setup["columns"][table]
-        return {k: cols[k] for k in keys}
+    # def get_column_setup(self, table, keys):
+    #     """Return a dictionary with column setup for keys from table."""
+    #     cols = self.table_setup["columns"][table]
+    #     return {k: cols[k] for k in keys}
 
-    def get_display_setup(self, display_key):
-        """Return the display setup."""
-        return self.table_setup["display"][display_key]
+    # def get_display_setup(self, display_key):
+    #     """Return the display setup."""
+    #     return self.table_setup["display"][display_key]
 
     sql_update_general = """UPDATE {table} SET {column}=(?) WHERE {cond}"""
     def update_one(self, table: str, column_key: str, pk: Iterable, values: Iterable):
@@ -1148,13 +1194,13 @@ class OfferTables:
 
     def copy_parts(self, table: str, old_id: str, new_id: str):
         """Copy parts of given product id to a new product id."""
-        if table == "offer_parts":
-            keys = oparts_keys
-            mcol = "product_id"
+        if table == "group_parts":
+            keys = keys_gpa
+            mcol = "gp_id"
             replace_id = True
         elif table == "parts":
-            keys = parts_keys
-            mcol = "product_code"
+            keys = keys_parts
+            mcol = "product_id"
             replace_id = False
         else:
             print("OfferTables.copy_oparts - Invalid table '{}'".format(table))
