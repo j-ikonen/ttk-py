@@ -272,6 +272,24 @@ sql_create_table_offer_materials = """
             ON UPDATE CASCADE
     )
 """
+omaterials_keys_select = [
+    "id",        
+    "group_id",  
+    "category",  
+    "code",      
+    "desc",      
+    "prod",      
+    "thickness", 
+    "is_stock",  
+    "unit",      
+    "cost",      
+    "add_cost",  
+    "edg_cost",  
+    "loss",      
+    "discount",
+    "tot_cost"
+]
+omaterials_keys_insert = omaterials_keys_select[:-1]
 columns_omats = [
     ("offer_materials", "id", "ID", "string", 0, 80, 1, 1),
     ("offer_materials", "group_id", "RyhmäID", "string", 1, 80, 1, 1),
@@ -289,7 +307,7 @@ columns_omats = [
     ("offer_materials", "discount", "Alennus", "double:6,2", 13, 60, 0, 0),
     ("offer_materials", "tot_cost", "Kokonaishinta", "double:6,2", 14, 60, 0, 1)
 ]
-select_omaterials = """SELECT * FROM offer_materials WHERE group_id=(?)"""
+select_omaterials = """SELECT {} FROM offer_materials WHERE group_id=(?)""".format(",".join(omaterials_keys_select))
 sql_create_table_offer_products = """
     CREATE TABLE IF NOT EXISTS offer_products (
         id          TEXT PRIMARY KEY,
@@ -1133,23 +1151,40 @@ class OfferTables:
         if table == "offer_parts":
             keys = oparts_keys
             mcol = "product_id"
+            replace_id = True
         elif table == "parts":
             keys = parts_keys
             mcol = "product_code"
+            replace_id = False
         else:
             print("OfferTables.copy_oparts - Invalid table '{}'".format(table))
             return False
-        sql = """
-            INSERT OR REPLACE INTO {table} ({keys})
-            SELECT {kwid}
-            FROM {table}
-            WHERE {m} = (?)
+        sql_select = """
+            SELECT {}
+            FROM {}
+            WHERE {} = (?)
         """
-        keystr = ",".join(keys)
-        keys_w_fk = [key if key != mcol else "(?)" for key in keys]
-        sel = ",".join(keys_w_fk)
-        sql = sql.format(table=table, keys=keystr, kwid=sel, m=mcol)
-        return self.update(sql, [new_id, old_id])
+        sql_insert = """
+            INSERT OR REPLACE INTO {} ({}) VALUES ({})
+        """
+
+        keystr = ", ".join(keys)
+        sql = sql_select.format(keystr, table, mcol)
+        sel_values = (old_id,)
+
+        data = self.select(sql, sel_values)
+        ins_values = []
+        for row in data:
+            newrow = list(row)
+            if replace_id:
+                newrow[0] = str(ObjectId())
+            idx = keys.index(mcol)
+            newrow[idx] = new_id
+            ins_values.append(newrow)
+            # print(newrow)
+
+        sql = sql_insert.format(table, keystr, ",".join(["(?)"] * len(keys)))
+        return self.update(sql, ins_values, True)
 
 
 if __name__ == '__main__':

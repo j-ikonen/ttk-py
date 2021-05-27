@@ -3,13 +3,12 @@ TODO
 ----
 """
 
-from types import resolve_bases
-from dialog import ConfirmDialog
 import wx
 import wx.grid as wxg
 from bson.objectid import ObjectId
-from asteval import Interpreter
+# from asteval import Interpreter
 
+from dialog import ConfirmDialog
 import table as tb
 
 
@@ -214,9 +213,10 @@ class DatabaseGridTable(wxg.GridTableBase):
 
     def GetPkValue(self, row):
         pk_val = []
-        for idx in self.pk_column:
+        # print(self.pk_column)
+        for key in self.pk:
             try:
-                pk_val.append(self.data[row][idx])
+                pk_val.append(self.data[row][self.col_keys.index(key)])
             except IndexError:
                 return None
         return pk_val
@@ -259,7 +259,7 @@ class DatabaseGridTable(wxg.GridTableBase):
 
         self.Clear()
         self.data.clear()
-        print("grid cleared in update_data")
+        # print("grid cleared in update_data")
         return True
 
     def set_fk_value(self, value):
@@ -365,22 +365,26 @@ class DatabaseGridTable(wxg.GridTableBase):
 
     def DeleteRows(self, pos, numRows):
         """Delete the rows and their data."""
+        ndel = 0
         for row in range(pos, pos + numRows):
             pkval = self.GetPkValue(row)
             if pkval is not None:
-                self.db.delete(self.tablename, self.pk, pkval)
+                if self.db.delete(self.tablename, self.pk, pkval):
+                    ndel += 1
+                    print(f"del row with pk: {pkval}")
+                    msg = wxg.GridTableMessage(
+                        self,
+                        wxg.GRIDTABLE_NOTIFY_ROWS_DELETED,
+                        pos,
+                        1
+                    )
+                    self.GetView().ProcessTableMessage(msg)
 
-        for n in range(numRows):
-            del self.data[pos]
+        # for n in range(numRows):
+        #     del self.data[pos]
 
-        msg = wxg.GridTableMessage(
-            self,
-            wxg.GRIDTABLE_NOTIFY_ROWS_DELETED,
-            pos,
-            numRows
-        )
-        self.GetView().ProcessTableMessage(msg)
         self.GetView().PostSizeEventToParent()
+        self.update_data(None)
         return True
 
     def DeleteCols(self, pos, numCols):
@@ -693,7 +697,7 @@ class PartsTable(DatabaseGridTable):
         self.unique = []
         self.read_only = []
         self.cant_update = []
-        self.aeval = Interpreter()
+        # self.aeval = Interpreter()
         self.parse_done = False
         self.dbcols = [n for n in range(len(setup))]
         self.dbtablename = "parts"
@@ -787,11 +791,11 @@ class GenTable(DatabaseGridTable):
                 res = self.db.get_with_conditions(self.tablename, self.col_keys, conditions)
                 self.last_conditions = conditions
                 for datarow in res:
-                    print(datarow)
+                    # print(datarow)
                     self.data.append(list(datarow))
                 self.GetView().ForceRefresh()
                 # self.GetView().Update()
-                print("LEN: {}".format(self.GetNumberRows()))
+                # print("LEN: {}".format(self.GetNumberRows()))
 
                 # newlen = len(self.data)
                 # self.change_number_rows(0, newlen)
@@ -887,7 +891,7 @@ class DbGrid(wxg.Grid):
                 crd = self.GetGridCursorCoords()
                 value = self.GetTable().GetValue(crd.GetRow(), crd.GetCol())
                 parent.copy.append([value])
-            print(parent.copy)
+            # print(parent.copy)
         else:
             for row in selected:
                 rowdata = self.GetTable().get_rowdata(row)
@@ -906,7 +910,7 @@ class DbGrid(wxg.Grid):
             return False
 
         selected = self.GetSelectedRows()
-        table = self.GetTable()
+        table: DatabaseGridTable = self.GetTable()
         if len(selected) == 0:
             self.clear_selected()
 
@@ -958,7 +962,7 @@ class DbGrid(wxg.Grid):
 
         elif len(self.copy_rows) > 0:
             table: DatabaseGridTable = self.GetTable()
-            table.append_rows(self.copy_rows, False)
+            self.save_state()
 
             old_ids = [row[0] for row in self.copy_rows]
             copydata = [[v for v in r] for r in self.copy_rows]
@@ -966,15 +970,19 @@ class DbGrid(wxg.Grid):
                 row[0] = str(ObjectId())
             new_ids = [row[0] for row in copydata]
 
-            if table.tablename == "products":
-                for n, new_id in enumerate(new_ids):
-                    old_id = old_ids[0]
-                    self.db.copy_parts("parts", old_id, new_id)
+            table.append_rows(copydata, False)
 
+            if table.tablename == "products":
+                part_table = "parts"
             elif table.tablename == "offer_products":
+                part_table = "offer_parts"
+            else:
+                part_table = None
+
+            if part_table is not None:
                 for n, new_id in enumerate(new_ids):
-                    old_id = old_ids[0]
-                    self.db.copy_parts("offer_parts", old_id, new_id)
+                    old_id = old_ids[n]
+                    self.db.copy_parts(part_table, old_id, new_id)
 
             table.update_data_with_row_change(None)
 

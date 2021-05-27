@@ -1,5 +1,6 @@
 """
 TODO
+    Figure how to simplify table modifying working together with OfferTables.
     Fix copy of product.
     Add search result limit and search result page browsing.
     Add search result count.
@@ -80,6 +81,8 @@ class SearchPanel(wx.Panel):
                 child_grid.Show(False)
             if tablename == "offers":
                 grid.set_primary_key(["ID"])
+            elif tablename == "parts":
+                grid.set_primary_key(["part", "product_code"])
             grid.Show(False)
 
         # self.lc_search = dv.DataViewListCtrl(self, style=dv.DV_ROW_LINES|dv.DV_MULTIPLE)
