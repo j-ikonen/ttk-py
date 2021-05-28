@@ -306,7 +306,7 @@ class TableGrid(BaseGrid):
         self.fk_key = display_setup["fk"]
         self.column_keys = display_setup["columns"]
 
-        column_setup = self.tables.get_column_setup(self.tablename, self.column_keys)
+        column_setup = self.tables.get_column_value(self.tablename, self.column_keys)
         self.types = [val["type"] for val in column_setup.values()]
 
         self.parent_id = None

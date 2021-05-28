@@ -165,6 +165,7 @@ sql_create_table_columns = """
         is_unique   INTEGER DEFAULT 0,
         ro          INTEGER DEFAULT 0,
         visible     INTEGER DEFAULT 1,
+        order       INTEGER DEFAULT 0,
         UNIQUE (tablename, key)
     )
 """
@@ -813,9 +814,9 @@ class OfferTables:
         """."""
         self.create_connection("ttk.db")
 
-        for table, sql in sql_create_table.items():
+        # for table, sql in sql_create_table.items():
             # OfferTables.cur.execute("""DROP TABLE IF EXISTS {};""".format(table))
-            self.create_table(sql)
+            # self.create_table(sql)
 
         # cur.execute("""DROP TABLE IF EXISTS parts;""")
         # self.create_table(sql_create_table_parts)
@@ -833,7 +834,15 @@ class OfferTables:
     def column_count(self, table):
         """Return the number of columns defined for given table in 'columns' table."""
         return self.select("SELECT COUNT(*) FROM columns WHERE tablename=(?)", (table,))[0][0]
-    
+
+    def get_col_order(self, table) -> list:
+        """Return a list of column orders in table."""
+        sql = """
+            SELECT col_order, col_idx FROM columns WHERE tablename=(?) ORDER BY col_order ASC
+        """
+        order = self.select(sql, (table,))
+        return [c[1] for c in order]
+
     def get_read_only(self, table) -> list:
         """Return a list of read only columns."""
         sql = """
@@ -842,8 +851,25 @@ class OfferTables:
         rolist = self.select(sql, (table, 1))
         return [row[0] for row in rolist]
 
-    def get_column_setup(self, table: str, key: str, col: int) -> str:
-        """Return the column label."""
+    def set_column_value(self, table: str, key: str, col: int, value: int):
+        """Set the value of a column in columns table."""
+        sql = """
+            UPDATE columns SET {}=(?) WHERE col_idx=(?) AND tablename=(?)
+        """.format(key)
+        return self.update(sql, (value, col, table))
+
+    def set_column_values(self, key: str, values: list):
+        """Set the values of a column in columns table.
+        
+        values = [(value, col, table), ...]
+        """
+        sql = """
+            UPDATE columns SET {}=(?) WHERE col_idx=(?) AND tablename=(?)
+        """.format(key)
+        return self.update(sql, values, True)
+
+    def get_column_value(self, table: str, key: str, col: int):
+        """Return value from columns table at key."""
         sql = """
             SELECT {}
             FROM columns

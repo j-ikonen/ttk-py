@@ -7,6 +7,15 @@ import table as tb
 
 class DatabaseGridTable(wxg.GridTableBase):
     def __init__(self, db, table):
+        """Custom grid table for displaying data from a database.
+
+        Parameters
+        ----------
+        db : table.OfferTables
+            Database control class.
+        table : str
+            Name of the database table this class displays.
+        """
         super().__init__()
 
         # Class for database funcitons.
@@ -20,7 +29,7 @@ class DatabaseGridTable(wxg.GridTableBase):
 
         # Values used to limit data displayed.
         self.fk_value = None
-        self.condition = {}
+        self.condition = None
 
         # Boolean for locking update until it is unlocked.
         self.is_update_locked = False
@@ -52,11 +61,11 @@ class DatabaseGridTable(wxg.GridTableBase):
 
     def GetColLabelValue(self, col):
         """Return the column label."""
-        return self.db.get_column_setup(self.table, "label", col)
+        return self.db.get_column_value(self.table, "label", col)
 
     def GetTypeName(self, row, col):
         """Return the type name."""
-        return self.db.get_column_setup(self.table, "type", col)
+        return self.db.get_column_value(self.table, "type", col)
 
     def CanGetValueAs(self, row, col, type_name):
         """Test if value can be received as type."""
@@ -178,7 +187,7 @@ class DatabaseGridTable(wxg.GridTableBase):
         if is_locked is False:
             self.update_data()
 
-    def get_pk_value(self, row) -> int:
+    def get_pk_value(self, row: int) -> int:
         """Return the primary key value."""
         pk_column = tb.get_pk_column(self.table)
         return self.GetValue(row, pk_column)
@@ -186,37 +195,134 @@ class DatabaseGridTable(wxg.GridTableBase):
     # def GetValueFromDb(self, row, col):
     #     """Return value from database."""
 
+
+SHOW_COL_HELP = "Muuta sarakkeen näkyvyyttä"
+
+
 class DatabaseGrid(wxg.Grid):
     def __init__(self, parent, db, dbtable):
+        """Grid to display data from a database table.
+
+        Either by search conditions, foreign key or neither.
+
+        Parameters
+        ----------
+        parent : wx.Window
+            The parent wx.Window.
+        db : table.OfferTables
+            The database control class.
+        dbtable : str
+            Name of the database table.
+        """
         super().__init__(parent, style=wx.WANTS_CHARS|wx.HD_ALLOW_REORDER)
 
-        table = DatabaseGridTable(db, dbtable)
-        self.SetTable(table, True)
-
-        self.db: tb.OfferTables = db
         self.table_name = dbtable
+        self.db: tb.OfferTables = db
+
+        self.first_col = None
+
+        table = DatabaseGridTable(db, dbtable)
+        self.SetTable(table, True, self.GridSelectRows)
+        self.set_widths()
+        self.set_order()
+
+        # Set Read Only Columns.
+        for col in self.db.get_read_only(self.table_name):
+            attr = wxg.GridCellAttr()
+            attr.SetReadOnly(True)
+            self.SetColAttr(col, attr)
+
+        # List of functions that are used to update an objects foreign key
+        # with the primary key of this grid.
+        self.child_set_fks = []
 
         self.copied_rows = []
         self.history = {}
         self.can_save_history = True
 
-        # List of read only columns.
-        self.read_only = self.db.get_read_only(self.table_name)
-
         self.SetRowLabelSize(35)
         self.EnableDragColMove(True)
+        # self.UseNativeColHeader(True)
 
-        self.Bind(wxg.EVT_GRID_CELL_CHANGED, self.on_cell_changed)
-        self.Bind(wxg.EVT_GRID_CELL_CHANGING, self.on_cell_changing)
-        self.Bind(wxg.EVT_GRID_EDITOR_SHOWN, self.on_show_editor)
+        self.Bind(wx.EVT_KEY_DOWN, self.on_key_down)
+        self.Bind(wxg.EVT_GRID_CELL_RIGHT_CLICK, self.on_context_menu)
+
+        self.Bind(wxg.EVT_GRID_CMD_LABEL_RIGHT_CLICK, self.on_label_menu) # Hide Columns
+        self.Bind(wxg.EVT_GRID_LABEL_LEFT_CLICK, self.on_label_lclick)  # Set Focus
+
+        self.Bind(wxg.EVT_GRID_CELL_CHANGED, self.on_cell_changed) # Refresh
+        self.Bind(wxg.EVT_GRID_CELL_CHANGING, self.on_cell_changing) # Check if has fk
+
+        # Event that can be used to veto edit before showing editor.
+        # self.Bind(wxg.EVT_GRID_EDITOR_SHOWN, self.on_show_editor)
+
+        self.Bind(wxg.EVT_GRID_SELECT_CELL, self.on_select_cell) # Run child set fk
+        self.Bind(wxg.EVT_GRID_COL_SIZE, self.on_col_size) # Save size
+        self.Bind(wxg.EVT_GRID_COL_MOVE, self.on_col_move) # Save order
+
+    def on_context_menu(self, evt):
+        """."""
+        pass
+
+    def on_label_menu(self, evt):
+        """Open menu to hide or show columns."""
+        self.SetFocus()
+        menu = wx.Menu()
+
+        if not hasattr(self, "id_columns"):
+            self.id_columns = wx.NewIdRef(self.GetNumberCols())
+            self.Bind(
+                wx.EVT_MENU,
+                self.on_show_column,
+                id=self.id_columns[0],
+                id2=self.id_columns[-1]
+            )
+
+        positions = [None] * self.GetNumberCols()
+        for col in range(self.GetNumberCols()):
+            pos = self.GetColPos(col)
+            is_shown = False if self.GetColSize(col) == 0 else True
+            label = self.GetColLabelValue(col)
+            positions[pos] = (col, label, is_shown)
+
+        for (col, label, is_shown) in positions:
+            menu.AppendCheckItem(self.id_columns[col], label, SHOW_COL_HELP)
+            menu.Check(self.id_columns[col], is_shown)
+
+        self.PopupMenu(menu)
+        menu.Destroy()
+        evt.Skip()
+
+    def on_show_column(self, evt):
+        """Show or hide the column."""
+        is_checked = evt.IsChecked()
+        col = self.id_columns.index(evt.GetId())
+
+        if is_checked:
+            width = self.db.get_column_value(self.table_name, "width", col)
+            self.db.set_visible(self.table_name, col, True)
+            self.SetColSize(col, width)
+        else:
+            self.HideCol(col)
+            self.db.set_visible(self.table_name, col, False)
+        evt.Skip()
+
+    def on_label_lclick(self, evt):
+        """Set focus on this grid."""
+        self.SetFocus()
+        evt.Skip()
 
     def set_fk(self, value):
         """Set the foreign key for the grid."""
         self.GetTable().set_fk(value)
-    
+
     def get_fk(self):
         """Return the value of foreign key."""
         return self.GetTable().get_fk()
+
+    def get_pk(self, row: int) -> int:
+        """Return the primary key from the given row."""
+        return self.GetTable().get_pk_value(row)
 
     def on_cell_changing(self, evt):
         """Veto cell change event if change is not allowed."""
@@ -233,12 +339,94 @@ class DatabaseGrid(wxg.Grid):
         self.ForceRefresh()
         evt.Skip()
 
-    def on_show_editor(self, evt):
-        """Veto cell editing for read only columns."""
+    def on_col_size(self, evt):
+        """Update the columns table with new column width."""
+        col = evt.GetRowOrCol()
+        width = self.GetColSize(col)
+        if width != 0:
+            self.save_width(col, width)
+        self.PostSizeEventToParent()
+        evt.Skip()
+
+    def on_col_move(self, evt):
+        """Veto moves of hidden columns and do CallAfter to save new positions."""
         col = evt.GetCol()
-        if col in self.read_only:
-            print(f"Column {col} is read only. Value can not be changed.")
+        if self.GetColSize(col) == 0:
             evt.Veto()
+        pos = self.GetColPos(col)
+        wx.CallAfter(self.col_moved, col, pos)
+        evt.Skip()
+
+    def col_moved(self, col_id, old_pos):
+        positions = []
+        for col in range(self.GetNumberCols()):
+            colpos = self.GetColPos(col)
+            positions.append((colpos, col, self.table_name))
+        self.db.set_column_values("col_order", positions)
+
+    def on_key_down(self, evt):
+        """Open the grid popupmenu."""
+        evt.Skip()
+
+
+    def on_select_cell(self, evt):
+        """Set the primary key of selected row as foreign key of any child grids."""
+        rowid = self.get_pk(evt.GetRow())
+        # print("select cell")
+        self.first_col = evt.GetCol()
+        # print(f"r,c: {evt.GetRow()},{evt.GetCol()}")
+        for fn in self.child_set_fks:
+            fn(rowid)
+        evt.Skip()
+    
+    # def on_show_editor(self, evt):
+    #     """Veto cell editing for read only columns."""
+    #     col = evt.GetCol()
+    #     if col in self.read_only:
+    #         print(f"Column {col} is read only. Value can not be changed.")
+    #         evt.Veto()
+
+    def save_width(self, col, width):
+        """Set the width of the column in columns table."""
+        self.db.set_column_value(self.table_name, "width", col, width)
+
+    def set_widths(self):
+        """Set the columns to widths from columns table."""
+        is_visible = self.db.get_visible(self.table_name)
+        for col in range(self.GetNumberCols()):
+            if is_visible[col]:
+                width = self.db.get_column_value(self.table_name, "width", col)
+                self.SetColSize(col, width)
+            else:
+                self.HideCol(col)
+
+    def set_order(self):
+        """Set the order of the columns."""
+        order = self.db.get_col_order(self.table_name)
+        self.SetColumnsOrder(order)
+        self.Layout()
+
+    def register_child(self, obj) -> bool:
+        """Register a child obj for setting it's foreign key by this grids selection.
+
+        Parameters
+        ----------
+        obj : Object
+            Any object that has set_fk function.
+
+        Returns
+        -------
+        bool
+            False if object has no set_fk function.
+        """
+        try:
+            self.child_set_fks.append(obj.set_fk)
+        except AttributeError as e:
+            print(f"AttributeError: {e} in DatabaseGrid.register_child")
+            print(f"\tGiven object does not have obj.set_fk(value: int) function.")
+            return False
+        return True
+
 
 class GridPanel(wx.Panel):
     def __init__(self, parent, db):
