@@ -62,6 +62,30 @@ def type2str(value):
         return strvalue.replace('.', ',')
     return strvalue
 
+def cond2str(condition):
+    """Parse condition dict to a sql string.
+
+    Return tuple with sql string and values for bindings.
+
+    Parameters
+    ----------
+    condition : dict
+        Search conditions in form {key: [op, val]}
+
+    Returns
+    -------
+    tuple(str, list)
+        (sql_conditions_string, value_list)
+    """
+    s = ""
+    values = []
+    for n, (key, val) in enumerate(condition.items()):
+        s += key + " " + val[0] + " (?)"
+        values.append(val[1])
+        if n != len(condition) - 1:
+            s += " AND "
+    return (s, values)
+
 from asteval import Interpreter
 aeval = Interpreter()
 
@@ -126,6 +150,9 @@ sql_create_table_variables = """
         val     REAL
     )
 """
+pk_variables = ["key"]
+fk_variables = []
+keys_variables = ["key", "val"]
 sql_create_table_columns = """
     CREATE TABLE IF NOT EXISTS columns (
         columns_id  INTEGER PRIMARY KEY,
@@ -421,8 +448,8 @@ sql_create_table_group_parts = """
         code_length TEXT,
         code_cost   TEXT,
 
-        FOREIGN KEY (product_id)
-            REFERENCES offer_products (id)
+        FOREIGN KEY (gp_id)
+            REFERENCES group_products (id)
             ON DELETE CASCADE
             ON UPDATE CASCADE,
         UNIQUE(gp_id, part)
@@ -479,7 +506,7 @@ keys_gpa = [
     "code_length", 
     "code_cost"
 ]
-select_oparts = """
+select_gpa = """
     SELECT
         pa.gpa_id,
         pa.gp_id,
@@ -543,8 +570,8 @@ sql_create_table_materials = """
         discount    REAL
     )
 """
-pk_material = ["material_id"]
-fk_material = []
+pk_materials = ["material_id"]
+fk_materials = []
 columns_mats = [
     ("materials", "material_id", "MateriaaliID", "long", 0, 60, 1, 1),
     ("materials", "code", "Koodi", "string", 1, 60, 0, 0),
@@ -578,7 +605,7 @@ keys_materials = [
 
 sql_create_table_products = """
     CREATE TABLE IF NOT EXISTS products (
-        product_id INTEGER PRIMARY KEY,
+        product_id  INTEGER PRIMARY KEY,
         code        TEXT UNIQUE,
         category    TEXT,
         desc        TEXT,
@@ -680,6 +707,81 @@ sql_select_general = """SELECT {columns} FROM {table} WHERE {cond}"""
 sql_update_general = """UPDATE {table} SET {key}=(?) WHERE {pk}=(?)"""
 sql_delete_general = """DELETE FROM {table} WHERE {key}=(?)"""
 
+primary_keys = {
+    "offers": pk_offers,
+    "groups": pk_groups,
+    "group_predefs": pk_gpd,
+    "group_materials": pk_gm,
+    "group_products": pk_gp,
+    "group_parts": pk_gpa,
+    "materials": pk_materials,
+    "products": pk_products,
+    "parts": pk_parts,
+    "columns": pk_columns,
+    "variables": pk_variables
+}
+foreign_keys = {
+    "offers": fk_offers,
+    "groups": fk_groups,
+    "group_predefs": fk_gpd,
+    "group_materials": fk_gm,
+    "group_products": fk_gp,
+    "group_parts": fk_gpa,
+    "materials": fk_materials,
+    "products": fk_products,
+    "parts": fk_parts,
+    "columns": fk_columns,
+    "variables": fk_variables
+}
+keys = {
+    "offers": keys_offers,
+    "groups": keys_groups,
+    "group_predefs": keys_gpd,
+    "group_materials": keys_gm,
+    "group_products": keys_gp,
+    "group_parts": keys_gpa,
+    "materials": keys_materials,
+    "products": keys_products,
+    "parts": keys_parts,
+    "columns": keys_columns,
+    "variables": keys_variables
+}
+insert_keys = {
+    "offers": keys_offers[1:],
+    "groups": keys_groups[1:],
+    "group_predefs": keys_gpd[1:],
+    "group_materials": keys_gm[1:],
+    "group_products": keys_gp[1:],
+    "group_parts": keys_gpa[1:],
+    "materials": keys_materials[1:],
+    "products": keys_products[1:],
+    "parts": keys_parts[1:],
+    "columns": keys_columns[1:-1],
+    "variables": keys_variables[1:]
+}
+# select_all = {
+#     "offers": sql_select_general.format(
+#         table="offers",
+#         columns=", ".join(keys_groups)),
+#     "groups": sql_select_general.format(
+#         table="groups",
+#         columns=", ".join(keys_groups)),
+#     "group_predefs": sql_select_general.format(
+#         table="group_predefs",
+#         columns=", ".join(keys_gpd)),
+#     "group_materials": sql_select_general.format(
+#         table="group_materials",
+#         columns=", ".join(keys_gm)),
+#     "group_products": select_gp,
+#     "group_parts": select_gpa,
+#     "materials": sql_select_general.format(
+#         table="materials",
+#         columns=", ".join(keys_groups)),
+#     "products": keys_products,
+#     "parts": keys_parts,
+#     "columns": keys_columns,
+#     "variables": keys_variables
+# }
 # ****************************************************************
 #  Get Treelist Queries
 # ****************************************************************
@@ -693,6 +795,13 @@ sql_select_groupnames_sorted = """
     ORDER BY name ASC
 """
 
+def get_pk_column(table: str) -> int:
+    """Return the primary key column for table."""
+    return keys[table].index(primary_keys[table][0])
+
+def has_fk(table: str) -> bool:
+    """Return True if the table requires a foreign key."""
+    return len(foreign_keys[table]) > 0
 
 class OfferTables:
     con = None
@@ -704,26 +813,107 @@ class OfferTables:
         """."""
         self.create_connection("ttk.db")
 
-        OfferTables.cur.execute("""DROP TABLE IF EXISTS offer_groups;""")
-        OfferTables.cur.execute("""DROP TABLE IF EXISTS offer_materials;""")
-        OfferTables.cur.execute("""DROP TABLE IF EXISTS offer_products;""")
-        OfferTables.cur.execute("""DROP TABLE IF EXISTS offer_parts;""")
         for table, sql in sql_create_table.items():
-            OfferTables.cur.execute("""DROP TABLE IF EXISTS {};""".format(table))
+            # OfferTables.cur.execute("""DROP TABLE IF EXISTS {};""".format(table))
             self.create_table(sql)
 
         # cur.execute("""DROP TABLE IF EXISTS parts;""")
         # self.create_table(sql_create_table_parts)
 
-        self.insert("columns", keys_columns, columns_gm, True)
-        self.insert("columns", keys_columns, columns_gp, True)
-        self.insert("columns", keys_columns, columns_gpa, True)
-        self.insert("columns", keys_columns, columns_gpd, True)
-        self.insert("columns", keys_columns, columns_parts, True, True)
-        self.insert("columns", keys_columns, columns_mats, True, True)
-        self.insert("columns", keys_columns, columns_products, True, True)
-        self.insert("columns", keys_columns, columns_offers, True, True)
+        # self.insert("columns", insert_keys["columns"], columns_gm, True)
+        # self.insert("columns", insert_keys["columns"], columns_gp, True)
+        # self.insert("columns", insert_keys["columns"], columns_gpa, True)
+        # self.insert("columns", insert_keys["columns"], columns_gpd, True)
+        # self.insert("columns", insert_keys["columns"], columns_parts, True, True)
+        # self.insert("columns", insert_keys["columns"], columns_mats, True, True)
+        # self.insert("columns", insert_keys["columns"], columns_products, True, True)
+        # self.insert("columns", insert_keys["columns"], columns_offers, True, True)
         self.con.commit()
+
+    def column_count(self, table):
+        """Return the number of columns defined for given table in 'columns' table."""
+        return self.select("SELECT COUNT(*) FROM columns WHERE tablename=(?)", (table,))[0][0]
+    
+    def get_read_only(self, table) -> list:
+        """Return a list of read only columns."""
+        sql = """
+            SELECT col_idx FROM columns WHERE tablename=(?) AND ro=(?)
+        """
+        rolist = self.select(sql, (table, 1))
+        return [row[0] for row in rolist]
+
+    def get_column_setup(self, table: str, key: str, col: int) -> str:
+        """Return the column label."""
+        sql = """
+            SELECT {}
+            FROM columns
+            WHERE tablename=(?) AND col_idx=(?)""".format(key)
+        return self.select(sql, (table, col))[0][0]
+
+    def update_cell(self, table: str, col: int, pk_value: int, value) -> bool:
+        """Update a value in the table.
+
+        Return True on success.
+        """
+        pk = primary_keys[table]
+        if len(pk) != 1:
+            print("OfferTables.update_cell update of table with multiple " +
+                  "primary keys is not supported. Tried to update table: '{}'".format(table)
+            )
+            return False
+        sql = """UPDATE {} SET {}=(?) WHERE {}=(?)""".format(
+            table, keys[table][col], pk[0]
+        )
+        return self.update(sql, (value, pk_value))
+
+    def insert_with_fk(self, table: str, fk_value: int) -> int:
+        """Insert a new row with possible foreign key.
+
+        Return inserted row id if successful.
+        """
+        sql_ins = """INSERT INTO {} {}"""
+        sql_fk = """({}) VALUES (?)"""
+        if fk_value is None:
+            sql = sql_ins.format(table, "DEFAULT VALUES")
+        else:
+            sql = sql_ins.format(table, sql_fk.format(foreign_keys[table][0]))
+
+        try:
+            if fk_value is None:
+                self.cur.execute(sql)
+            else:
+                self.cur.execute(sql, (fk_value,))
+            self.con.commit()
+        except (sqlite3.Error, ValueError) as e:
+            print("OfferTables.insert_with_fk\n\t{}".format(e))
+            print("\tsql: {}".format(sql))
+            print("\ttable: {}".format(table))
+            print("\tfk_value: {}".format(fk_value))
+            return None
+        
+        return self.cur.lastrowid
+
+    def select_with(self, table, fk_value=None, condition: dict=None):
+        """Return all results with fkvalue or condition from table."""
+        if table == "group_materials":
+            columns = ", ".join(keys[table])
+            fk = foreign_keys[table][0]
+            sql = sql_select_general
+
+        if fk_value is not None and condition is None:
+            (cond_str, values) = cond2str({fk: ["=", fk_value]})
+        elif condition is not None and fk_value is None:
+            (cond_str, values) = cond2str(condition)
+        elif condition is None and fk_value is None:
+            cond_str = "1"
+            values = []
+        else:
+            condition.update({fk: ["=", fk_value]})
+            (cond_str, values) = cond2str(condition)
+        pk = primary_keys[table][0]
+        cond_str += " ORDER BY {} ASC".format(pk)
+        sql = sql_select_general.format(columns=columns, table=table, cond=cond_str)
+        return self.select(sql, values)
 
     def insert_from_csv(self, table, file):
         data_keys = None
@@ -811,12 +1001,6 @@ class OfferTables:
             print(e)
             return False
         return True
-    
-    def insert_fk(self, table: str, fk: str, value):
-        """Insert a new row with foreign key. Return False if not successful."""
-        sql = sql_insert_fk.format(table=table, fk=fk)
-        success = self.select(sql, (value,))
-        return success
 
 
     def get(self, table: str, columns: Iterable, match_columns: Iterable,
