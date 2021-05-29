@@ -285,6 +285,19 @@ columns_gpd = [
     ("group_predefs", "part", "Osa", "string", 2, 60, 0, 0),
     ("group_predefs", "material", "Materiaali", "string", 3, 60, 0, 0)
 ]
+sql_temp_group_predefs = """
+    CREATE TEMP TABLE group_predefs (
+        temp_id     INTEGER PRIMARY KEY,
+        stack_id    INTEGER,
+
+        gpd_id      INTEGER,
+        group_id    INTEGER NOT NULL,
+        part        TEXT,
+        material    TEXT,
+
+        UNIQUE(group_id, part)
+    )
+"""
 sql_create_table_group_materials = """
     CREATE TABLE IF NOT EXISTS group_materials (
         gm_id       INTEGER PRIMARY KEY,
@@ -310,6 +323,27 @@ sql_create_table_group_materials = """
             ON DELETE CASCADE
             ON UPDATE CASCADE,
         UNIQUE(group_id, code)
+    )
+"""
+sql_temp_group_materials = """
+    CREATE TEMP TABLE group_materials (
+        temp_id     INTEGER PRIMARY KEY,
+        stack_id    INTEGER,
+
+        gm_id       INTEGER,
+        group_id    INTEGER,
+        category    TEXT,
+        code        TEXT,
+        desc        TEXT,
+        prod        TEXT,
+        thickness   INTEGER,
+        is_stock    TEXT,
+        unit        TEXT,
+        cost        REAL,
+        add_cost    REAL,
+        edg_cost    REAL,
+        loss        REAL,
+        discount    REAL
     )
 """
 pk_gm = ["gm_id"]
@@ -884,6 +918,34 @@ class OfferTables:
             FROM columns
             WHERE tablename=(?) AND col_idx=(?)""".format(key)
         return self.select(sql, (table, col))[0][0]
+
+    def delete_row(self, table: str, pk: int) -> bool:
+        """Delete a row matching given primary key in table."""
+        sql = """
+            DELETE FROM {} WHERE {}=(?)
+        """.format(table, primary_keys[table][0])
+        return self.update(sql, (pk,))
+
+    def save_temp(self, table: str, fk: int):
+        """Save a tables contents to it's temporary table."""
+        keys = insert_keys[table]
+        keystr = ", ".join(keys)
+        sql = """
+            INSERT INTO temp.{t} ({k}, stack_id)
+            VALUES (
+                SELECT {k}, IFNULL(
+                    SELECT MAX(stack_id) + 1
+                    FROM temp.{t}
+                    WHERE group_id=(?), 0)
+                FROM {t}
+                WHERE group_id=(?)
+            )
+        """.format(t=table, k=keystr)
+        self.update(sql, (fk, fk))
+        sql_del = """
+            DELETE FROM temp.{t} WHERE group_id=(?) AND stack_id <= MAX(stack_id) - 10
+        """.format(t=table)
+        self.update(sql_del, (fk,))
 
     def update_cell(self, table: str, col: int, pk_value: int, value) -> bool:
         """Update a value in the table.

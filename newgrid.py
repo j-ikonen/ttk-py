@@ -143,12 +143,12 @@ class DatabaseGridTable(wxg.GridTableBase):
         """Use same attributes for all rows of a column."""
         return True
 
-    def set_fk(self, value):
+    def set_fk(self, value: int):
         """Set the foreign key value and update the grid."""
         self.fk_value = value
         self.update_data()
 
-    def get_fk(self):
+    def get_fk(self) -> int:
         """Return the foreign key value."""
         return self.fk_value
 
@@ -192,6 +192,8 @@ class DatabaseGridTable(wxg.GridTableBase):
         pk_column = tb.get_pk_column(self.table)
         return self.GetValue(row, pk_column)
 
+    def delete_row(self, row: int):
+        pkval = self.get_pk_value(row)
     # def GetValueFromDb(self, row, col):
     #     """Return value from database."""
 
@@ -257,14 +259,16 @@ class DatabaseGrid(wxg.Grid):
         self.Bind(wxg.EVT_GRID_SELECT_CELL, self.on_select_cell) # Run child set fk
         self.Bind(wxg.EVT_GRID_COL_SIZE, self.on_col_size) # Save size
         self.Bind(wxg.EVT_GRID_COL_MOVE, self.on_col_move) # Save order
-    
+
     def can_undo(self):
         """Return True if action can be undone."""
-        pass
+        if self.get_fk() in self.history and len(self.history[self.get_fk()]) > 0:
+            return True
+        return False
 
     def on_undo(self, evt):
         """Handle the menu event."""
-        pass
+        self.undo()
 
     def undo(self):
         """."""
@@ -457,11 +461,11 @@ class DatabaseGrid(wxg.Grid):
         self.SetFocus()
         evt.Skip()
 
-    def set_fk(self, value):
+    def set_fk(self, value: int):
         """Set the foreign key for the grid."""
         self.GetTable().set_fk(value)
 
-    def get_fk(self):
+    def get_fk(self) -> int:
         """Return the value of foreign key."""
         return self.GetTable().get_fk()
 
@@ -477,6 +481,7 @@ class DatabaseGrid(wxg.Grid):
             print("\tForeign key needs to be set.")
             evt.Veto()
 
+        self.db.save_temp(self.table_name, self.get_fk())
         evt.Skip()
 
     def on_cell_changed(self, evt):
@@ -511,12 +516,12 @@ class DatabaseGrid(wxg.Grid):
 
     def on_select_cell(self, evt):
         """Set the primary key of selected row as foreign key of any child grids."""
-        self.ClearSelection()
+        # self.ClearSelection()
         rowid = self.get_pk(evt.GetRow())
         for fn in self.child_set_fks:
             fn(rowid)
         evt.Skip()
-    
+
     # def on_show_editor(self, evt):
     #     """Veto cell editing for read only columns."""
     #     col = evt.GetCol()
