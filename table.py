@@ -760,6 +760,11 @@ insert_keys = {
     "columns": keys_columns[1:-1],
     "variables": keys_variables[1:]
 }
+database_tables = {
+    "group_materials": "materials",
+    "group_products": "products",
+    "group_parts": "parts"
+}
 # select_all = {
 #     "offers": sql_select_general.format(
 #         table="offers",
@@ -830,6 +835,10 @@ class OfferTables:
         # self.insert("columns", insert_keys["columns"], columns_products, True, True)
         # self.insert("columns", insert_keys["columns"], columns_offers, True, True)
         self.con.commit()
+
+    def has_database_table(self, table):
+        """Return true if the table has a related database table."""
+        return table in database_tables
 
     def column_count(self, table):
         """Return the number of columns defined for given table in 'columns' table."""

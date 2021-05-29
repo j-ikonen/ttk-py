@@ -219,8 +219,6 @@ class DatabaseGrid(wxg.Grid):
         self.table_name = dbtable
         self.db: tb.OfferTables = db
 
-        self.first_col = None
-
         table = DatabaseGridTable(db, dbtable)
         self.SetTable(table, True, self.GridSelectRows)
         self.set_widths()
@@ -247,7 +245,7 @@ class DatabaseGrid(wxg.Grid):
         self.Bind(wx.EVT_KEY_DOWN, self.on_key_down)
         self.Bind(wxg.EVT_GRID_CELL_RIGHT_CLICK, self.on_context_menu)
 
-        self.Bind(wxg.EVT_GRID_CMD_LABEL_RIGHT_CLICK, self.on_label_menu) # Hide Columns
+        self.Bind(wxg.EVT_GRID_LABEL_RIGHT_CLICK, self.on_label_menu) # Hide Columns
         self.Bind(wxg.EVT_GRID_LABEL_LEFT_CLICK, self.on_label_lclick)  # Set Focus
 
         self.Bind(wxg.EVT_GRID_CELL_CHANGED, self.on_cell_changed) # Refresh
@@ -259,14 +257,161 @@ class DatabaseGrid(wxg.Grid):
         self.Bind(wxg.EVT_GRID_SELECT_CELL, self.on_select_cell) # Run child set fk
         self.Bind(wxg.EVT_GRID_COL_SIZE, self.on_col_size) # Save size
         self.Bind(wxg.EVT_GRID_COL_MOVE, self.on_col_move) # Save order
+    
+    def can_undo(self):
+        """Return True if action can be undone."""
+        pass
 
-    def on_context_menu(self, evt):
+    def on_undo(self, evt):
+        """Handle the menu event."""
+        pass
+
+    def undo(self):
         """."""
         pass
+    
+    def on_cut(self, evt):
+        """Handle the menu event."""
+        pass
+
+    def cut(self):
+        """."""
+        pass
+    
+    def on_copy(self, evt):
+        """Handle the menu event."""
+        pass
+
+    def copy(self):
+        """."""
+        pass
+
+    def can_paste(self):
+        """Return True if copied values can be pasted."""
+        pass
+
+    def on_paste(self, evt):
+        """Handle the menu event."""
+        pass
+
+    def paste(self):
+        """."""
+        pass
+    
+    def on_delete(self, evt):
+        """Handle the menu event."""
+        pass
+
+    def delete(self):
+        """."""
+        pass
+    
+    def on_save(self, evt):
+        """Handle the menu event."""
+        pass
+
+    def save(self):
+        """."""
+        pass
+    
+    def on_context_menu(self, evt):
+        """Open the cell context menu."""
+        self.SetFocus()
+        menu = wx.Menu()
+        row = evt.GetRow()
+        col = evt.GetCol()
+        no_row_selected = len(self.GetSelectedRows()) == 0
+
+        # Clear selection and set grid cursor to clicked cell if
+        # right click was not in a selected cell.
+        if not self.IsInSelection(row, col):
+            self.ClearSelection()
+            self.SetGridCursor(row, col)
+
+        if not hasattr(self, "id_save"):
+            self.id_save = wx.NewIdRef()
+            self.Bind(wx.EVT_MENU, self.on_undo, id=wx.ID_UNDO)
+            self.Bind(wx.EVT_MENU, self.on_cut, id=wx.ID_CUT)
+            self.Bind(wx.EVT_MENU, self.on_copy, id=wx.ID_COPY)
+            self.Bind(wx.EVT_MENU, self.on_paste, id=wx.ID_PASTE)
+            self.Bind(wx.EVT_MENU, self.on_delete, id=wx.ID_DELETE)
+            self.Bind(wx.EVT_MENU, self.on_save, id=self.id_save)
+        
+        mi_undo: wx.MenuItem = menu.Append(wx.ID_UNDO)
+        menu.Append(wx.ID_CUT)
+        menu.Append(wx.ID_COPY)
+        mi_paste = menu.Append(wx.ID_PASTE)
+        menu.AppendSeparator()
+        mi_delete = menu.Append(wx.ID_DELETE, "Poista\tDelete")
+
+        # Only add db items if the grid table has database table.
+        if self.db.has_database_table(self.table_name):
+            menu.AppendSeparator()
+            mi_save = menu.Append(self.id_save, "Tallenna", "Tallenna valinta tietokantaan")
+
+            if no_row_selected:
+                mi_save.Enable(False)
+
+        if not self.can_undo():
+            mi_undo.Enable(False)
+
+        if not self.can_paste():
+            mi_paste.Enable(False)
+
+        if no_row_selected:
+            mi_delete.Enable(False)
+
+        self.PopupMenu(menu)
+
+        menu.Destroy()
+        evt.Skip()
+
+    def on_key_down(self, evt):
+        """Handle key events."""
+        keycode = evt.GetUnicodeKey()
+        if keycode == wx.WXK_NONE:
+            keycode = evt.GetKeyCode()
+        
+        mod = evt.GetModifiers()
+        if mod == wx.MOD_CONTROL:
+
+            # CTRL+A
+            if keycode == 65:
+                pass
+
+            # CTRL+C
+            elif keycode == 67:
+                pass
+
+            # CTRL+V
+            elif keycode == 86:
+                pass
+
+            # CTRL+Z
+            elif keycode == 90:
+                pass
+
+        elif mod == wx.MOD_SHIFT:
+            pass
+
+        elif mod == wx.MOD_ALT:
+            pass
+
+        else:
+            # Delete
+            if keycode == wx.WXK_DELETE:
+                pass
+
+        evt.Skip()
 
     def on_label_menu(self, evt):
         """Open menu to hide or show columns."""
         self.SetFocus()
+
+        # Do not show label menu on row label click.
+        if evt.GetCol() == -1:
+            return
+
         menu = wx.Menu()
 
         if not hasattr(self, "id_columns"):
@@ -364,17 +509,10 @@ class DatabaseGrid(wxg.Grid):
             positions.append((colpos, col, self.table_name))
         self.db.set_column_values("col_order", positions)
 
-    def on_key_down(self, evt):
-        """Open the grid popupmenu."""
-        evt.Skip()
-
-
     def on_select_cell(self, evt):
         """Set the primary key of selected row as foreign key of any child grids."""
+        self.ClearSelection()
         rowid = self.get_pk(evt.GetRow())
-        # print("select cell")
-        self.first_col = evt.GetCol()
-        # print(f"r,c: {evt.GetRow()},{evt.GetCol()}")
         for fn in self.child_set_fks:
             fn(rowid)
         evt.Skip()
