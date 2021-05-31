@@ -326,7 +326,7 @@ sql_create_table_group_materials = """
     )
 """
 sql_temp_group_materials = """
-    CREATE TEMP TABLE group_materials (
+    CREATE TEMP TABLE temp_gmats (
         temp_id     INTEGER PRIMARY KEY,
         stack_id    INTEGER,
 
@@ -782,22 +782,28 @@ keys = {
     "variables": keys_variables
 }
 insert_keys = {
-    "offers": keys_offers[1:],
-    "groups": keys_groups[1:],
-    "group_predefs": keys_gpd[1:],
-    "group_materials": keys_gm[1:],
-    "group_products": keys_gp[1:],
-    "group_parts": keys_gpa[1:],
-    "materials": keys_materials[1:],
-    "products": keys_products[1:],
-    "parts": keys_parts[1:],
-    "columns": keys_columns[1:-1],
-    "variables": keys_variables[1:]
+    "offers": keys_offers,
+    "groups": keys_groups,
+    "group_predefs": keys_gpd,
+    "group_materials": keys_gm[:-1],
+    "group_products": keys_gp,
+    "group_parts": keys_gpa,
+    "materials": keys_materials,
+    "products": keys_products,
+    "parts": keys_parts,
+    "columns": keys_columns,
+    "variables": keys_variables
 }
 database_tables = {
     "group_materials": "materials",
     "group_products": "products",
     "group_parts": "parts"
+}
+temp_tables = {
+    "group_predefs": "temp_gpdefs",
+    "group_materials": "temp_gmats",
+    "group_products": "temp_gproducts",
+    "group_parts": "temp_gparts"
 }
 # select_all = {
 #     "offers": sql_select_general.format(
@@ -852,11 +858,14 @@ class OfferTables:
     def __init__(self) -> None:
         """."""
         self.create_connection("ttk.db")
-
         # for table, sql in sql_create_table.items():
             # OfferTables.cur.execute("""DROP TABLE IF EXISTS {};""".format(table))
             # self.create_table(sql)
-
+        self.create_table(sql_temp_group_materials)
+        # tables = self.select("SELECT name FROM sqlite_master WHERE type=(?)", ("table",))
+        # print(tables)
+        # totcost = self.select("SELECT tot_cost FROM group_materials WHERE group_id=(?)", ("1",))
+        # print(totcost)
         # cur.execute("""DROP TABLE IF EXISTS parts;""")
         # self.create_table(sql_create_table_parts)
 
@@ -926,27 +935,6 @@ class OfferTables:
         """.format(table, primary_keys[table][0])
         return self.update(sql, (pk,))
 
-    def save_temp(self, table: str, fk: int):
-        """Save a tables contents to it's temporary table."""
-        keys = insert_keys[table]
-        keystr = ", ".join(keys)
-        sql = """
-            INSERT INTO temp.{t} ({k}, stack_id)
-            VALUES (
-                SELECT {k}, IFNULL(
-                    SELECT MAX(stack_id) + 1
-                    FROM temp.{t}
-                    WHERE group_id=(?), 0)
-                FROM {t}
-                WHERE group_id=(?)
-            )
-        """.format(t=table, k=keystr)
-        self.update(sql, (fk, fk))
-        sql_del = """
-            DELETE FROM temp.{t} WHERE group_id=(?) AND stack_id <= MAX(stack_id) - 10
-        """.format(t=table)
-        self.update(sql_del, (fk,))
-
     def update_cell(self, table: str, col: int, pk_value: int, value) -> bool:
         """Update a value in the table.
 
@@ -987,15 +975,39 @@ class OfferTables:
             print("\ttable: {}".format(table))
             print("\tfk_value: {}".format(fk_value))
             return None
-        
+
         return self.cur.lastrowid
+
+    def insert_rows(self, table: str, data: list) -> int:
+        """Insert a row with given values."""
+        values = []
+        keys = []
+        ins_keys = insert_keys[table][1:]
+        # print(ins_keys)
+        # print(rowdata)
+        # for col, key in enumerate(insert_keys[table]):
+        #     # key = self.get_column_value(table, "key", col)
+        #     if key in ins_keys:
+        #         # values.append(rowdata[col])
+        #         keys.append(key)
+        for dr in data:
+            values.append(dr[1:len(ins_keys)+1])
+        return self.insert(table, ins_keys, values, True)
+
+    def delete_with_fk(self, table, value):
+        """Delete all rows with a foreign key."""
+        sql = """
+            DELETE FROM {t} WHERE group_id=(?)
+        """.format(t=table)
+        self.update(sql, (value,))
 
     def select_with(self, table, fk_value=None, condition: dict=None):
         """Return all results with fkvalue or condition from table."""
         if table == "group_materials":
             columns = ", ".join(keys[table])
+            # columns = "*"
             fk = foreign_keys[table][0]
-            sql = sql_select_general
+            # sql = sql_select_general
 
         if fk_value is not None and condition is None:
             (cond_str, values) = cond2str({fk: ["=", fk_value]})
@@ -1010,7 +1022,11 @@ class OfferTables:
         pk = primary_keys[table][0]
         cond_str += " ORDER BY {} ASC".format(pk)
         sql = sql_select_general.format(columns=columns, table=table, cond=cond_str)
-        return self.select(sql, values)
+        data = self.select(sql, values)
+        # print(sql)
+        # print(values)
+        # print(data)
+        return data
 
     def insert_from_csv(self, table, file):
         data_keys = None

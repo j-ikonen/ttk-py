@@ -86,7 +86,8 @@ class DatabaseGridTable(wxg.GridTableBase):
             value = None
 
         # Cell in unitialized row.
-        if row >= self.GetNumberRows() - 1:
+        is_last_row = row >= self.GetNumberRows() - 1
+        if is_last_row:
             pk_value = self.db.insert_with_fk(self.table, self.fk_value)
 
         # Cell in initialized row.
@@ -96,15 +97,17 @@ class DatabaseGridTable(wxg.GridTableBase):
         # Set value to a valid row with Primary Key.
         if pk_value is not None:
             success = self.db.update_cell(self.table, col, pk_value, value)
-
-            if success:
+            
+            if not success and is_last_row:
+                self.db.delete_row(self.table, pk_value)
+            elif success:
                 self.update_data()
             else:
                 print("\nDbGridTable.SetValue update value failed.")
-                print(f"\ttable: {self.table}")
-                print(f"\t(row, col): ({row}, {col})")
-                print(f"\tpk_value: {pk_value}")
-                print(f"\tvalue: {value}")
+                # print(f"\ttable: {self.table}")
+                # print(f"\t(row, col): ({row}, {col})")
+                # print(f"\tpk_value: {pk_value}")
+                # print(f"\tvalue: {value}")
 
     def AppendRows(self, numRows):
         """Append rows to the grid."""
@@ -194,6 +197,9 @@ class DatabaseGridTable(wxg.GridTableBase):
 
     def delete_row(self, row: int):
         pkval = self.get_pk_value(row)
+        self.db.delete_row(self.table, pkval)
+        # del self.data[row]
+
     # def GetValueFromDb(self, row, col):
     #     """Return value from database."""
 
@@ -237,8 +243,8 @@ class DatabaseGrid(wxg.Grid):
         self.child_set_fks = []
 
         self.copied_rows = []
-        self.history = {}
-        self.can_save_history = True
+        self.undostack = {}
+        self.redostack = {}
 
         self.SetRowLabelSize(35)
         self.EnableDragColMove(True)
@@ -260,9 +266,13 @@ class DatabaseGrid(wxg.Grid):
         self.Bind(wxg.EVT_GRID_COL_SIZE, self.on_col_size) # Save size
         self.Bind(wxg.EVT_GRID_COL_MOVE, self.on_col_move) # Save order
 
+    def delete_row(self, row):
+        """Delete a row and it's data from grid."""
+        self.GetTable().delete_row(row)
+
     def can_undo(self):
         """Return True if action can be undone."""
-        if self.get_fk() in self.history and len(self.history[self.get_fk()]) > 0:
+        if self.get_fk() in self.undostack and len(self.undostack[self.get_fk()]) > 0:
             return True
         return False
 
@@ -272,15 +282,24 @@ class DatabaseGrid(wxg.Grid):
 
     def undo(self):
         """."""
-        pass
-    
+        if not self.can_undo():
+            return
+
+        fk = self.get_fk()
+        data = self.undostack[fk].pop()
+        self.db.delete_with_fk(self.table_name, fk)
+
+        self.db.insert_rows(self.table_name, data)
+        self.update_content()
+        self.ForceRefresh()
+
     def on_cut(self, evt):
         """Handle the menu event."""
         pass
 
     def cut(self):
         """."""
-        pass
+        self.save_action()
     
     def on_copy(self, evt):
         """Handle the menu event."""
@@ -300,15 +319,21 @@ class DatabaseGrid(wxg.Grid):
 
     def paste(self):
         """."""
-        pass
+        self.save_action()
     
     def on_delete(self, evt):
         """Handle the menu event."""
-        pass
+        self.delete()
 
     def delete(self):
-        """."""
-        pass
+        """Delete selected rows."""
+        self.save_action()
+        selected_rows = self.GetSelectedRows()
+        selected_rows.sort(reverse=True)
+        for row in selected_rows:
+            self.delete_row(row)
+        self.update_content()
+        # self.ForceRefresh()
     
     def on_save(self, evt):
         """Handle the menu event."""
@@ -393,7 +418,7 @@ class DatabaseGrid(wxg.Grid):
 
             # CTRL+Z
             elif keycode == 90:
-                pass
+                self.undo()
 
         elif mod == wx.MOD_SHIFT:
             pass
@@ -404,7 +429,7 @@ class DatabaseGrid(wxg.Grid):
         else:
             # Delete
             if keycode == wx.WXK_DELETE:
-                pass
+                self.delete()
 
         evt.Skip()
 
@@ -481,7 +506,7 @@ class DatabaseGrid(wxg.Grid):
             print("\tForeign key needs to be set.")
             evt.Veto()
 
-        self.db.save_temp(self.table_name, self.get_fk())
+        self.save_action()
         evt.Skip()
 
     def on_cell_changed(self, evt):
@@ -529,6 +554,21 @@ class DatabaseGrid(wxg.Grid):
     #         print(f"Column {col} is read only. Value can not be changed.")
     #         evt.Veto()
 
+    def save_action(self):
+        """Save the action to undostack."""
+        fk = self.get_fk()
+        if fk not in self.undostack:
+            self.undostack[fk] = []
+
+        data = self.GetTable().data
+        datacopy = []
+        for row, rd in enumerate(data):
+            rowcopy = []
+            for col, value in enumerate(rd):
+                rowcopy.append(value)
+            datacopy.append(rowcopy)
+        self.undostack[fk].append(datacopy)
+
     def save_width(self, col, width):
         """Set the width of the column in columns table."""
         self.db.set_column_value(self.table_name, "width", col, width)
@@ -548,6 +588,10 @@ class DatabaseGrid(wxg.Grid):
         order = self.db.get_col_order(self.table_name)
         self.SetColumnsOrder(order)
         self.Layout()
+    
+    def update_content(self):
+        """Update the contents of this grid."""
+        self.GetTable().update_data()
 
     def register_child(self, obj) -> bool:
         """Register a child obj for setting it's foreign key by this grids selection.
