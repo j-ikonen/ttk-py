@@ -166,7 +166,8 @@ sql_create_table_columns = """
         ro          INTEGER DEFAULT 0,
         visible     INTEGER DEFAULT 1,
         order       INTEGER DEFAULT 0,
-        UNIQUE (tablename, key)
+        UNIQUE (tablename, key),
+        UNIQUE (tablename, col_idx)
     )
 """
 pk_columns = ["columns_id"]
@@ -309,7 +310,7 @@ sql_create_table_group_materials = """
         thickness   INTEGER,
         is_stock    TEXT DEFAULT 'varasto',
         unit        TEXT,
-        cost        REAL DEFAULT 0.0,
+        cost        REAL,
         add_cost    REAL DEFAULT 0.0,
         edg_cost    REAL DEFAULT 0.0,
         loss        REAL DEFAULT 0.0,
@@ -323,27 +324,6 @@ sql_create_table_group_materials = """
             ON DELETE CASCADE
             ON UPDATE CASCADE,
         UNIQUE(group_id, code)
-    )
-"""
-sql_temp_group_materials = """
-    CREATE TEMP TABLE temp_gmats (
-        temp_id     INTEGER PRIMARY KEY,
-        stack_id    INTEGER,
-
-        gm_id       INTEGER,
-        group_id    INTEGER,
-        category    TEXT,
-        code        TEXT,
-        desc        TEXT,
-        prod        TEXT,
-        thickness   INTEGER,
-        is_stock    TEXT,
-        unit        TEXT,
-        cost        REAL,
-        add_cost    REAL,
-        edg_cost    REAL,
-        loss        REAL,
-        discount    REAL
     )
 """
 pk_gm = ["gm_id"]
