@@ -1,123 +1,84 @@
+import sqlite3
 import unittest
-
-from bson.objectid import ObjectId
-
-import table as tb
+import sqlite3
+import tablebase as tb
 
 
-class TestTables(unittest.TestCase):
+class TestOffersTable(unittest.TestCase):
     
-    tables = tb.OfferTables()
+    @classmethod
+    def setUpClass(cls):
+        cls.con = sqlite3.connect(":memory:")
+        cls.con.execute("PRAGMA foreign_keys = OFF")
+        cls.table = tb.OffersTable(cls.con)
+        cls.table.create()
 
-    offer_keys = ["id", "name"]
-    offer_data = [
-        (str(ObjectId()), "Tarjous 1"),
-        (str(ObjectId()), "Tarjous 2"),
-        (str(ObjectId()), "Testi tarjous"),
-        (str(ObjectId()), "Uusi tarjous")
-    ]
-    group_keys = ["id", "offer_id", "name"]
-    group_data = [
-        (str(ObjectId()), offer_data[0][0], "Keittiö"),
-        (str(ObjectId()), offer_data[0][0], "Kylpyhuone"),
-        (str(ObjectId()), offer_data[1][0], "Keittiö"),
-        (str(ObjectId()), offer_data[2][0], "Keittiö"),
-        (str(ObjectId()), offer_data[3][0], "Keittiö"),
-        (str(ObjectId()), offer_data[3][0], "...")
-    ]
-    opredef_keys = ["id", "group_id"]
-    opredef_data = (str(ObjectId()), group_data[0][0])
+    @classmethod
+    def tearDownClass(cls):
+        cls.con.execute("DROP TABLE IF EXISTS columns")
+        cls.con.execute("DROP TABLE IF EXISTS offers")
+        cls.con.close()
 
-    omaterial_keys = ["id", "group_id"]
-    omaterial_data = (str(ObjectId()), group_data[0][0])
-
-    oproduct_keys = ["id", "group_id", "width", "height", "depth"]
-    oproduct_data = (str(ObjectId()), group_data[0][0], 1200, 2300, 620)
-
-    opart_keys = ["id", "product_id"]
-    opart_data = (str(ObjectId()), oproduct_data[0][0])
-
-    material_keys = ["code"]
-    material_data = ("MAT16",)
-
-    product_keys = ["code", "width", "height", "depth"]
-    product_data = ("kaappi", 1200, 2300, 620)
-    product_data2 = ("tuote", 650, 300, 420)
-    product_data3 = [("tuote1", 650, 300, 420), ("tuote2", 640, 310, 410)]
-
-    part_keys = ["code", "product_code"]
-    part_data = [
-        ("hylly", "kaappi"),
-        ("tausta", "kaappi"),
-        ("ovi", "kaappi")
-    ]
-
-    def test_insert_offer(self):
-        res = self.tables.insert("offers", self.offer_keys, self.offer_data[0])
-        self.assertEqual(res, True)
-
-    def test_insert_many_offers(self):
-        res = self.tables.insert("offers", self.offer_keys, self.offer_data[1:], True)
-        self.assertEqual(res, True)
-
-    def test_insert_many_groups(self):
-        res = self.tables.insert("offer_groups", self.group_keys, self.group_data, True)
-        self.assertEqual(res, True)
-
-    def test_insert_offer_predefs(self):
-        res = self.tables.insert("offer_predefs", self.opredef_keys, self.opredef_data)
-        self.assertEqual(res, True)
-
-    def test_insert_offer_materials(self):
-        res = self.tables.insert("offer_materials", self.omaterial_keys, self.omaterial_data)
-        self.assertEqual(res, True)
-
-    def test_insert_offer_products(self):
-        res = self.tables.insert("offer_products", self.oproduct_keys, self.oproduct_data)
-        self.assertEqual(res, True)
-
-    def test_insert_offer_parts(self):
-        res = self.tables.insert("offer_parts", self.opart_keys, self.opart_data)
-        self.assertEqual(res, True)
-
-    def test_insert_materials(self):
-        res = self.tables.insert("materials", self.material_keys, self.material_data)
-        self.assertEqual(res, True)
-
-    def test_insert_products(self):
-        res = self.tables.insert("products", self.product_keys, self.product_data)
-        self.assertEqual(res, True)
-
-    def test_insert_parts(self):
-        res = self.tables.insert("parts", self.part_keys, self.part_data, True)
-        self.assertEqual(res, True)
-
-    def test_get(self):
-        res = self.tables.insert("products", self.product_keys, self.product_data2)
-        res = self.tables.get_one(
-            "products",
-            [self.product_keys[2]],
-            [self.product_keys[0]],
-            [self.product_data2[0]]
+    def test_create(self):
+        sql = "SELECT name FROM sqlite_master WHERE type=(?) AND name=(?)"
+        result = self.table.execute_dql(
+            sql, ("table", "offers")
         )
-        self.assertEqual(res[0], self.product_data2[2])
+        self.assertEqual(len(result), 1)
 
-    def test_get(self):
-        self.tables.insert("products", self.product_keys, self.product_data2)
-        res = self.tables.get(
-            "products",
-            [self.product_keys[2]],
-            [self.product_keys[0]],
-            [self.product_data2[0]]
-        )
-        self.assertEqual(res[0], self.product_data2[2])
+    def test_insert_empty(self):
+        rowid = self.table.insert_empty(None)
+        self.assertIsNotNone(rowid)
 
-    def test_get_many(self):
-        self.tables.insert("products", self.product_keys, self.product_data3, True)
-        res = self.tables.get(
-            "products",
-            [self.product_keys[2]],
-            [self.product_keys[0]],
-            [self.product_data3[1][0]], True
+    def test_update(self):
+        rowid = self.table.insert_empty(None)
+        result = self.table.update(rowid, 2, "Nimi")
+        self.assertTrue(result)
+
+    def test_delete(self):
+        self.assertTrue(self.table.delete(1))
+
+    def test_execute_dql(self):
+        rowid = self.table.insert_empty(None)
+        result = self.table.update(rowid, 1, "Nimi")
+        result = self.table.execute_dql(
+            "SELECT name FROM offers WHERE offer_id=(?)", (rowid,)
         )
-        self.assertEqual(res[0][0], self.product_data3[1][2])
+        self.assertEqual(result[0][0], "Nimi")
+
+    def test_insert(self):
+        values = (
+            "name",      
+            "firstname", 
+            "lastname",  
+            "company",   
+            "phone",     
+            "email",     
+            "address",   
+            "postcode",  
+            "postarea",  
+            "info"
+        )
+        result = self.table.insert(values)
+        self.assertIsNotNone(result)
+        self.assertIsInstance(result, int)
+        self.assertNotEqual(result, -1)
+
+    def test_get_column_setup_value(self):
+        result = self.table.get_column_setup("key", 2)
+        self.assertEqual(result, "firstname")
+
+    def test_get_column_setup_list(self):
+        result = self.table.get_column_setup("key")
+        self.assertEqual(len(result), len(self.table.keys_select))
+        self.assertEqual(result[2], "firstname")
+
+    def test_set_column_setup(self):
+        success = self.table.set_column_setup("width", 2, 122)
+        self.assertTrue(success)
+        result = self.table.get_column_setup("width", 2)
+        self.assertEqual(result, 122)
+
+
+if __name__ == '__main__':
+    unittest.main()

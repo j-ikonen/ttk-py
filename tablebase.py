@@ -13,8 +13,42 @@ class SQLTableBase:
     RO = 7
     VISIBLE = 8
 
+    setup_done = False
+
     def __init__(self, connection):
         self.con: sqlite3.Connection = connection
+        self.create_columns = """
+            CREATE TABLE IF NOT EXISTS columns (
+                columns_id  INTEGER PRIMARY KEY,
+                tablename   TEXT,
+                key         TEXT,
+                label       TEXT,
+                type        TEXT,
+                col_idx     INTEGER,
+                col_order   INTEGER,
+                width       INTEGER DEFAULT 55,
+                ro          INTEGER DEFAULT 0,
+                visible     INTEGER DEFAULT 1,
+                UNIQUE (tablename, key),
+                UNIQUE (tablename, col_idx),
+                UNIQUE (tablename, col_order)
+            )
+        """
+        self.idx_columns = [
+            """CREATE INDEX IF NOT EXISTS idx_columns ON columns(tablename, col_idx)"""
+        ]
+        self.columns_keys = [
+            "columns_id", 
+            "tablename",  
+            "key",        
+            "label",      
+            "type",       
+            "col_idx",    
+            "col_order",  
+            "width",      
+            "ro",         
+            "visible"
+        ]
 
         self.name = None
         self.sql_create_table = None
@@ -24,27 +58,41 @@ class SQLTableBase:
         self.read_only = None
         self.default_columns = None
         self.keys_insert = None
-    
+
+
     def create(self):
         """Create the table and it's indexes."""
         try:
             with self.con:
+                # Create columns table if not done yet.
+                if not self.setup_done:
+                    self.con.execute(self.create_columns)
+
+                # Create table and indexes.
                 self.con.execute(self.sql_create_table)
                 for idx in self.indexes:
                     self.con.execute(idx)
-                cols = []
-                for n, col in enumerate(self.default_columns):
-                    ro = 1 if col[self.KEY] in self.read_only else 0
-                    cols.append(list(col) + [n, n, 60, ro, 1])
-                self.con.execute("""
-                    INSERT INTO columns (*) VALUES (?,?,?,?,?,?,?,?,?)
-                """, self.cols)
+
+                # Insert default columns values if required.
+                count = self.con.execute(
+                    """SELECT COUNT(*) FROM columns WHERE tablename=(?)""",
+                    (self.name,)
+                )
+                if count != len(self.default_columns):
+                    for n, col in enumerate(self.default_columns):
+                        ro = 1 if col[self.KEY] in self.read_only else 0
+                        self.con.execute(
+                            "INSERT INTO columns ({k}) VALUES (?,?,?,?,?,?,?,?,?)".format(
+                                k=",".join(self.columns_keys[1:])
+                            ),
+                            list(col) + [n, n, 60, ro, 1]
+                        )
 
         except sqlite3.OperationalError as e:
             print("\nsqlite3.OperationalError: {}".format(e))
             print("Could not create table: {}".format(self.name))
 
-    def execute_dml(self, sql: str, values: list=None, many: bool=False) -> int:
+    def execute_dml(self, sql: str, values: list=None, many: bool=False, rowid: bool=False) -> bool:
         """Run execute on a data manipulation language string.
 
         Used for SQL INSERT, REPLACE, UPDATE and DELETE statements.
@@ -61,33 +109,40 @@ class SQLTableBase:
 
         Returns
         -------
+        bool
+            True on success. False on Errors.
         int
-            Last rowid. If statement was not INSERT or REPLACE or 'many' was set True
-            return -1.
-        None
-            On sqlite3.IntegrityError
+            Last rowid if 'rowid' is set as True.
         """
-        rowid = -1
         try:
             with self.con:
                 if many:
                     if values is None:
-                        self.con.executemany(sql)
+                        cur = self.con.executemany(sql)
                     else:
-                        self.con.executemany(sql, values)
+                        cur = self.con.executemany(sql, values)
                 else:
                     if values is None:
-                        rowid = self.con.execute(sql).lastrowid
+                        cur = self.con.execute(sql)
                     else:
-                        rowid = self.con.execute(sql, values).lastrowid
+                        cur = self.con.execute(sql, values)
 
         except sqlite3.IntegrityError as e:
             print("\nsqlite3.IntegrityError: {}".format(e))
             print("In SQLTableBase.execute_dml")
             print("Error with sql: {}".format(sql))
             print("using values: {}".format(values))
-            return None
-        return rowid
+            return False
+        except sqlite3.Error as e:
+            print("\n{}: {}".format(type(e), e))
+            print("In SQLTableBase.execute_dml")
+            print("Error with sql: {}".format(sql))
+            print("using values: {}".format(values))
+            return False
+        if rowid:
+            return cur.lastrowid
+        else:
+            return True
 
     def execute_dql(self, sql: str, values: list=None, cursor: bool=False) -> list:
         """Execute a Data Query Language command.
@@ -117,8 +172,8 @@ class SQLTableBase:
                 else:
                     cur = self.con.execute(sql, values)
 
-        except sqlite3.IntegrityError as e:
-            print("\nsqlite3.IntegrityError: {}".format(e))
+        except sqlite3.Error as e:
+            print("\n{}: {}".format(type(e), e))
             print("In SQLTableBase.execute_dql")
             print("Error with sql: {}".format(sql))
             print("using values: {}".format(values))
@@ -136,20 +191,28 @@ class SQLTableBase:
         ----------
         values : list
             A list or values or a list of rows.
+        many : bool
+            Set True if inserting multiple rows in one statement.
+        include_rowid : bool
+            Set True if rowid / primary key is included in values.
 
         Returns
         -------
         int
-            Last rowid. If 'many' was set True return -1. On error return None.
+            Last rowid.
+        bool
+            If many was set True, return true on success and False on Errors.
         """
         if include_rowid:
-            keys = self.keys_insert
+            keys = ",".join(self.keys_insert)
+            binds = ",".join(["?"] * len(self.keys_insert))
         else:
-            keys = self.keys_insert[1:]
-        binds = ",".join(["?"] * len(keys))
+            keys = ",".join(self.keys_insert[1:])
+            binds = ",".join(["?"] * len(self.keys_insert[1:]))
         sql = "INSERT INTO {t}({k}) VALUES ({b})".format(t=self.name, k=keys, b=binds)
 
-        return self.execute_dml(sql, values, many)
+        ret_rowid = False if many else True
+        return self.execute_dml(sql, values, many, ret_rowid)
 
     def insert_empty(self, fk: int=None) -> int:
         """Insert an empty row.
@@ -167,10 +230,11 @@ class SQLTableBase:
         sql_ins = "INSERT INTO {t}"
         sql_val = "({k}) VALUES (?)"
         if fk is None:
-            sql = sql_ins.format(self.name)
+            sql = sql_ins.format(t=self.name) + " DEFAULT VALUES"
+            return self.execute_dml(sql)
         else:
             sql = sql_ins.format(t=self.name) + sql_val.format(k=self.foreign_key)
-        return self.execute_dml(sql, (fk,))
+            return self.execute_dml(sql, (fk,))
 
     def update(self, pk: int, col: int, value) -> bool:
         """Update a single value in the table.
@@ -197,31 +261,130 @@ class SQLTableBase:
         )
         values = (value, pk)
         result = self.execute_dml(sql, values)
-        return True if result == -1 else False
+        return result
 
     def delete(self, pk: int) -> bool:
         sql = "DELETE FROM {t} WHERE {pk}=(?)".format(t=self.name, pk=self.primary_key)
         values = (pk,)
-        return True if self.execute_dml(sql, values) == -1 else False
+        return self.execute_dml(sql, values)
 
-    def get_labels(self) -> list:
-        raise NotImplementedError("\nget_labels is not implemented")
+    def get_column_setup(self, key: str, col: int=None):
+        """Get a list or value for column setup.
 
-    def get_width(self, col: int) -> int:
-        raise NotImplementedError("\nget_width is not implemented")
+        Parameters
+        ----------
+        key : str
+            Key to value to get.
+        col : int, optional
+            Column index to get single value instead of a list, by default None
 
-    def set_width(self, col: int, width: int) -> bool:
-        raise NotImplementedError("\nset_width is not implemented")
+        Returns
+        -------
+        list
+            List of setup values for this tables columns.
+        """
+        sql = """
+            SELECT {k} FROM columns WHERE tablename=(?){c}ORDER BY col_idx ASC
+        """
+        if col is None:
+            sql = sql.format(k=key, c=" ")
+            values = (self.name,)
+        else:
+            sql = sql.format(k=key, c=" AND col_idx=(?) ")
+            values = (self.name, col)
+        result = self.execute_dql(sql, values)
+        if col is None:
+            return [s[0] for s in result]
+        else:
+            return result[0][0]
 
-    def is_readonly(self, col: int) -> bool:
-        """Return True if column at index 'col' is read only."""
-        return self.keys_select.index(col) in self.read_only
+    def set_column_setup(self, key: str, col: int, value) -> bool:
+        """Set a value to column setup.
 
-    def get_visible(self) -> list:
-        raise NotImplementedError("\nget_visible is not implemented")
+        Parameters
+        ----------
+        key : str
+            Key of the value to set.
+        col : int
+            Column index of the value.
+        value : Any
+            Value to set.
 
-    def set_visible(self, col: int, is_visible: bool) -> bool:
-        raise NotImplementedError("\nset_visible is not implemented")
+        Returns
+        -------
+        bool
+            True on success.
+        """
+        sql = """
+            UPDATE columns SET {k}=(?) WHERE tablename=(?) and col_idx=(?)
+        """.format(k=key)
+        values = (value, self.name, col)
+        return self.execute_dml(sql, values)
+
+
+class OffersTable(SQLTableBase):
+    def __init__(self, connection):
+        super().__init__(connection)
+        self.name = "offers"
+        self.sql_create_table = """
+            CREATE TABLE IF NOT EXISTS offers (
+                offer_id    INTEGER PRIMARY KEY,
+                name        TEXT UNIQUE,
+                firstname   TEXT,
+                lastname    TEXT,
+                company     TEXT,
+                phone       TEXT,
+                email       TEXT,
+                address     TEXT,
+                postcode    TEXT,
+                postarea    TEXT,
+                info        TEXT
+            )
+        """
+        self.indexes = [
+            """CREATE INDEX IF NOT EXISTS idx_offers_name ON offers(name)"""
+        ]
+        self.primary_key = "offer_id"
+        self.foreign_key = None
+        self.read_only = ["offer_id"]
+        self.default_columns = [
+            ("offers", "offer_id", "ID", "string"),
+            ("offers", "name", "Tarjouksen nimi", "string"),
+            ("offers", "firstname", "Etunimi", "string"),
+            ("offers", "lastname", "Sukunimi", "string"),
+            ("offers", "company", "Yritys.", "string"),
+            ("offers", "phone", "Puh", "string"),
+            ("offers", "email", "Sähköposti", "string"),
+            ("offers", "address", "Lähiosoite", "string"),
+            ("offers", "postcode", "Postinumero", "string"),
+            ("offers", "postarea", "Postitoimipaikka", "string"),
+            ("offers", "info", "Lisätiedot", "string")
+        ]
+        self.keys_insert = [
+            "name",
+            "firstname",
+            "lastname",
+            "company",
+            "phone",
+            "email",
+            "address",
+            "postcode",
+            "postarea",
+            "info"
+        ]
+        self.keys_select = [
+            "offer_id",
+            "name",
+            "firstname",
+            "lastname",
+            "company",
+            "phone",
+            "email",
+            "address",
+            "postcode",
+            "postarea",
+            "info"
+        ]
 
 
 class GroupMaterialsTable(SQLTableBase):
@@ -249,14 +412,14 @@ class GroupMaterialsTable(SQLTableBase):
                     ((cost * (1 + loss) + edg_cost + add_cost) * (1 - discount))
                     STORED,
 
-                FOREIGN KEY (group_id) REFERENCES offer_groups (id)
+                FOREIGN KEY (group_id) REFERENCES groups (group_id)
                     ON DELETE CASCADE
                     ON UPDATE CASCADE,
                 UNIQUE(group_id, code)
             )
         """
         self.indexes = [
-            """CREATE INDEX idx_gm_group_id ON group_materials(group_id)"""
+            """CREATE INDEX IF NOT EXISTS idx_gm_code ON group_materials(group_id, code)"""
         ]
         self.primary_key = "gm_id"
         self.foreign_key = "group_id"
@@ -279,7 +442,6 @@ class GroupMaterialsTable(SQLTableBase):
             ("group_materials", "tot_cost", "Kokonaishinta", "double:6,2")
         ]
         self.keys_insert = [
-            "gm_id",        
             "group_id",  
             "category",  
             "code",      
@@ -294,4 +456,20 @@ class GroupMaterialsTable(SQLTableBase):
             "loss",      
             "discount"
         ]
-        self.keys_select = []
+        self.keys_select = [
+            "gm_id",        
+            "group_id",  
+            "category",  
+            "code",      
+            "desc",      
+            "prod",      
+            "thickness", 
+            "is_stock",  
+            "unit",      
+            "cost",      
+            "add_cost",  
+            "edg_cost",  
+            "loss",      
+            "discount",
+            "tot_cost"
+        ]

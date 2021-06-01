@@ -1,10 +1,4 @@
-"""Database operations.
-
-TODO
-----
-Do unittests for any functions that do not have them
-Add delete unittest
-"""
+"""Database operations."""
 
 import json
 import sqlite3
@@ -165,7 +159,7 @@ sql_create_table_columns = """
         is_unique   INTEGER DEFAULT 0,
         ro          INTEGER DEFAULT 0,
         visible     INTEGER DEFAULT 1,
-        order       INTEGER DEFAULT 0,
+        col_order   INTEGER DEFAULT 0,
         UNIQUE (tablename, key),
         UNIQUE (tablename, col_idx)
     )
