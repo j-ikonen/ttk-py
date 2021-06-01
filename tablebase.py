@@ -58,6 +58,7 @@ class SQLTableBase:
         self.read_only = None
         self.default_columns = None
         self.keys_insert = None
+        self.keys_select = None
 
 
     def create(self):
@@ -320,6 +321,54 @@ class SQLTableBase:
         """.format(k=key)
         values = (value, self.name, col)
         return self.execute_dml(sql, values)
+
+    def select(self, fk: int=None, filter: dict=None) -> list:
+        """Get list of rows from the table.
+
+        Filters results by using foreign key or filter dictionary.
+        If both are set as None or left to default, returns whole table.
+
+        Parameters
+        ----------
+        fk : int, optional
+            Foreign key used for filtering the results, by default None
+        filter : dict, optional
+            A dictionary as a filter in format {key: [operator, value]}, by default None
+
+        Returns
+        -------
+        list
+            List of selected values.
+        """
+        cond = ""
+        values = []
+        keys = self.keys_select
+        sql_sel = "SELECT {k} FROM {t}".format(k=",".join(keys), t=self.name)
+
+        # Add the foreign key to filter for parsing.
+        if fk is not None:
+            if filter is None:
+                filter = {self.foreign_key: ["=", fk]}
+            else:
+                filter[self.foreign_key] = ["=", fk]
+
+        if filter is not None:
+            # Parse a WHERE string from filter dictionary.
+            where_str = "{k} {op} (?)"
+            for n, (key, value) in enumerate(filter.items()):
+                cond += where_str.format(k=keys[key], op=value[0])
+                values.append(value[1])
+                if n < len(filter) - 1:
+                    cond += " AND "
+            sql_con = " WHERE {}".format(cond)
+            sql = sql_sel + sql_con
+
+        else:
+            # SELECT whole table.
+            sql = sql_sel
+            values = None
+
+        return self.execute_dql(sql, values)
 
 
 class OffersTable(SQLTableBase):
