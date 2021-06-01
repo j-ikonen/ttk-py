@@ -1,6 +1,6 @@
-import sqlite3
 import unittest
 import sqlite3
+
 import tablebase as tb
 
 
@@ -8,15 +8,79 @@ class TestOffersTable(unittest.TestCase):
     
     @classmethod
     def setUpClass(cls):
+        """Setup a SQLite database in memory for testing."""
+        class TestOffersTables(tb.SQLTableBase):
+            """Class for testing tb.SQLTableBase functions."""
+            def __init__(self, connection):
+                super().__init__(connection)
+                self.name = "offers"
+                self.sql_create_table = """
+                    CREATE TABLE IF NOT EXISTS offers (
+                        offer_id    INTEGER PRIMARY KEY,
+                        name        TEXT UNIQUE,
+                        firstname   TEXT,
+                        lastname    TEXT,
+                        company     TEXT,
+                        phone       TEXT,
+                        email       TEXT,
+                        address     TEXT,
+                        postcode    TEXT,
+                        postarea    TEXT,
+                        info        TEXT
+                    )
+                """
+                self.indexes = [
+                    """CREATE INDEX IF NOT EXISTS idx_offers_name ON offers(name)"""
+                ]
+                self.primary_key = "offer_id"
+                self.foreign_key = None
+                self.read_only = ["offer_id"]
+                self.default_columns = [
+                    ("offers", "offer_id", "ID", "string"),
+                    ("offers", "name", "Tarjouksen nimi", "string"),
+                    ("offers", "firstname", "Etunimi", "string"),
+                    ("offers", "lastname", "Sukunimi", "string"),
+                    ("offers", "company", "Yritys.", "string"),
+                    ("offers", "phone", "Puh", "string"),
+                    ("offers", "email", "Sähköposti", "string"),
+                    ("offers", "address", "Lähiosoite", "string"),
+                    ("offers", "postcode", "Postinumero", "string"),
+                    ("offers", "postarea", "Postitoimipaikka", "string"),
+                    ("offers", "info", "Lisätiedot", "string")
+                ]
+                self.keys_insert = [
+                    "name",
+                    "firstname",
+                    "lastname",
+                    "company",
+                    "phone",
+                    "email",
+                    "address",
+                    "postcode",
+                    "postarea",
+                    "info"
+                ]
+                self.keys_select = [
+                    "offer_id",
+                    "name",
+                    "firstname",
+                    "lastname",
+                    "company",
+                    "phone",
+                    "email",
+                    "address",
+                    "postcode",
+                    "postarea",
+                    "info"
+                ]
+
         cls.con = sqlite3.connect(":memory:")
         cls.con.execute("PRAGMA foreign_keys = OFF")
-        cls.table = tb.OffersTable(cls.con)
+        cls.table = TestOffersTables(cls.con)
         cls.table.create()
 
     @classmethod
     def tearDownClass(cls):
-        cls.con.execute("DROP TABLE IF EXISTS columns")
-        cls.con.execute("DROP TABLE IF EXISTS offers")
         cls.con.close()
 
     def test_create(self):
