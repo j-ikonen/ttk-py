@@ -1,5 +1,4 @@
 import sqlite3
-from sqlite3.dbapi2 import PARSE_DECLTYPES
 
 
 class SQLTableBase:
@@ -42,8 +41,93 @@ class SQLTableBase:
                 """, self.cols)
 
         except sqlite3.OperationalError as e:
+            print("\nsqlite3.OperationalError: {}".format(e))
             print("Could not create table: {}".format(self.name))
-            print("sqlite3.OperationalError: {}".format(e))
+
+    def execute_dml(self, sql: str, values: list=None, many: bool=False) -> int:
+        """Run execute on a data manipulation language string.
+
+        Used for SQL INSERT, REPLACE, UPDATE and DELETE statements.
+
+        Parameters
+        ----------
+        sql : str
+            SQL command string.
+        values : list, optional
+            Bound values used in the command, by default None. If 'many' is set True
+            this must be a list of the values used in each execution.
+        many : bool, optional
+            Set True if the SQL command is to be executed multiple times.
+
+        Returns
+        -------
+        int
+            Last rowid. If statement was not INSERT or REPLACE or 'many' was set True
+            return -1.
+        None
+            On sqlite3.IntegrityError
+        """
+        rowid = -1
+        try:
+            with self.con:
+                if many:
+                    if values is None:
+                        self.con.executemany(sql)
+                    else:
+                        self.con.executemany(sql, values)
+                else:
+                    if values is None:
+                        rowid = self.con.execute(sql).lastrowid
+                    else:
+                        rowid = self.con.execute(sql, values).lastrowid
+
+        except sqlite3.IntegrityError as e:
+            print("\nsqlite3.IntegrityError: {}".format(e))
+            print("In SQLTableBase.execute_dml")
+            print("Error with sql: {}".format(sql))
+            print("using values: {}".format(values))
+            return None
+        return rowid
+
+    def execute_dql(self, sql: str, values: list=None, cursor: bool=False) -> list:
+        """Execute a Data Query Language command.
+        
+        Used for SQL SELECT statements.
+
+        Parameters
+        ----------
+        sql : str
+            SQL statement.
+        values : list, optional
+            Bound values used in the SQL statement, by default None
+        cursor : bool, optional
+            Set True to return sqlite3.cursor object instead of a list of results,
+            by default False
+
+        Returns
+        -------
+        list | sqlite3.Cursor
+            Return a list of results. On Error return None. If 'cursor' is set True
+            returns sqlite3.Cursor object.
+        """
+        try:
+            with self.con:
+                if values is None:
+                    cur = self.con.execute(sql)
+                else:
+                    cur = self.con.execute(sql, values)
+
+        except sqlite3.IntegrityError as e:
+            print("\nsqlite3.IntegrityError: {}".format(e))
+            print("In SQLTableBase.execute_dql")
+            print("Error with sql: {}".format(sql))
+            print("using values: {}".format(values))
+            return None
+
+        if cursor:
+            return cur
+        else:
+            return cur.fetchall()
 
     def insert(self, values: list, many=False, include_rowid=True):
         """Insert one or many values to database.
@@ -56,7 +140,7 @@ class SQLTableBase:
         Returns
         -------
         int
-            Last row id if inserting a single row. None otherwise.
+            Last rowid. If 'many' was set True return -1. On error return None.
         """
         if include_rowid:
             keys = self.keys_insert
@@ -65,12 +149,79 @@ class SQLTableBase:
         binds = ",".join(["?"] * len(keys))
         sql = "INSERT INTO {t}({k}) VALUES ({b})".format(t=self.name, k=keys, b=binds)
 
-        with self.con:
-            if many:
-                self.con.executemany(sql, values)
-            else:
-                return self.con.execute(sql, values).lastrowid
-        return None
+        return self.execute_dml(sql, values, many)
+
+    def insert_empty(self, fk: int=None) -> int:
+        """Insert an empty row.
+
+        Parameters
+        ----------
+        fk : int
+            A foreign key or None if the table uses no foreign key.
+
+        Returns
+        -------
+        int
+            Last rowid. On error return None.
+        """
+        sql_ins = "INSERT INTO {t}"
+        sql_val = "({k}) VALUES (?)"
+        if fk is None:
+            sql = sql_ins.format(self.name)
+        else:
+            sql = sql_ins.format(t=self.name) + sql_val.format(k=self.foreign_key)
+        return self.execute_dml(sql, (fk,))
+
+    def update(self, pk: int, col: int, value) -> bool:
+        """Update a single value in the table.
+
+        Parameters
+        ----------
+        pk : int
+            The primary key used to find the row.
+        col : int
+            The column index for the value to be updated.
+        value : Any
+            The new value.
+
+        Returns
+        -------
+        bool
+            True on success. False on Error.
+        """
+        key = self.keys_select[col]
+        sql = "UPDATE {t} SET {k}=(?) WHERE {pk}=(?)".format(
+            t=self.name,
+            k=key,
+            pk=self.primary_key
+        )
+        values = (value, pk)
+        result = self.execute_dml(sql, values)
+        return True if result == -1 else False
+
+    def delete(self, pk: int) -> bool:
+        sql = "DELETE FROM {t} WHERE {pk}=(?)".format(t=self.name, pk=self.primary_key)
+        values = (pk,)
+        return True if self.execute_dml(sql, values) == -1 else False
+
+    def get_labels(self) -> list:
+        raise NotImplementedError("\nget_labels is not implemented")
+
+    def get_width(self, col: int) -> int:
+        raise NotImplementedError("\nget_width is not implemented")
+
+    def set_width(self, col: int, width: int) -> bool:
+        raise NotImplementedError("\nset_width is not implemented")
+
+    def is_readonly(self, col: int) -> bool:
+        """Return True if column at index 'col' is read only."""
+        return self.keys_select.index(col) in self.read_only
+
+    def get_visible(self) -> list:
+        raise NotImplementedError("\nget_visible is not implemented")
+
+    def set_visible(self, col: int, is_visible: bool) -> bool:
+        raise NotImplementedError("\nset_visible is not implemented")
 
 
 class GroupMaterialsTable(SQLTableBase):
@@ -143,3 +294,4 @@ class GroupMaterialsTable(SQLTableBase):
             "loss",      
             "discount"
         ]
+        self.keys_select = []
