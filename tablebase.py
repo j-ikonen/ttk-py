@@ -49,6 +49,23 @@ class SQLTableBase:
             "ro",         
             "visible"
         ]
+        self.create_variables = """
+            CREATE TABLE IF NOT EXISTS variables (
+                variable_id INTEGER PRIMARY KEY,
+                label       TEXT,
+                value_real  REAL,
+                value_int   INTEGER,
+                value_txt   TEXT,
+
+                CHECK(
+                    (value_real IS NOT NULL AND value_int IS NULL AND value_txt IS NULL)
+                    OR
+                    (value_real IS NULL AND value_int IS NOT NULL AND value_txt IS NULL)
+                    OR
+                    (value_real IS NULL AND value_int IS NULL AND value_txt IS NOT NULL)
+                )
+            )
+        """
 
         self.name = None
         self.sql_create_table = None
@@ -346,11 +363,12 @@ class SQLTableBase:
         sql_sel = "SELECT {k} FROM {t}".format(k=",".join(keys), t=self.name)
 
         # Add the foreign key to filter for parsing.
-        if fk is not None:
+        if fk is not None and self.foreign_key is not None:
+            fk_idx = self.keys_select.index(self.foreign_key)
             if filter is None:
-                filter = {self.foreign_key: ["=", fk]}
+                filter = {fk_idx: ["=", fk]}
             else:
-                filter[self.foreign_key] = ["=", fk]
+                filter[fk_idx] = ["=", fk]
 
         if filter is not None:
             # Parse a WHERE string from filter dictionary.
@@ -367,7 +385,6 @@ class SQLTableBase:
             # SELECT whole table.
             sql = sql_sel
             values = None
-
         return self.execute_dql(sql, values)
 
 

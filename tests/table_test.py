@@ -143,6 +143,33 @@ class TestOffersTable(unittest.TestCase):
         result = self.table.get_column_setup("width", 2)
         self.assertEqual(result, 122)
 
+    def test_select_with_filter(self):
+        rowid = self.table.insert_empty(None)
+        self.table.update(rowid, 3, "SukuNimi")
+        result = self.table.select(None, {3: ["like", "suku%"]})
+        self.assertEqual(result[0][3], "SukuNimi")
+
+    def test_select_with_fk(self):
+        rowid = self.table.insert_empty(None)
+        self.table.update(rowid, 3, "SukuNimi")
+
+        self.table.foreign_key = "lastname"
+        result = self.table.select("SukuNimi", None)
+        self.table.foreign_key = None
+
+        self.assertEqual(result[0][3], "SukuNimi")
+
+    def test_select_with_fk_and_filter(self):
+        rowid = self.table.insert_empty(None)
+        self.table.update(rowid, 2, "EtuNimi")
+        self.table.update(rowid, 3, "SukuNimi")
+
+        self.table.foreign_key = "lastname"
+        result = self.table.select("SukuNimi", {2: ["like", "etu%"]})
+        self.table.foreign_key = None
+
+        self.assertEqual(result[0][2], "EtuNimi")
+
 
 if __name__ == '__main__':
     unittest.main()
