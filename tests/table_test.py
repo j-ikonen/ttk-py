@@ -48,19 +48,7 @@ class TestOffersTable(unittest.TestCase):
                     ("offers", "postarea", "Postitoimipaikka", "string"),
                     ("offers", "info", "Lisätiedot", "string")
                 ]
-                self.keys_insert = [
-                    "name",
-                    "firstname",
-                    "lastname",
-                    "company",
-                    "phone",
-                    "email",
-                    "address",
-                    "postcode",
-                    "postarea",
-                    "info"
-                ]
-                self.keys_select = [
+                self.table_keys = [
                     "offer_id",
                     "name",
                     "firstname",
@@ -128,13 +116,36 @@ class TestOffersTable(unittest.TestCase):
         self.assertIsInstance(result, int)
         self.assertNotEqual(result, -1)
 
+    def test_insert_or_replace(self):
+        values = [
+            1,
+            "name",      
+            "firstname", 
+            "lastname",  
+            "company",   
+            "phone",     
+            "email",     
+            "address",   
+            "postcode",  
+            "postarea",  
+            "info"
+        ]
+        rowid = self.table.insert(values, include_rowid=True, upsert=True)
+        self.assertEqual(rowid, 1)
+        values[1] = "Tarjouksen nimi"
+        rowid = self.table.insert(values, include_rowid=True, upsert=True)
+        result = self.table.execute_dql(
+            "SELECT name FROM offers WHERE offer_id=(?)", (rowid,)
+        )
+        self.assertEqual(result[0][0], "Tarjouksen nimi")
+
     def test_get_column_setup_value(self):
         result = self.table.get_column_setup("key", 2)
         self.assertEqual(result, "firstname")
 
     def test_get_column_setup_list(self):
         result = self.table.get_column_setup("key")
-        self.assertEqual(len(result), len(self.table.keys_select))
+        self.assertEqual(len(result), len(self.table.table_keys))
         self.assertEqual(result[2], "firstname")
 
     def test_set_column_setup(self):

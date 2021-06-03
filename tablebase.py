@@ -1,6 +1,10 @@
 import sqlite3
 
 
+VAR_ID_WORK_COST = 0
+VAR_ID_INSTALL_UNIT_MULT = 1
+
+
 class SQLTableBase:
 
     TABLENAME = 0
@@ -66,6 +70,13 @@ class SQLTableBase:
                 )
             )
         """
+        self.default_variables = [
+            [VAR_ID_WORK_COST, "Työn hinta", None, 0, None],
+            [VAR_ID_INSTALL_UNIT_MULT, "Asennusyksikön kerroin", None, 0, None]
+        ]
+        self.variables_table_keys = [
+            "variable_id", "label", "value_real", "value_int", "value_txt"
+        ]
 
         self.name = None
         self.sql_create_table = None
@@ -74,17 +85,24 @@ class SQLTableBase:
         self.foreign_key = None
         self.read_only = None
         self.default_columns = None
-        self.keys_insert = None
-        self.keys_select = None
+        self.table_keys = None
 
 
     def create(self):
         """Create the table and it's indexes."""
         try:
             with self.con:
-                # Create columns table if not done yet.
+                # Create columns and variables table if not done yet.
                 if not self.setup_done:
                     self.con.execute(self.create_columns)
+                    self.con.execute(self.create_variables)
+                    self.execute_dml(
+                        "INSERT INTO variables({}) VALUES(?,?,?,?,?)".format(
+                            ",".join(self.variables_table_keys)
+                        ),
+                        self.default_variables,
+                        True
+                    )
 
                 # Create table and indexes.
                 self.con.execute(self.sql_create_table)
@@ -124,6 +142,8 @@ class SQLTableBase:
             this must be a list of the values used in each execution.
         many : bool, optional
             Set True if the SQL command is to be executed multiple times.
+        rowid : bool, optional
+            If set True, return last inserted rowid instead of bool.
 
         Returns
         -------
@@ -202,7 +222,7 @@ class SQLTableBase:
         else:
             return cur.fetchall()
 
-    def insert(self, values: list, many=False, include_rowid=True):
+    def insert(self, values: list, many=False, include_rowid=False, upsert=False):
         """Insert one or many values to database.
 
         Parameters
@@ -222,12 +242,18 @@ class SQLTableBase:
             If many was set True, return true on success and False on Errors.
         """
         if include_rowid:
-            keys = ",".join(self.keys_insert)
-            binds = ",".join(["?"] * len(self.keys_insert))
+            keys = ",".join(self.table_keys)
+            binds = ",".join(["?"] * len(self.table_keys))
         else:
-            keys = ",".join(self.keys_insert[1:])
-            binds = ",".join(["?"] * len(self.keys_insert[1:]))
-        sql = "INSERT INTO {t}({k}) VALUES ({b})".format(t=self.name, k=keys, b=binds)
+            keys = ",".join(self.table_keys[1:])
+            binds = ",".join(["?"] * len(self.table_keys[1:]))
+        if upsert:
+            rep_str = " OR REPLACE "
+        else:
+            rep_str = " "
+        sql = "INSERT{u}INTO {t}({k}) VALUES ({b})".format(
+            u=rep_str, t=self.name, k=keys, b=binds
+        )
 
         ret_rowid = False if many else True
         return self.execute_dml(sql, values, many, ret_rowid)
@@ -271,7 +297,7 @@ class SQLTableBase:
         bool
             True on success. False on Error.
         """
-        key = self.keys_select[col]
+        key = self.col2key(col)
         sql = "UPDATE {t} SET {k}=(?) WHERE {pk}=(?)".format(
             t=self.name,
             k=key,
@@ -359,12 +385,12 @@ class SQLTableBase:
         """
         cond = ""
         values = []
-        keys = self.keys_select
+        keys = self.table_keys
         sql_sel = "SELECT {k} FROM {t}".format(k=",".join(keys), t=self.name)
 
         # Add the foreign key to filter for parsing.
         if fk is not None and self.foreign_key is not None:
-            fk_idx = self.keys_select.index(self.foreign_key)
+            fk_idx = self.table_keys.index(self.foreign_key)
             if filter is None:
                 filter = {fk_idx: ["=", fk]}
             else:
@@ -386,6 +412,24 @@ class SQLTableBase:
             sql = sql_sel
             values = None
         return self.execute_dql(sql, values)
+
+    def col2key(self, col: int) -> str:
+        """Return a key matching the given column from display.
+
+        Override this to handle any displays that use columns in different order
+        or columns not specified in CREATE TABLE statement.
+
+        Parameters
+        ----------
+        col : int
+            Column index from display.
+
+        Returns
+        -------
+        str
+            Key used in SQL statements.
+        """
+        return self.table_keys[col]
 
 
 class OffersTable(SQLTableBase):
@@ -414,7 +458,7 @@ class OffersTable(SQLTableBase):
         self.foreign_key = None
         self.read_only = ["offer_id"]
         self.default_columns = [
-            ("offers", "offer_id", "ID", "string"),
+            ("offers", "offer_id", "TarjousID", "string"),
             ("offers", "name", "Tarjouksen nimi", "string"),
             ("offers", "firstname", "Etunimi", "string"),
             ("offers", "lastname", "Sukunimi", "string"),
@@ -426,19 +470,7 @@ class OffersTable(SQLTableBase):
             ("offers", "postarea", "Postitoimipaikka", "string"),
             ("offers", "info", "Lisätiedot", "string")
         ]
-        self.keys_insert = [
-            "name",
-            "firstname",
-            "lastname",
-            "company",
-            "phone",
-            "email",
-            "address",
-            "postcode",
-            "postarea",
-            "info"
-        ]
-        self.keys_select = [
+        self.table_keys = [
             "offer_id",
             "name",
             "firstname",
@@ -453,30 +485,106 @@ class OffersTable(SQLTableBase):
         ]
 
 
+class GroupsTable(SQLTableBase):
+    def __init__(self, connection):
+        super().__init__(connection)
+        self.name = "groups"
+        self.sql_create_table = """
+            CREATE TABLE IF NOT EXISTS groups (
+                group_id    INTEGER PRIMARY KEY,
+                offer_id    INTEGER NOT NULL,
+                name        TEXT,
+
+                FOREIGN KEY (offer_id)
+                    REFERENCES offers (offer_id)
+                    ON DELETE CASCADE
+                    ON UPDATE CASCADE,
+                UNIQUE (offer_id, name)
+            )
+        """
+        self.indexes = [
+            """CREATE INDEX IF NOT EXISTS idx_groups_name ON groups(offer_id, name)"""
+        ]
+        self.primary_key = "group_id"
+        self.foreign_key = "offer_id"
+        self.read_only = ["group_id", "offer_id"]
+        self.default_columns = [
+            ("offers", "group_id", "RyhmäID", "string"),
+            ("offers", "offer_id", "TarjousID", "string"),
+            ("offers", "name", "Ryhmän nimi", "string")
+        ]
+        self.table_keys = [
+            "group_id",
+            "offer_id",
+            "name"
+        ]
+
+
+class GroupsPredefsTable(SQLTableBase):
+    def __init__(self, connection):
+        super().__init__(connection)
+        self.name = "group_predefs"
+        self.sql_create_table = """
+            CREATE TABLE IF NOT EXISTS group_predefs (
+                group_predef_id INTEGER PRIMARY KEY,
+                group_id        INTEGER NOT NULL,
+                part            TEXT,
+                material        TEXT,
+
+                FOREIGN KEY (group_id)
+                    REFERENCES groups (group_id)
+                    ON DELETE CASCADE
+                    ON UPDATE CASCADE,
+                UNIQUE(group_id, part)
+            )
+        """
+        self.indexes = [
+            """
+            CREATE INDEX IF NOT EXISTS idx_group_predefs_part
+            ON group_predefs(group_id, part)
+            """
+        ]
+        self.primary_key = "group_predef_id"
+        self.foreign_key = "group_id"
+        self.read_only = ["group_predef_id", "group_id"]
+        self.default_columns = [
+            ("group_predefs", "group_predef_id", "EsimääritysID", "long"),
+            ("group_predefs", "group_id", "RyhmäID", "long"),
+            ("group_predefs", "part", "Osa", "string"),
+            ("group_predefs", "material", "Materiaali", "string")
+        ]
+        self.table_keys = [
+            "group_predef_id",  
+            "group_id",  
+            "part",      
+            "material"
+        ]
+
+
 class GroupMaterialsTable(SQLTableBase):
     def __init__(self, connection):
         super().__init__(connection)
         self.name = "group_materials"
         self.sql_create_table = """
             CREATE TABLE IF NOT EXISTS group_materials (
-                gm_id       INTEGER PRIMARY KEY,
+                group_materials_id INTEGER PRIMARY KEY,
                 group_id    INTEGER NOT NULL,
-                category    TEXT,
                 code        TEXT,
+                category    TEXT,
                 desc        TEXT,
                 prod        TEXT,
                 thickness   INTEGER,
                 is_stock    TEXT DEFAULT 'varasto',
                 unit        TEXT,
-                cost        REAL,
-                add_cost    REAL DEFAULT 0.0,
-                edg_cost    REAL DEFAULT 0.0,
-                loss        REAL DEFAULT 0.0,
-                discount    REAL DEFAULT 0.0,
-                tot_cost    REAL
-                    GENERATED ALWAYS AS
-                    ((cost * (1 + loss) + edg_cost + add_cost) * (1 - discount))
-                    STORED,
+                cost        TEXT,
+                add_cost    TEXT DEFAULT '0.0',
+                edg_cost    TEXT DEFAULT '0.0',
+                loss        TEXT DEFAULT '0.0',
+                discount    TEXT DEFAULT '0.0',
+                tot_cost    TEXT
+                    GENERATED ALWAYS AS (
+                        decimal_mul(decimal_add(decimal_mul(cost, decimal_add(1, loss)), add_cost, edg_cost), decimal_sub(1, discount))
+                    ) STORED,
 
                 FOREIGN KEY (group_id) REFERENCES groups (group_id)
                     ON DELETE CASCADE
@@ -487,11 +595,11 @@ class GroupMaterialsTable(SQLTableBase):
         self.indexes = [
             """CREATE INDEX IF NOT EXISTS idx_gm_code ON group_materials(group_id, code)"""
         ]
-        self.primary_key = "gm_id"
+        self.primary_key = "group_materials_id"
         self.foreign_key = "group_id"
-        self.read_only = ["gm_id", "group_id", "tot_cost"]
+        self.read_only = ["group_materials_id", "group_id", "tot_cost"]
         self.default_columns = [
-            ("group_materials", "gm_id", "MateriaaliID", "long",),
+            ("group_materials", "group_materials_id", "MateriaaliID", "long",),
             ("group_materials", "group_id", "RyhmäID", "long"),
             ("group_materials", "category", "Tuoteryhmä", "string"),
             ("group_materials", "code", "Koodi", "string"),
@@ -507,26 +615,11 @@ class GroupMaterialsTable(SQLTableBase):
             ("group_materials", "discount", "Alennus", "double:6,2"),
             ("group_materials", "tot_cost", "Kokonaishinta", "double:6,2")
         ]
-        self.keys_insert = [
+        self.table_keys = [
+            "group_materials_id",        
             "group_id",  
+            "code",  
             "category",  
-            "code",      
-            "desc",      
-            "prod",      
-            "thickness", 
-            "is_stock",  
-            "unit",      
-            "cost",      
-            "add_cost",  
-            "edg_cost",  
-            "loss",      
-            "discount"
-        ]
-        self.keys_select = [
-            "gm_id",        
-            "group_id",  
-            "category",  
-            "code",      
             "desc",      
             "prod",      
             "thickness", 
@@ -539,3 +632,5 @@ class GroupMaterialsTable(SQLTableBase):
             "discount",
             "tot_cost"
         ]
+
+
