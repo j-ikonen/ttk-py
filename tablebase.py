@@ -1,8 +1,86 @@
 import sqlite3
+from decimal import Decimal
 
 
 VAR_ID_WORK_COST = 0
 VAR_ID_INSTALL_UNIT_MULT = 1
+
+
+class DecimalSum:
+    """Custom AggregateClass for sqlite3 to sum pydecimal columns."""
+    def __init__(self):
+        self.sum = Decimal('0.00')
+    
+    def step(self, value):
+        self.sum += converter_decimal(value)
+    
+    def finalize(self):
+        return adapter_decimal(self.sum)
+
+def adapter_decimal(decimal: Decimal):
+    """Adapt a decimal to bytes for insert into sqlite table."""
+    return str(decimal).encode('ascii')
+
+def converter_decimal(decimal: bytes):
+    """Convert bytes from sqlite to Decimal."""
+    return Decimal(decimal.decode('ascii'))
+
+def decimal_add(*args):
+    """Define custom function for adding Decimal arguments in sqlite queries."""
+    sum = Decimal('0.00')
+    for value in args:
+        sum += converter_decimal(value)
+    return adapter_decimal(sum)
+
+def decimal_sub(a, b):
+    """Define custom function for substracting Decimal arguments in sqlite queries."""
+    return adapter_decimal(converter_decimal(a) - converter_decimal(b))
+
+def decimal_mul(a, b):
+    """Define custom function for multiplying Decimal arguments in sqlite queries."""
+    return adapter_decimal(converter_decimal(a) * converter_decimal(b))
+
+def decimal_div(a, b):
+    """Define custom function for dividing Decimal arguments in sqlite queries."""
+    return adapter_decimal(converter_decimal(a) / converter_decimal(b))
+
+def material_cost(cost, add, edg, loss, discount):
+    """Return the total cost per unit for the material row."""
+    a = converter_decimal(cost) * (Decimal('1.00') + converter_decimal(loss))
+    b = (Decimal('1.00') - converter_decimal(discount))
+    c = converter_decimal(edg)
+    d = converter_decimal(add)
+    return adapter_decimal((a + d + c) * b)
+
+def init_connection(db_name: str) -> sqlite3.Connection:
+    """Return a connection object to sqlite3 database with given name.
+
+    Custom types must be declared in data queries to get
+    the correct type instead of bytes.
+        SELECT a AS 'a [pydecimal]' FROM table
+    
+    Do adapter/converter registering for custom types:
+        pydecimal
+    Create functions:
+        dec_add, dec_sub, dec_mul, dec_div
+    Create aggregates:
+        dec_sum
+    """
+    # Converter and adapter for Decimal type.
+    sqlite3.register_adapter(Decimal, adapter_decimal)
+    sqlite3.register_converter("pydecimal", converter_decimal)
+
+    # Custom type is parsed from table declaration.
+    con = sqlite3.connect(db_name, detect_types=sqlite3.PARSE_COLNAMES)
+
+    # Create functions to handle math in queries for custom types.
+    con.create_function("dec_add", -1, decimal_add, deterministic=True)
+    con.create_function("dec_sub", 2, decimal_sub, deterministic=True)
+    con.create_function("dec_mul", 2, decimal_mul, deterministic=True)
+    con.create_function("dec_div", 2, decimal_div, deterministic=True)
+    con.create_function("material_cost", 5, material_cost, deterministic=True)
+    con.create_aggregate("dec_sum", 1, DecimalSum)
+    return con
 
 
 class SQLTableBase:

@@ -1,3 +1,4 @@
+from decimal import Decimal
 import unittest
 import sqlite3
 
@@ -180,6 +181,103 @@ class TestOffersTable(unittest.TestCase):
         self.table.foreign_key = None
 
         self.assertEqual(result[0][2], "EtuNimi")
+
+
+class TestSQLDecimal(unittest.TestCase):
+    def setUp(self) -> None:
+        """Setup a SQLite database in memory for testing."""
+        class TestDecimal(tb.SQLTableBase):
+            """Class for testing tb.SQLTableBase functions."""
+            def __init__(self, connection):
+                super().__init__(connection)
+                self.name = "decimals"
+                self.sql_create_table = """
+                    CREATE TABLE IF NOT EXISTS decimals (
+                        rowid       INTEGER PRIMARY KEY,
+                        col_a pydecimal,
+                        col_b pydecimal,
+                        col_c pydecimal,
+                        col_sum pydecimal
+                            GENERATED ALWAYS AS (
+                                dec_add(col_a, col_b, col_c)
+                            )
+                    )
+                """
+                self.indexes = [
+                ]
+                self.primary_key = "rowid"
+                self.foreign_key = None
+                self.read_only = ["rowid"]
+                self.default_columns = [
+                    ("decimals", "rowid", "ID", "string"),
+                    ("decimals", "col_a", "A", "string"),
+                    ("decimals", "col_b", "B", "string"),
+                    ("decimals", "col_c", "C", "string")
+                ]
+                self.table_keys = [
+                    "rowid",
+                    "col_a",
+                    "col_b",
+                    "col_c"
+                ]
+
+        self.con = tb.init_connection(":memory:")
+        self.con.execute("PRAGMA foreign_keys = OFF")
+        self.table = TestDecimal(self.con)
+        self.table.create()
+
+    def tearDown(self) -> None:
+        self.con.close()
+
+    def test_decimal(self):
+        self.table.execute_dml(
+            "INSERT INTO decimals(col_a, col_b, col_c) VALUES(?,?,?)",
+            [Decimal('1.01'), Decimal('12.78'), Decimal('14.51')]
+        )
+        values = self.table.execute_dql("SELECT col_a as 'col_a [pydecimal]' FROM decimals")
+        self.assertEqual(values[0][0], Decimal('1.01'))
+
+    def test_decimal_add(self):
+        a = '0.10'.encode('ascii')
+        sum = tb.decimal_add(a, a, a)
+        self.assertEqual(sum, '0.30'.encode('ascii'))
+
+    def test_decimal_add_query(self):
+        self.table.execute_dml(
+            "INSERT INTO decimals(col_a, col_b, col_c) VALUES(?,?,?)",
+            [Decimal('1.01'), Decimal('12.78'), Decimal('14.51')]
+        )
+        values = self.table.execute_dql("SELECT col_sum as 'col_sum [pydecimal]' FROM decimals")
+        self.assertEqual(values[0][0], Decimal('1.01') + Decimal('12.78') + Decimal('14.51'))
+
+    def test_decimal_sum(self):
+        success = self.table.execute_dml(
+            "INSERT INTO decimals(col_a, col_b, col_c) VALUES(?,?,?)",
+            [
+                [Decimal('0.1'), Decimal('12.78'), Decimal('14.51')],
+                [Decimal('0.1'), Decimal('12.78'), Decimal('14.51')],
+                [Decimal('0.1'), Decimal('12.78'), Decimal('14.51')]
+            ],
+            True
+        )
+        self.assertTrue(success)
+        values = self.table.execute_dql("SELECT dec_sum(col_a) 's [pydecimal]' FROM decimals")
+        self.assertEqual(values[0][0], Decimal('0.3'))
+
+    def test_material_cost(self):
+        success = self.table.execute_dml(
+            "INSERT INTO decimals(col_a, col_b, col_c) VALUES(?,?,?)",
+            [Decimal('5.1'), Decimal('12.78'), Decimal('0.15')]
+        )
+        self.assertTrue(success)
+        values = self.table.execute_dql(
+            """
+            SELECT material_cost(col_b, col_a, col_a, col_c, col_c) AS 'tot_cost [pydecimal]'
+            FROM decimals
+            """)
+        tot_cost = (Decimal('12.78') * (Decimal('1.00') + Decimal('0.15')) + 
+                    Decimal('5.1') + Decimal('5.1')) * (Decimal('1.00') - Decimal('0.15'))
+        self.assertEqual(values[0][0], tot_cost)
 
 
 if __name__ == '__main__':
