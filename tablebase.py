@@ -1,5 +1,6 @@
 import sqlite3
 from decimal import Decimal
+from asteval import Interpreter
 
 
 VAR_ID_WORK_COST = 0
@@ -861,8 +862,8 @@ class GroupPartsTable(SQLTableBase):
         self.name = "group_parts"
         self.sql_create_table = """
             CREATE TABLE IF NOT EXISTS group_parts (
-                group_parts_id      INTEGER PRIMARY KEY,
-                group_products_id   INTEGER NOT NULL,
+                group_part_id      INTEGER PRIMARY KEY,
+                group_product_id   INTEGER NOT NULL,
                 part        TEXT,
                 count       INTEGER DEFAULt 1,
                 code        TEXT,
@@ -876,8 +877,8 @@ class GroupPartsTable(SQLTableBase):
                 code_length TEXT,
                 code_cost   TEXT,
 
-                FOREIGN KEY (group_products_id)
-                    REFERENCES group_products (group_products_id)
+                FOREIGN KEY (group_product_id)
+                    REFERENCES group_products (group_product_id)
                     ON DELETE CASCADE
                     ON UPDATE CASCADE,
                 UNIQUE(group_products_id, part)
@@ -886,14 +887,14 @@ class GroupPartsTable(SQLTableBase):
         self.indexes = [
             """
             CREATE INDEX IF NOT EXISTS idx_gpa_code 
-            ON group_parts(group_products_id, code)"""
+            ON group_parts(group_product_id, code)"""
         ]
-        self.primary_key = "group_parts_id"
-        self.foreign_key = "group_products_id"
-        self.read_only = ["group_parts_id", "group_products_id"]
+        self.primary_key = "group_part_id"
+        self.foreign_key = "group_product_id"
+        self.read_only = ["group_part_id", "group_product_id"]
         self.default_columns = [
-            ("group_parts", "group_parts_id", "OsaID", "string"),
-            ("group_parts", "group_products_id", "TuoteID", "string"),
+            ("group_parts", "group_part_id", "OsaID", "string"),
+            ("group_parts", "group_product_id", "TuoteID", "string"),
             ("group_parts", "part", "Osa", "string"),
             ("group_parts", "count", "Määrä", "long"),
             ("group_parts", "code", "Koodi", "string"),
@@ -915,8 +916,8 @@ class GroupPartsTable(SQLTableBase):
             ("group_parts", "product_code", "Tuote Koodi", "string"),
         ]
         self.table_keys = [
-            "group_parts_id",          
-            "group_products_id",  
+            "group_part_id",          
+            "group_product_id",  
             "part",        
             "count",       
             "code",
@@ -930,13 +931,138 @@ class GroupPartsTable(SQLTableBase):
             "code_length", 
             "code_cost"
         ]
+        self.aeval = Interpreter(minimal=True)
+        self.code2col = {
+            "määrä": 4,
+            "leveys": 8,
+            "pituus": 9,
+            "mpaksuus": 15,
+            "mhinta": 16,
+            "tleveys": 17,
+            "tkorkeus": 18,
+            "tsyvyys": 19
+        }
+
+    def select(self, fk: int, filter: dict) -> list:
+        """Update the changed coded parts values before returning the select list."""
+        # SELECT parts of the product.
+        parts = super().select(fk, None)
+        # Parse part codes to list of values to update.
+        new_values = self.parse_codes(parts)
+        # UPDATE with rows in update queue.
+        self.execute_dml(
+            """
+            UPDATE
+                group_parts
+            SET
+                width=(?), length=(?), cost=(?)
+            WHERE
+                group_part_id=(?)
+            """, new_values, True
+        )
+        # Get the parts with updated values.
+        return super().select(fk=fk, filter=filter)
+
+    def parse_codes(self, parts: list):
+        """Return list of changed values parsed from codes."""
+        new_values_list = []
+        for part_row, part in enumerate(parts):
+            new_values = []
+            is_changed = []
+
+            for n in range(8, 11):
+                old_value = part[n]
+                code = part[n + 3]
+                value = self.code2value(code, part_row, parts)
+                new_values.append(value)
+                if value != old_value:
+                    is_changed = True
+
+            if is_changed:
+                new_values.append(part[0])
+                new_values_list.append(new_values)
+        return new_values_list
+
+    def code2value(self, code: str, row: int, parts: list):
+        """Parse a code to a value.
+
+        Parameters
+        ----------
+        code : str
+            Code string.
+        row : int
+            Origin row in parts list.
+        parts : list
+            Parts data for finding values referred to in code.
+
+        Returns
+        -------
+        int | Decimal
+            Parsed value.
+        """
+        # Test for valididy of the code string.
+        try:
+            if code[0] != "=":
+                return None
+            code = code[1:]
+        except (TypeError, IndexError):
+            return None
+        else:
+            # Remove dublicates and split to list.
+            split = list(dict.fromkeys(code.split(" ")))
+            for word in split:
+                # Default values
+                src_row = row
+                key = word
+                # Link format: "part".key
+                # If word is link to another row in parts.
+                # get value from parts list.
+                if word[0] == '"':
+                    try:
+                        # ("part", key)
+                        (source, key) = word.split(".")
+                    except ValueError:
+                        print('SyntaxError when parsing "{}"\n'.format(code) +
+                              'to refer to another part use: "part".key')
+                        return None
+                    else:
+                        # Find row for source part.
+                        source_part = source.strip('"')
+                        temp_row = None
+                        for n, dr in enumerate(parts):
+                            if dr[2] == source_part:
+                                temp_row = n
+                                break
+                        if temp_row:
+                            src_row = temp_row
+                # if key in code2col:
+                try:
+                    col = self.code2col[key]
+                    value = parts[src_row][col]
+                except KeyError:
+                    return None
+                else:
+                    if value is None:
+                        return None
+                    value_str = str(value)
+                    code = code.replace(word, value_str)
+            try:
+                ev = self.aeval(code)
+                if isinstance(ev, float):
+                    return Decimal(str(ev))
+                else:
+                    return ev
+
+            except NameError as e:
+                print("{}: {}".format(type(e), e))
+                return None
 
     def get_select_query(self):
         """Return GroupParts SELECT statement with pydecimal formattings."""
         return """
             SELECT
-                pa.gpa_id,
-                pa.gp_id,
+                pa.group_part_id,
+                pa.group_product_id,
                 pa.part,
                 pa.code,
                 pa.count,
@@ -945,7 +1071,7 @@ class GroupPartsTable(SQLTableBase):
                 pa.default_mat,
                 pa.width,
                 pa.length,
-                pa.cost,
+                pa.cost AS 'inst_unit [pydecimal]',
                 pa.code_width,
                 pa.code_length,
                 pa.code_cost,
@@ -954,9 +1080,9 @@ class GroupPartsTable(SQLTableBase):
                         pa.default_mat
                     ELSE
                         d.material
-                    END used_mat,
+                END used_mat,
                 m.thickness,
-                m.tot_cost,
+                m.tot_cost AS 'inst_unit [pydecimal]',
                 pr.width,
                 pr.height,
                 pr.depth,
@@ -964,7 +1090,7 @@ class GroupPartsTable(SQLTableBase):
 
             FROM group_parts pa
                 INNER JOIN group_products pr
-                    ON pa.gp_id=pr.id
+                    ON pa.group_product_id=pr.group_product_id
 
                 LEFT JOIN group_predefs d
                     ON pr.group_id=d.group_id AND pa.part=d.part
@@ -976,7 +1102,6 @@ class GroupPartsTable(SQLTableBase):
                                 pa.default_mat
                             ELSE
                                 d.material
-                            END
-                        ) = m.code
-
+                        END
+                    ) = m.code
         """
