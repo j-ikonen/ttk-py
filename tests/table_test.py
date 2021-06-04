@@ -280,5 +280,47 @@ class TestSQLDecimal(unittest.TestCase):
         self.assertEqual(values[0][0], tot_cost)
 
 
+class TestMaterialsTable(unittest.TestCase):
+    def setUp(self) -> None:
+        """Setup a SQLite database in memory for testing."""
+        self.con = tb.init_connection(":memory:")
+        self.con.execute("PRAGMA foreign_keys = OFF")
+        self.table = tb.GroupMaterialsTable(self.con)
+        self.table.create()
+
+    def tearDown(self) -> None:
+        self.con.close()
+
+    def test_materials_create(self):
+        self.assertIsInstance(self.con, sqlite3.Connection)
+
+    def test_insert_empty_on_generated_column(self):
+        # values = [None * len(self.table.table_keys)]
+        rowid = self.table.insert_empty(12)
+        result = self.table.select(filter={0: ["=", rowid]})
+        self.assertEqual(result[0][1], 12)
+
+    def test_insert_on_generated_column(self):
+        values = [None] * len(self.table.get_insert_keys())
+        values[0] = 12
+        rowid = self.table.insert(values)
+        result = self.table.select(filter={0: ["=", rowid]})
+        self.assertEqual(result[0][1], 12)
+
+    def test_update_fail_on_generated_column(self):
+        rowid = self.table.insert_empty(12)
+        result = self.table.update(rowid, len(self.table.table_keys) - 1, Decimal('0.1'))
+        self.assertFalse(result)
+
+    def test_select_generated_column(self):
+        rowid = self.table.insert_empty(12)
+        self.table.update(rowid, len(self.table.table_keys) - 6, Decimal('0.1'))
+        self.table.update(rowid, len(self.table.table_keys) - 5, Decimal('0.1'))
+        self.table.update(rowid, len(self.table.table_keys) - 4, Decimal('0.1'))
+        result = self.table.select(filter={0: ["=", rowid]})
+        tot_cost_col = len(self.table.table_keys) - 1
+        self.assertEqual(result[0][tot_cost_col], Decimal('0.3'))
+
+
 if __name__ == '__main__':
     unittest.main()

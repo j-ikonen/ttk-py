@@ -19,11 +19,16 @@ class DecimalSum:
 
 def adapter_decimal(decimal: Decimal):
     """Adapt a decimal to bytes for insert into sqlite table."""
+    if decimal is None:
+        decimal = Decimal('0.00')
     return str(decimal).encode('ascii')
 
 def converter_decimal(decimal: bytes):
     """Convert bytes from sqlite to Decimal."""
-    return Decimal(decimal.decode('ascii'))
+    try:
+        return Decimal(decimal.decode('ascii'))
+    except AttributeError:
+        return Decimal('0.00')
 
 def decimal_add(*args):
     """Define custom function for adding Decimal arguments in sqlite queries."""
@@ -133,18 +138,18 @@ class SQLTableBase:
         ]
         self.create_variables = """
             CREATE TABLE IF NOT EXISTS variables (
-                variable_id INTEGER PRIMARY KEY,
-                label       TEXT,
-                value_real  REAL,
-                value_int   INTEGER,
-                value_txt   TEXT,
+                variable_id     INTEGER PRIMARY KEY,
+                label           TEXT,
+                value_decimal   PYDECIMAL,
+                value_int       INTEGER,
+                value_txt       TEXT,
 
                 CHECK(
-                    (value_real IS NOT NULL AND value_int IS NULL AND value_txt IS NULL)
+                    (value_decimal IS NOT NULL AND value_int IS NULL AND value_txt IS NULL)
                     OR
-                    (value_real IS NULL AND value_int IS NOT NULL AND value_txt IS NULL)
+                    (value_decimal IS NULL AND value_int IS NOT NULL AND value_txt IS NULL)
                     OR
-                    (value_real IS NULL AND value_int IS NULL AND value_txt IS NOT NULL)
+                    (value_decimal IS NULL AND value_int IS NULL AND value_txt IS NOT NULL)
                 )
             )
         """
@@ -153,7 +158,7 @@ class SQLTableBase:
             [VAR_ID_INSTALL_UNIT_MULT, "Asennusyksikön kerroin", None, 0, None]
         ]
         self.variables_table_keys = [
-            "variable_id", "label", "value_real", "value_int", "value_txt"
+            "variable_id", "label", "value_decimal", "value_int", "value_txt"
         ]
 
         self.name = None
@@ -164,7 +169,6 @@ class SQLTableBase:
         self.read_only = None
         self.default_columns = None
         self.table_keys = None
-
 
     def create(self):
         """Create the table and it's indexes."""
@@ -319,18 +323,16 @@ class SQLTableBase:
         bool
             If many was set True, return true on success and False on Errors.
         """
-        if include_rowid:
-            keys = ",".join(self.table_keys)
-            binds = ",".join(["?"] * len(self.table_keys))
-        else:
-            keys = ",".join(self.table_keys[1:])
-            binds = ",".join(["?"] * len(self.table_keys[1:]))
+        keys = self.get_insert_keys(include_rowid)
+        keys_str = ",".join(keys)
+        binds = ",".join(["?"] * len(keys))
+
         if upsert:
             rep_str = " OR REPLACE "
         else:
             rep_str = " "
         sql = "INSERT{u}INTO {t}({k}) VALUES ({b})".format(
-            u=rep_str, t=self.name, k=keys, b=binds
+            u=rep_str, t=self.name, k=keys_str, b=binds
         )
 
         ret_rowid = False if many else True
@@ -353,10 +355,10 @@ class SQLTableBase:
         sql_val = "({k}) VALUES (?)"
         if fk is None:
             sql = sql_ins.format(t=self.name) + " DEFAULT VALUES"
-            return self.execute_dml(sql)
+            return self.execute_dml(sql, rowid=True)
         else:
             sql = sql_ins.format(t=self.name) + sql_val.format(k=self.foreign_key)
-            return self.execute_dml(sql, (fk,))
+            return self.execute_dml(sql, (fk,), rowid=True)
 
     def update(self, pk: int, col: int, value) -> bool:
         """Update a single value in the table.
@@ -389,6 +391,54 @@ class SQLTableBase:
         sql = "DELETE FROM {t} WHERE {pk}=(?)".format(t=self.name, pk=self.primary_key)
         values = (pk,)
         return self.execute_dml(sql, values)
+
+    def select(self, fk: int=None, filter: dict=None) -> list:
+        """Get list of rows from the table.
+
+        Filters results by using foreign key or filter dictionary.
+        If both are set as None or left to default, returns whole table.
+
+        Parameters
+        ----------
+        fk : int, optional
+            Foreign key used for filtering the results, by default None
+        filter : dict, optional
+            A dictionary as a filter in format {key: [operator, value]}, by default None
+
+        Returns
+        -------
+        list
+            List of selected values.
+        """
+        cond = ""
+        values = []
+        keys = self.table_keys
+        sql_sel = self.get_select_query()
+
+        # Add the foreign key to filter for parsing.
+        if fk is not None and self.foreign_key is not None:
+            fk_idx = keys.index(self.foreign_key)
+            if filter is None:
+                filter = {fk_idx: ["=", fk]}
+            else:
+                filter[fk_idx] = ["=", fk]
+
+        if filter is not None:
+            # Parse a WHERE string from filter dictionary.
+            where_str = "{k} {op} (?)"
+            for n, (key, value) in enumerate(filter.items()):
+                cond += where_str.format(k=keys[key], op=value[0])
+                values.append(value[1])
+                if n < len(filter) - 1:
+                    cond += " AND "
+            sql_con = " WHERE {}".format(cond)
+            sql = sql_sel + sql_con
+
+        else:
+            # SELECT whole table.
+            sql = sql_sel
+            values = None
+        return self.execute_dql(sql, values)
 
     def get_column_setup(self, key: str, col: int=None):
         """Get a list or value for column setup.
@@ -443,54 +493,6 @@ class SQLTableBase:
         values = (value, self.name, col)
         return self.execute_dml(sql, values)
 
-    def select(self, fk: int=None, filter: dict=None) -> list:
-        """Get list of rows from the table.
-
-        Filters results by using foreign key or filter dictionary.
-        If both are set as None or left to default, returns whole table.
-
-        Parameters
-        ----------
-        fk : int, optional
-            Foreign key used for filtering the results, by default None
-        filter : dict, optional
-            A dictionary as a filter in format {key: [operator, value]}, by default None
-
-        Returns
-        -------
-        list
-            List of selected values.
-        """
-        cond = ""
-        values = []
-        keys = self.table_keys
-        sql_sel = "SELECT {k} FROM {t}".format(k=",".join(keys), t=self.name)
-
-        # Add the foreign key to filter for parsing.
-        if fk is not None and self.foreign_key is not None:
-            fk_idx = self.table_keys.index(self.foreign_key)
-            if filter is None:
-                filter = {fk_idx: ["=", fk]}
-            else:
-                filter[fk_idx] = ["=", fk]
-
-        if filter is not None:
-            # Parse a WHERE string from filter dictionary.
-            where_str = "{k} {op} (?)"
-            for n, (key, value) in enumerate(filter.items()):
-                cond += where_str.format(k=keys[key], op=value[0])
-                values.append(value[1])
-                if n < len(filter) - 1:
-                    cond += " AND "
-            sql_con = " WHERE {}".format(cond)
-            sql = sql_sel + sql_con
-
-        else:
-            # SELECT whole table.
-            sql = sql_sel
-            values = None
-        return self.execute_dql(sql, values)
-
     def col2key(self, col: int) -> str:
         """Return a key matching the given column from display.
 
@@ -508,6 +510,21 @@ class SQLTableBase:
             Key used in SQL statements.
         """
         return self.table_keys[col]
+
+    def get_insert_keys(self, inc_rowid=False):
+        """Return a list of keys for INSERT statements.
+        
+        Override for tables that have columns that do not allow inserts.
+        """
+        return self.table_keys if inc_rowid else self.table_keys[1:]
+
+    def get_select_query(self):
+        """Return a SQL SELECT FROM [* JOIN] string.
+
+        Meant to be overridden when necessary to format selected keys
+        as required for each table.
+        """
+        return "SELECT {k} FROM {t}".format(k=",".join(self.table_keys), t=self.name)
 
 
 class OffersTable(SQLTableBase):
@@ -654,14 +671,14 @@ class GroupMaterialsTable(SQLTableBase):
                 thickness   INTEGER,
                 is_stock    TEXT DEFAULT 'varasto',
                 unit        TEXT,
-                cost        TEXT,
-                add_cost    TEXT DEFAULT '0.0',
-                edg_cost    TEXT DEFAULT '0.0',
-                loss        TEXT DEFAULT '0.0',
-                discount    TEXT DEFAULT '0.0',
-                tot_cost    TEXT
+                cost        PYDECIMAL,
+                add_cost    PYDECIMAL,
+                edg_cost    PYDECIMAL,
+                loss        PYDECIMAL,
+                discount    PYDECIMAL,
+                tot_cost    PYDECIMAL
                     GENERATED ALWAYS AS (
-                        decimal_mul(decimal_add(decimal_mul(cost, decimal_add(1, loss)), add_cost, edg_cost), decimal_sub(1, discount))
+                        material_cost(cost, add_cost, edg_cost, loss, discount)
                     ) STORED,
 
                 FOREIGN KEY (group_id) REFERENCES groups (group_id)
@@ -711,4 +728,255 @@ class GroupMaterialsTable(SQLTableBase):
             "tot_cost"
         ]
 
+    def get_insert_keys(self, inc_rowid=False):
+        """Overridden member function to remove tot_cost column from insert."""
+        return self.table_keys[:-1] if inc_rowid else self.table_keys[1:-1]
 
+    def get_select_query(self):
+        """Return GroupMaterials SELECT statement with pydecimal formattings."""
+        return """
+            SELECT
+                group_materials_id,
+                group_id,    
+                code,        
+                category,    
+                desc,        
+                prod,        
+                thickness,   
+                is_stock,    
+                unit,        
+                cost AS 'cost [pydecimal]',        
+                add_cost AS 'add_cost [pydecimal]',    
+                edg_cost AS 'edg_cost [pydecimal]',    
+                loss AS 'loss [pydecimal]',        
+                discount AS 'discount [pydecimal]',    
+                tot_cost AS 'tot_cost [pydecimal]'
+            FROM group_materials
+        """
+
+
+class GroupProductsTable(SQLTableBase):
+    def __init__(self, connection):
+        super().__init__(connection)
+        self.name = "group_products"
+        self.sql_create_table = """
+            CREATE TABLE IF NOT EXISTS group_products (
+                group_products_id INTEGER PRIMARY KEY,
+                group_id    INTEGER NOT NULL,
+                code        TEXT,
+                count       INTEGER DEFAULT 1,
+                category    TEXT,
+                desc        TEXT,
+                prod        TEXT,
+                width       INTEGER,
+                height      INTEGER,
+                depth       INTEGER,
+                inst_unit   PYDECIMAL,
+                work_time   PYDECIMAL,
+
+                FOREIGN KEY (group_id)
+                    REFERENCES groups (group_id)
+                    ON DELETE CASCADE
+                    ON UPDATE CASCADE,
+                UNIQUE(group_id, code)
+            )
+        """
+        self.indexes = [
+            """CREATE INDEX IF NOT EXISTS idx_gp_code ON group_products(group_id, code)"""
+        ]
+        self.primary_key = "group_products_id"
+        self.foreign_key = "group_id"
+        self.read_only = ["group_products_id", "group_id", "tot_cost"]
+        self.default_columns = [
+            ("group_products", "group_products_id", "TuoteID", "long"),
+            ("group_products", "group_id", "RyhmäID", "long"),
+            ("group_products", "code", "Koodi", "string"),
+            ("group_products", "count", "Määrä", "long"),
+            ("group_products", "category", "Tuoteryhmä", "string"),
+            ("group_products", "desc", "Kuvaus", "string"),
+            ("group_products", "prod", "Valmistaja", "string"),
+            ("group_products", "width", "Leveys", "long"),
+            ("group_products", "height", "Korkeus", "long"),
+            ("group_products", "depth", "Syvyys", "long"),
+            ("group_products", "inst_unit", "As.Yksikkö", "double:6,2"),
+            ("group_products", "work_time", "Työaika", "double:6,2"),
+            ("group_products", "part_cost", "Osahinta", "double:6,2"),
+            ("group_products", "tot_cost", "Kokonaishinta", "double:6,2"),
+        ]
+        self.table_keys = [
+            "group_products_id",
+            "group_id",
+            "code",
+            "count",
+            "category",
+            "desc",
+            "prod",
+            "inst_unit",
+            "width",
+            "height",
+            "depth",
+            "work_time"
+        ]
+
+    def get_select_query(self):
+        """Return GroupProducts SELECT statement with pydecimal formattings."""
+        return """
+            SELECT
+                group_products_id,
+                group_id, 
+                code,     
+                count,    
+                category, 
+                desc,     
+                prod,     
+                width,    
+                height,   
+                depth,    
+                inst_unit AS 'inst_unit [pydecimal]',
+                work_time AS 'work_time [pydecimal]',
+                a.part_cost AS 'work_time [pydecimal]',
+                product_cost(
+                    a.part_cost,
+                    work_time,
+                    (
+                        SELECT value_decimal
+                        FROM variables
+                        WHERE variable_id=0
+                    )
+                ) tot_cost
+
+            FROM
+                group_products as p
+                LEFT JOIN (
+                    SELECT a.group_products_id, dec_sum(a.cost) AS 'part_cost [pydecimal]'
+                    FROM group_parts AS a
+                    GROUP BY a.group_products_id
+                ) a USING(group_products_id)
+        """
+
+
+class GroupPartsTable(SQLTableBase):
+    def __init__(self, connection):
+        super().__init__(connection)
+        self.name = "group_parts"
+        self.sql_create_table = """
+            CREATE TABLE IF NOT EXISTS group_parts (
+                group_parts_id      INTEGER PRIMARY KEY,
+                group_products_id   INTEGER NOT NULL,
+                part        TEXT,
+                count       INTEGER DEFAULt 1,
+                code        TEXT,
+                desc        TEXT,
+                use_predef  INTEGER DEFAULT 0,
+                default_mat TEXT,
+                width       INTEGER DEFAULT 0,
+                length      INTEGER DEFAULT 0,
+                cost        PYDECIMAL,
+                code_width  TEXT,
+                code_length TEXT,
+                code_cost   TEXT,
+
+                FOREIGN KEY (group_products_id)
+                    REFERENCES group_products (group_products_id)
+                    ON DELETE CASCADE
+                    ON UPDATE CASCADE,
+                UNIQUE(group_products_id, part)
+            )
+        """
+        self.indexes = [
+            """
+            CREATE INDEX IF NOT EXISTS idx_gpa_code 
+            ON group_parts(group_products_id, code)"""
+        ]
+        self.primary_key = "group_parts_id"
+        self.foreign_key = "group_products_id"
+        self.read_only = ["group_parts_id", "group_products_id"]
+        self.default_columns = [
+            ("group_parts", "group_parts_id", "OsaID", "string"),
+            ("group_parts", "group_products_id", "TuoteID", "string"),
+            ("group_parts", "part", "Osa", "string"),
+            ("group_parts", "count", "Määrä", "long"),
+            ("group_parts", "code", "Koodi", "string"),
+            ("group_parts", "desc", "Kuvaus", "string"),
+            ("group_parts", "use_predef", "Käytä esimääritystä", "bool"),
+            ("group_parts", "default_mat", "Oletus materiaali", "string"),
+            ("group_parts", "width", "Leveys", "long"),
+            ("group_parts", "length", "Pituus", "long"),
+            ("group_parts", "cost", "Hinta", "double:6,2"),
+            ("group_parts", "code_width", "Koodi Leveys", "string"),
+            ("group_parts", "code_length", "Koodi Pituus", "string"),
+            ("group_parts", "code_cost", "Koodi Hinta", "string"),
+            ("group_parts", "used_mat", "Käyt. Mat.", "string"),
+            ("group_parts", "m.thickness", "Paksuus", "long"),
+            ("group_parts", "m.tot_cost", "Mat. Hinta", "double:6,2"),
+            ("group_parts", "pr.width", "Tuote leveys", "long"),
+            ("group_parts", "pr.height", "Tuote korkeus", "long"),
+            ("group_parts", "pr.depth", "Tuote syvyys", "long"),
+            ("group_parts", "product_code", "Tuote Koodi", "string"),
+        ]
+        self.table_keys = [
+            "group_parts_id",          
+            "group_products_id",  
+            "part",        
+            "count",       
+            "code",
+            "desc",        
+            "use_predef",  
+            "default_mat", 
+            "width",       
+            "length",      
+            "cost",        
+            "code_width",  
+            "code_length", 
+            "code_cost"
+        ]
+
+    def get_select_query(self):
+        """Return GroupParts SELECT statement with pydecimal formattings."""
+        return """
+            SELECT
+                pa.gpa_id,
+                pa.gp_id,
+                pa.part,
+                pa.code,
+                pa.count,
+                pa.desc,
+                pa.use_predef,
+                pa.default_mat,
+                pa.width,
+                pa.length,
+                pa.cost,
+                pa.code_width,
+                pa.code_length,
+                pa.code_cost,
+                CASE
+                    WHEN pa.use_predef=0 THEN
+                        pa.default_mat
+                    ELSE
+                        d.material
+                    END used_mat,
+                m.thickness,
+                m.tot_cost,
+                pr.width,
+                pr.height,
+                pr.depth,
+                pr.code as product_code
+
+            FROM group_parts pa
+                INNER JOIN group_products pr
+                    ON pa.gp_id=pr.id
+
+                LEFT JOIN group_predefs d
+                    ON pr.group_id=d.group_id AND pa.part=d.part
+
+                LEFT JOIN group_materials m
+                    ON (
+                        CASE
+                            WHEN pa.use_predef=0 THEN
+                                pa.default_mat
+                            ELSE
+                                d.material
+                            END
+                        ) = m.code
+
+        """
