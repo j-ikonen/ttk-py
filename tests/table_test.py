@@ -6,7 +6,7 @@ import tablebase as tb
 
 
 class TestOffersTable(unittest.TestCase):
-    
+    """Test that SQLTableBase functions work as intended on a simplest SQL table."""
     @classmethod
     def setUpClass(cls):
         """Setup a SQLite database in memory for testing."""
@@ -63,7 +63,7 @@ class TestOffersTable(unittest.TestCase):
                     "info"
                 ]
 
-        cls.con = sqlite3.connect(":memory:")
+        cls.con = tb.connect(":memory:")
         cls.con.execute("PRAGMA foreign_keys = OFF")
         cls.table = TestOffersTables(cls.con)
         cls.table.create()
@@ -183,7 +183,8 @@ class TestOffersTable(unittest.TestCase):
         self.assertEqual(result[0][2], "EtuNimi")
 
 
-class TestSQLDecimal(unittest.TestCase):
+class TestRegisteredFunctions(unittest.TestCase):
+    """Test if functions, types and aggregates registered to sqlite3 work as intented."""
     def setUp(self) -> None:
         """Setup a SQLite database in memory for testing."""
         class TestDecimal(tb.SQLTableBase):
@@ -221,7 +222,7 @@ class TestSQLDecimal(unittest.TestCase):
                     "col_c"
                 ]
 
-        self.con = tb.init_connection(":memory:")
+        self.con = tb.connect(":memory:")
         self.con.execute("PRAGMA foreign_keys = OFF")
         self.table = TestDecimal(self.con)
         self.table.create()
@@ -281,9 +282,10 @@ class TestSQLDecimal(unittest.TestCase):
 
 
 class TestMaterialsTable(unittest.TestCase):
+    """Test if member functions work with a generated column in table."""
     def setUp(self) -> None:
         """Setup a SQLite database in memory for testing."""
-        self.con = tb.init_connection(":memory:")
+        self.con = tb.connect(":memory:")
         self.con.execute("PRAGMA foreign_keys = OFF")
         self.table = tb.GroupMaterialsTable(self.con)
         self.table.create()
@@ -320,6 +322,51 @@ class TestMaterialsTable(unittest.TestCase):
         result = self.table.select(filter={0: ["=", rowid]})
         tot_cost_col = len(self.table.table_keys) - 1
         self.assertEqual(result[0][tot_cost_col], Decimal('0.3'))
+
+
+class TestPartsTable(unittest.TestCase):
+    """Test if overridden functions work for group_parts table."""
+    def setUp(self) -> None:
+        """Setup a SQLite database in memory for testing."""
+        self.con = tb.connect(":memory:")
+        self.con.execute("PRAGMA foreign_keys = OFF")
+        self.table = tb.GroupPartsTable(self.con)
+        self.products_table = tb.GroupProductsTable(self.con)
+        self.predefs_table = tb.GroupPredefsTable(self.con)
+        self.materials_table = tb.GroupMaterialsTable(self.con)
+        self.predefs_table.create()
+        self.materials_table.create()
+        self.products_table.create()
+        self.table.create()
+
+    def tearDown(self) -> None:
+        self.con.close()
+
+    def test_materials_create(self):
+        self.assertIsInstance(self.con, sqlite3.Connection)
+
+    def test_insert_and_select(self):
+        # Parts select uses INNER JOIN with products.
+        # SELECT of parts requires an existing product.
+        pr_rowid = self.products_table.insert_empty(12)
+        rowid = self.table.insert_empty(pr_rowid)
+        result = self.table.select()
+        self.assertEqual(result[0][0], rowid)
+
+    def test_update(self):
+        pr_rowid = self.products_table.insert_empty(12)
+        rowid = self.table.insert_empty(pr_rowid)
+        self.table.update(rowid, 13, "=määrä * 11.12")
+        result = self.table.select()
+        self.assertEqual(result[0][13], "=määrä * 11.12")
+
+    def test_code_parse(self):
+        pr_rowid = self.products_table.insert_empty(12)
+        rowid = self.table.insert_empty(pr_rowid)
+        self.table.update(rowid, 13, "=määrä * 11.12")
+        self.table.update(rowid, 3, 4)
+        result = self.table.select()
+        self.assertEqual(result[0][10], Decimal('4') * Decimal('11.12'))
 
 
 if __name__ == '__main__':

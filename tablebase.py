@@ -58,7 +58,7 @@ def material_cost(cost, add, edg, loss, discount):
     d = converter_decimal(add)
     return adapter_decimal((a + d + c) * b)
 
-def init_connection(db_name: str) -> sqlite3.Connection:
+def connect(db_name: str) -> sqlite3.Connection:
     """Return a connection object to sqlite3 database with given name.
 
     Custom types must be declared in data queries to get
@@ -78,6 +78,7 @@ def init_connection(db_name: str) -> sqlite3.Connection:
 
     # Custom type is parsed from table declaration.
     con = sqlite3.connect(db_name, detect_types=sqlite3.PARSE_COLNAMES)
+    con.execute("PRAGMA foreign_keys = ON")
 
     # Create functions to handle math in queries for custom types.
     con.create_function("dec_add", -1, decimal_add, deterministic=True)
@@ -86,6 +87,60 @@ def init_connection(db_name: str) -> sqlite3.Connection:
     con.create_function("dec_div", 2, decimal_div, deterministic=True)
     con.create_function("material_cost", 5, material_cost, deterministic=True)
     con.create_aggregate("dec_sum", 1, DecimalSum)
+
+    con.execute("""
+        CREATE TABLE IF NOT EXISTS columns (
+            columns_id  INTEGER PRIMARY KEY,
+            tablename   TEXT,
+            key         TEXT,
+            label       TEXT,
+            type        TEXT,
+            col_idx     INTEGER,
+            col_order   INTEGER,
+            width       INTEGER DEFAULT 55,
+            ro          INTEGER DEFAULT 0,
+            visible     INTEGER DEFAULT 1,
+            UNIQUE (tablename, key),
+            UNIQUE (tablename, col_idx),
+            UNIQUE (tablename, col_order)
+        )"""
+    )
+    con.execute("""
+        CREATE INDEX IF NOT EXISTS idx_columns
+        ON columns(tablename, col_idx)"""
+    )
+    con.execute("""
+        CREATE TABLE IF NOT EXISTS variables (
+            variable_id     INTEGER PRIMARY KEY,
+            label           TEXT,
+            value_decimal   PYDECIMAL,
+            value_int       INTEGER,
+            value_txt       TEXT,
+
+            CHECK(
+                (value_decimal IS NOT NULL AND value_int IS NULL AND value_txt IS NULL)
+                OR
+                (value_decimal IS NULL AND value_int IS NOT NULL AND value_txt IS NULL)
+                OR
+                (value_decimal IS NULL AND value_int IS NULL AND value_txt IS NOT NULL)
+            )
+        )"""
+    )
+    con.executemany("""
+        INSERT INTO variables(
+            variable_id,
+            label,
+            value_decimal,
+            value_int,
+            value_txt
+        ) VALUES(?,?,?,?,?)
+        """,
+        [
+            [VAR_ID_WORK_COST, "Työn hinta", Decimal('0.0'), None, None],
+            [VAR_ID_INSTALL_UNIT_MULT, "Asennusyksikön kerroin", Decimal('0.0'), None, None]
+        ]
+    )
+    con.commit()
     return con
 
 
@@ -102,30 +157,11 @@ class SQLTableBase:
     VISIBLE = 8
 
     setup_done = False
+    print_errors = False
 
     def __init__(self, connection):
         self.con: sqlite3.Connection = connection
-        self.create_columns = """
-            CREATE TABLE IF NOT EXISTS columns (
-                columns_id  INTEGER PRIMARY KEY,
-                tablename   TEXT,
-                key         TEXT,
-                label       TEXT,
-                type        TEXT,
-                col_idx     INTEGER,
-                col_order   INTEGER,
-                width       INTEGER DEFAULT 55,
-                ro          INTEGER DEFAULT 0,
-                visible     INTEGER DEFAULT 1,
-                UNIQUE (tablename, key),
-                UNIQUE (tablename, col_idx),
-                UNIQUE (tablename, col_order)
-            )
-        """
-        self.idx_columns = [
-            """CREATE INDEX IF NOT EXISTS idx_columns ON columns(tablename, col_idx)"""
-        ]
-        self.columns_keys = [
+        self.columns_table_keys = [
             "columns_id", 
             "tablename",  
             "key",        
@@ -136,27 +172,6 @@ class SQLTableBase:
             "width",      
             "ro",         
             "visible"
-        ]
-        self.create_variables = """
-            CREATE TABLE IF NOT EXISTS variables (
-                variable_id     INTEGER PRIMARY KEY,
-                label           TEXT,
-                value_decimal   PYDECIMAL,
-                value_int       INTEGER,
-                value_txt       TEXT,
-
-                CHECK(
-                    (value_decimal IS NOT NULL AND value_int IS NULL AND value_txt IS NULL)
-                    OR
-                    (value_decimal IS NULL AND value_int IS NOT NULL AND value_txt IS NULL)
-                    OR
-                    (value_decimal IS NULL AND value_int IS NULL AND value_txt IS NOT NULL)
-                )
-            )
-        """
-        self.default_variables = [
-            [VAR_ID_WORK_COST, "Työn hinta", None, 0, None],
-            [VAR_ID_INSTALL_UNIT_MULT, "Asennusyksikön kerroin", None, 0, None]
         ]
         self.variables_table_keys = [
             "variable_id", "label", "value_decimal", "value_int", "value_txt"
@@ -175,18 +190,6 @@ class SQLTableBase:
         """Create the table and it's indexes."""
         try:
             with self.con:
-                # Create columns and variables table if not done yet.
-                if not self.setup_done:
-                    self.con.execute(self.create_columns)
-                    self.con.execute(self.create_variables)
-                    self.execute_dml(
-                        "INSERT INTO variables({}) VALUES(?,?,?,?,?)".format(
-                            ",".join(self.variables_table_keys)
-                        ),
-                        self.default_variables,
-                        True
-                    )
-
                 # Create table and indexes.
                 self.con.execute(self.sql_create_table)
                 for idx in self.indexes:
@@ -202,14 +205,15 @@ class SQLTableBase:
                         ro = 1 if col[self.KEY] in self.read_only else 0
                         self.con.execute(
                             "INSERT INTO columns ({k}) VALUES (?,?,?,?,?,?,?,?,?)".format(
-                                k=",".join(self.columns_keys[1:])
+                                k=",".join(self.columns_table_keys[1:])
                             ),
                             list(col) + [n, n, 60, ro, 1]
                         )
 
         except sqlite3.OperationalError as e:
-            print("\nsqlite3.OperationalError: {}".format(e))
-            print("Could not create table: {}".format(self.name))
+            if SQLTableBase.print_errors:
+                print("\nsqlite3.OperationalError: {}".format(e))
+                print("Could not create table: {}".format(self.name))
 
     def execute_dml(self, sql: str, values: list=None, many: bool=False, rowid: bool=False) -> bool:
         """Run execute on a data manipulation language string.
@@ -248,18 +252,14 @@ class SQLTableBase:
                     else:
                         cur = self.con.execute(sql, values)
 
-        except sqlite3.IntegrityError as e:
-            print("\nsqlite3.IntegrityError: {}".format(e))
-            print("In SQLTableBase.execute_dml")
-            print("Error with sql: {}".format(sql))
-            print("using values: {}".format(values))
-            return False
         except sqlite3.Error as e:
-            print("\n{}: {}".format(type(e), e))
-            print("In SQLTableBase.execute_dml")
-            print("Error with sql: {}".format(sql))
-            print("using values: {}".format(values))
+            if SQLTableBase.print_errors:
+                print("\n{}: {}".format(type(e), e.args[0]))
+                print("In SQLTableBase.execute_dml")
+                print("Error with sql: {}".format(sql))
+                print("using values: {}".format(values))
             return False
+
         if rowid:
             return cur.lastrowid
         else:
@@ -294,10 +294,11 @@ class SQLTableBase:
                     cur = self.con.execute(sql, values)
 
         except sqlite3.Error as e:
-            print("\n{}: {}".format(type(e), e))
-            print("In SQLTableBase.execute_dql")
-            print("Error with sql: {}".format(sql))
-            print("using values: {}".format(values))
+            if SQLTableBase.print_errors:
+                print("\n{}: {}".format(type(e), e))
+                print("In SQLTableBase.execute_dql")
+                print("Error with sql: {}".format(sql))
+                print("using values: {}".format(values))
             return None
 
         if cursor:
@@ -415,6 +416,7 @@ class SQLTableBase:
         values = []
         keys = self.table_keys
         sql_sel = self.get_select_query()
+        table_alias = self.get_table_alias()
 
         # Add the foreign key to filter for parsing.
         if fk is not None and self.foreign_key is not None:
@@ -426,9 +428,9 @@ class SQLTableBase:
 
         if filter is not None:
             # Parse a WHERE string from filter dictionary.
-            where_str = "{k} {op} (?)"
+            where_str = "{t}.{k} {op} (?)"
             for n, (key, value) in enumerate(filter.items()):
-                cond += where_str.format(k=keys[key], op=value[0])
+                cond += where_str.format(t=table_alias, k=keys[key], op=value[0])
                 values.append(value[1])
                 if n < len(filter) - 1:
                     cond += " AND "
@@ -527,6 +529,18 @@ class SQLTableBase:
         """
         return "SELECT {k} FROM {t}".format(k=",".join(self.table_keys), t=self.name)
 
+    def get_table_alias(self) -> str:
+        """Return the table alias used in SELECT queries.
+
+        Override if a tables SELECT query uses an alias for the table name.
+
+        Returns
+        -------
+        str
+            Alias of the table name.
+        """
+        return self.name
+
 
 class OffersTable(SQLTableBase):
     def __init__(self, connection):
@@ -616,7 +630,7 @@ class GroupsTable(SQLTableBase):
         ]
 
 
-class GroupsPredefsTable(SQLTableBase):
+class GroupPredefsTable(SQLTableBase):
     def __init__(self, connection):
         super().__init__(connection)
         self.name = "group_predefs"
@@ -762,7 +776,7 @@ class GroupProductsTable(SQLTableBase):
         self.name = "group_products"
         self.sql_create_table = """
             CREATE TABLE IF NOT EXISTS group_products (
-                group_products_id INTEGER PRIMARY KEY,
+                group_product_id INTEGER PRIMARY KEY,
                 group_id    INTEGER NOT NULL,
                 code        TEXT,
                 count       INTEGER DEFAULT 1,
@@ -785,11 +799,11 @@ class GroupProductsTable(SQLTableBase):
         self.indexes = [
             """CREATE INDEX IF NOT EXISTS idx_gp_code ON group_products(group_id, code)"""
         ]
-        self.primary_key = "group_products_id"
+        self.primary_key = "group_product_id"
         self.foreign_key = "group_id"
-        self.read_only = ["group_products_id", "group_id", "tot_cost"]
+        self.read_only = ["group_product_id", "group_id", "tot_cost"]
         self.default_columns = [
-            ("group_products", "group_products_id", "TuoteID", "long"),
+            ("group_products", "group_product_id", "TuoteID", "long"),
             ("group_products", "group_id", "RyhmäID", "long"),
             ("group_products", "code", "Koodi", "string"),
             ("group_products", "count", "Määrä", "long"),
@@ -805,7 +819,7 @@ class GroupProductsTable(SQLTableBase):
             ("group_products", "tot_cost", "Kokonaishinta", "double:6,2"),
         ]
         self.table_keys = [
-            "group_products_id",
+            "group_product_id",
             "group_id",
             "code",
             "count",
@@ -823,18 +837,18 @@ class GroupProductsTable(SQLTableBase):
         """Return GroupProducts SELECT statement with pydecimal formattings."""
         return """
             SELECT
-                group_products_id,
-                group_id, 
-                code,     
-                count,    
-                category, 
-                desc,     
-                prod,     
-                width,    
-                height,   
-                depth,    
-                inst_unit AS 'inst_unit [pydecimal]',
-                work_time AS 'work_time [pydecimal]',
+                p.group_product_id,
+                p.group_id, 
+                p.code,     
+                p.count,    
+                p.category, 
+                p.desc,     
+                p.prod,     
+                p.width,    
+                p.height,   
+                p.depth,    
+                p.inst_unit AS 'inst_unit [pydecimal]',
+                p.work_time AS 'work_time [pydecimal]',
                 a.part_cost AS 'work_time [pydecimal]',
                 product_cost(
                     a.part_cost,
@@ -849,10 +863,10 @@ class GroupProductsTable(SQLTableBase):
             FROM
                 group_products as p
                 LEFT JOIN (
-                    SELECT a.group_products_id, dec_sum(a.cost) AS 'part_cost [pydecimal]'
+                    SELECT a.group_product_id, dec_sum(a.cost) AS 'part_cost [pydecimal]'
                     FROM group_parts AS a
-                    GROUP BY a.group_products_id
-                ) a USING(group_products_id)
+                    GROUP BY a.group_product_id
+                ) a USING(group_product_id)
         """
 
 
@@ -881,7 +895,7 @@ class GroupPartsTable(SQLTableBase):
                     REFERENCES group_products (group_product_id)
                     ON DELETE CASCADE
                     ON UPDATE CASCADE,
-                UNIQUE(group_products_id, part)
+                UNIQUE(group_product_id, part)
             )
         """
         self.indexes = [
@@ -933,9 +947,10 @@ class GroupPartsTable(SQLTableBase):
         ]
         self.aeval = Interpreter(minimal=True)
         self.code2col = {
-            "määrä": 4,
+            "määrä": 3,
             "leveys": 8,
             "pituus": 9,
+            "hinta": 10,
             "mpaksuus": 15,
             "mhinta": 16,
             "tleveys": 17,
@@ -943,12 +958,14 @@ class GroupPartsTable(SQLTableBase):
             "tsyvyys": 19
         }
 
-    def select(self, fk: int, filter: dict) -> list:
+    def select(self, fk: int=None, filter: dict=None) -> list:
         """Update the changed coded parts values before returning the select list."""
         # SELECT parts of the product.
         parts = super().select(fk, None)
         # Parse part codes to list of values to update.
+        # print("\nPARTS:\n{}".format(parts))
         new_values = self.parse_codes(parts)
+        # print("\nNEW VALUES:\n{}".format(new_values))
         # UPDATE with rows in update queue.
         self.execute_dml(
             """
@@ -968,12 +985,14 @@ class GroupPartsTable(SQLTableBase):
         new_values_list = []
         for part_row, part in enumerate(parts):
             new_values = []
-            is_changed = []
+            is_changed = False
 
             for n in range(8, 11):
                 old_value = part[n]
                 code = part[n + 3]
+                # print("\nCODE:\n{}".format(code))
                 value = self.code2value(code, part_row, parts)
+                # print("\nVALUE:\n{}".format(value))
                 new_values.append(value)
                 if value != old_value:
                     is_changed = True
@@ -1011,6 +1030,7 @@ class GroupPartsTable(SQLTableBase):
             # Remove dublicates and split to list.
             split = list(dict.fromkeys(code.split(" ")))
             for word in split:
+                # print(word)
                 # Default values
                 src_row = row
                 key = word
@@ -1036,17 +1056,21 @@ class GroupPartsTable(SQLTableBase):
                         if temp_row:
                             src_row = temp_row
                 # if key in code2col:
+                # if len(key) == 1 and key in '*/+-^()':
+                #     continue
                 try:
                     col = self.code2col[key]
                     value = parts[src_row][col]
                 except KeyError:
-                    return None
+                    continue
                 else:
                     if value is None:
-                        return None
-                    value_str = str(value)
+                        value_str = "0"
+                    else:
+                        value_str = str(value)
                     code = code.replace(word, value_str)
             try:
+                # print("\nCODE TO EVAL:\{}".format(code))
                 ev = self.aeval(code)
                 if isinstance(ev, float):
                     return Decimal(str(ev))
@@ -1057,6 +1081,10 @@ class GroupPartsTable(SQLTableBase):
                 print("{}: {}".format(type(e), e))
                 return None
 
+    def get_table_alias(self):
+        """Return the alias used for this tables name."""
+        return "pa"
+
     def get_select_query(self):
         """Return GroupParts SELECT statement with pydecimal formattings."""
         return """
@@ -1064,8 +1092,8 @@ class GroupPartsTable(SQLTableBase):
                 pa.group_part_id,
                 pa.group_product_id,
                 pa.part,
-                pa.code,
                 pa.count,
+                pa.code,
                 pa.desc,
                 pa.use_predef,
                 pa.default_mat,
@@ -1088,9 +1116,9 @@ class GroupPartsTable(SQLTableBase):
                 pr.depth,
                 pr.code as product_code
 
-            FROM group_parts pa
-                INNER JOIN group_products pr
-                    ON pa.group_product_id=pr.group_product_id
+            FROM group_parts AS pa
+                INNER JOIN group_products AS pr
+                    ON pr.group_product_id=pa.group_product_id
 
                 LEFT JOIN group_predefs d
                     ON pr.group_id=d.group_id AND pa.part=d.part
