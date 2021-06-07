@@ -1133,3 +1133,207 @@ class GroupPartsTable(SQLTableBase):
                         END
                     ) = m.code
         """
+
+
+class MaterialsTable(SQLTableBase):
+    def __init__(self, connection):
+        super().__init__(connection)
+        self.name = "materials"
+        self.sql_create_table = """
+            CREATE TABLE IF NOT EXISTS materials (
+                material_id INTEGER PRIMARY KEY,
+                code        TEXT UNIQUE,
+                category    TEXT,
+                desc        TEXT,
+                prod        TEXT,
+                thickness   INTEGER,
+                is_stock    TEXT,
+                unit        TEXT,
+                cost        PYDECIMAL,
+                add_cost    PYDECIMAL,
+                edg_cost    PYDECIMAL,
+                loss        PYDECIMAL,
+                discount    PYDECIMAL
+            )
+        """
+        self.indexes = [
+            """CREATE INDEX IF NOT EXISTS idx_materials_code ON materials(code)""",
+            """CREATE INDEX IF NOT EXISTS idx_materials_category ON materials(category, code)"""
+        ]
+        self.primary_key = "material_id"
+        self.foreign_key = None
+        self.read_only = ["material_id"]
+        self.default_columns = [
+            ("materials", "material_id", "MateriaaliID", "long"),
+            ("materials", "code", "Koodi", "string"),
+            ("materials", "category", "Tuoteryhmä", "string"),
+            ("materials", "desc", "Kuvaus", "string"),
+            ("materials", "prod", "Valmistaja", "string"),
+            ("materials", "thickness", "Paksuus", "long"),
+            ("materials", "is_stock", "Onko varasto", "choice:varasto,tilaus,tarkista"),
+            ("materials", "unit", "Hintayksikkö", "choice:€/m2,€/kpl"),
+            ("materials", "cost", "Hinta", "double:6,2"),
+            ("materials", "add_cost", "Lisähinta", "double:6,2"),
+            ("materials", "edg_cost", "R.Nauhan hinta", "double:6,2"),
+            ("materials", "loss", "Hukka", "double:6,2"),
+            ("materials", "discount", "Alennus", "double:6,2"),
+        ]
+        self.table_keys = [
+            "material_id",
+            "code",      
+            "category",  
+            "desc",      
+            "prod",      
+            "thickness", 
+            "is_stock",
+            "unit",      
+            "cost",      
+            "add_cost",  
+            "edg_cost",  
+            "loss",      
+            "discount",
+        ]
+
+    def get_select_query(self):
+        """Return a SELECT FROM query string."""
+        return """
+            SELECT
+                material_id,
+                code,
+                category,
+                desc,
+                prod,
+                thickness,
+                is_stock,
+                unit,
+                cost AS 'cost [pydecimal]',
+                add_cost AS 'add_cost [pydecimal]',
+                edg_cost AS 'edg_cost [pydecimal]',
+                loss AS 'loss [pydecimal]',
+                discount AS 'discount [pydecimal]'
+            FROM 
+                materials
+        """
+
+
+class ProductsTable(SQLTableBase):
+    def __init__(self, connection):
+        super().__init__(connection)
+        self.name = "products"
+        self.sql_create_table = """
+            CREATE TABLE IF NOT EXISTS products (
+                product_id  INTEGER PRIMARY KEY,
+                code        TEXT UNIQUE,
+                category    TEXT,
+                desc        TEXT,
+                prod        TEXT,
+                width       INTEGER,
+                height      INTEGER,
+                depth       INTEGER,
+                inst_unit   PYDECIMAL,
+                work_time   PYDECIMAL
+            )
+        """
+        self.indexes = [
+            """CREATE INDEX IF NOT EXISTS idx_products_code ON products(code)""",
+            """CREATE INDEX IF NOT EXISTS idx_products_category ON products(category, code)"""
+        ]
+        self.primary_key = "product_id"
+        self.foreign_key = None
+        self.read_only = ["product_id"]
+        self.default_columns = [
+            ("products", "product_id", "TuoteID", "long"),
+            ("products", "code", "Koodi", "string"),
+            ("products", "category", "Tuoteryhmä", "string"),
+            ("products", "desc", "Kuvaus", "string"),
+            ("products", "prod", "Valmistaja", "string"),
+            ("products", "width", "Leveys", "long"),
+            ("products", "height", "Korkeus", "long"),
+            ("products", "depth", "Syvyys", "long"),
+            ("products", "inst_unit", "As.Yksikkö", "double:6,2"),
+            ("products", "work_time", "Työaika", "double:6,2")
+        ]
+        self.table_keys = [
+            "code",        
+            "category",    
+            "desc",        
+            "prod",        
+            "width",       
+            "height",      
+            "depth",       
+            "inst_unit",
+            "work_time"
+        ]
+
+    def get_select_query(self):
+        """Return a SELECT FROM query string."""
+        return """
+            SELECT
+                code,
+                category,
+                desc,
+                prod,
+                width,
+                height,
+                depth,
+                inst_unit AS 'cost [pydecimal]',
+                work_time AS 'cost [pydecimal]'
+            FROM 
+                products
+        """
+
+
+class PartsTable(SQLTableBase):
+    def __init__(self, connection):
+        super().__init__(connection)
+        self.name = "parts"
+        self.sql_create_table = """
+            CREATE TABLE IF NOT EXISTS parts (
+                part_id         INTEGER PRIMARY KEY,
+                product_id      INTEGER,
+                part            TEXT,
+                count           INTEGER DEFAULT 1,
+                code            TEXT,
+                desc            TEXT,
+                default_mat     TEXT,
+                code_width      TEXT,
+                code_length     TEXT,
+                code_cost       TEXT,
+
+                UNIQUE (product_id, part),
+                FOREIGN KEY (product_id)
+                    REFERENCES products (product_id)
+                    ON DELETE CASCADE
+                    ON UPDATE CASCADE
+            )
+        """
+        self.indexes = [
+            """CREATE INDEX IF NOT EXISTS idx_parts_fk ON parts(product_id, part)"""
+        ]
+        self.primary_key = "part_id"
+        self.foreign_key = "product_id"
+        self.read_only = ["part_id", "product_id"]
+        self.default_columns = [
+            ("parts", "part_id", "OsaID", "long"),
+            ("parts", "product_id", "TuoteID", "long"),
+            ("parts", "part", "Osa", "string"),
+            ("parts", "count", "Määrä", "long"),
+            ("parts", "code", "Koodi", "string"),
+            ("parts", "desc", "Kuvaus", "string"),
+            ("parts", "default_mat", "Oletus materiaali", "string"),
+            ("parts", "code_width", "Koodi Leveys", "string"),
+            ("parts", "code_length", "Koodi Pituus", "string"),
+            ("parts", "code_cost", "Koodi Hinta", "string")
+        ]
+        self.table_keys = [
+            "part",
+            "code",
+            "product_code",
+            "count",
+            "desc",
+            "default_mat",
+            "code_width",
+            "code_length",
+            "code_cost"
+        ]
+
