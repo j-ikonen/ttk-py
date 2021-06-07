@@ -542,6 +542,48 @@ class SQLTableBase:
         return self.name
 
 
+class CatalogueTable(SQLTableBase):
+    def __init__(self, connection, catalogue):
+        super().__init__(connection)
+        self.catalogue = catalogue
+    
+    def from_catalogue(self, sql: str, values: list=None) -> int:
+        """INSERT a row from catalogue table.
+
+        Parameters
+        ----------
+        sql : str
+            SQL INSERT INTO SELECT FROM statement.
+            Provide this in overridden function.
+        values : list
+            Values to use in given sql statement bindings.
+
+        Returns
+        -------
+        int
+            Last inserted rowid.
+        """
+        return self.execute_dml(sql, values, rowid=True)
+
+    def to_catalogue(self, sql: str, values: list=None) -> int:
+        """Insert a row from this table to a catalogue table.
+
+        Parameters
+        ----------
+        sql : str
+            SQL statement string used for insert.
+            Provide this in overridden function.
+        values : list
+            Values to use in given sql statement bindings.
+
+        Returns
+        -------
+        int
+            Inserted Primary key.
+        """
+        return self.execute_dml(sql, values, rowid=True)
+
+
 class OffersTable(SQLTableBase):
     def __init__(self, connection):
         super().__init__(connection)
@@ -671,7 +713,7 @@ class GroupPredefsTable(SQLTableBase):
         ]
 
 
-class GroupMaterialsTable(SQLTableBase):
+class GroupMaterialsTable(CatalogueTable):
     def __init__(self, connection):
         super().__init__(connection)
         self.name = "group_materials"
@@ -769,8 +811,104 @@ class GroupMaterialsTable(SQLTableBase):
             FROM group_materials
         """
 
+    def from_catalogue(self, rowid: int, fk: int=None) -> int:
+        """Insert a row from catalogue table to this table.
 
-class GroupProductsTable(SQLTableBase):
+        Parameters
+        ----------
+        rowid : int
+            Primary key of a row in catalogue table.
+
+        Returns
+        -------
+        int
+            Primary key of the inserted row.
+        """
+        sql = """
+            INSERT INTO group_materials(
+                group_id,
+                code,
+                category,
+                desc,
+                prod,
+                thickness,
+                is_stock,
+                unit,
+                cost,
+                add_cost,
+                edg_cost,
+                loss,
+                discount)
+            SELECT
+                (?),
+                code,
+                category,
+                desc,
+                prod,
+                thickness,
+                is_stock,
+                unit,
+                cost AS 'cost [pydecimal]',
+                add_cost AS 'add_cost [pydecimal]',
+                edg_cost AS 'edg_cost [pydecimal]',
+                loss AS 'loss [pydecimal]',
+                discount AS 'discount [pydecimal]'
+            FROM
+                materials
+            WHERE
+                material_id=(?)
+        """
+        return super().from_catalogue((fk, rowid), sql)
+
+    def to_catalogue(self, rowid: int) -> int:
+        """Insert a row from this table to catalogue table.
+
+        Parameters
+        ----------
+        rowid : int
+            Primary key of a row in this table.
+
+        Returns
+        -------
+        int
+            Primary key of the inserted row.
+        """
+        sql = """
+            INSERT INTO materials(
+                code,
+                category,
+                desc,
+                prod,
+                thickness,
+                is_stock,
+                unit,
+                cost,
+                add_cost,
+                edg_cost,
+                loss,
+                discount)
+            SELECT
+                code,
+                category,
+                desc,
+                prod,
+                thickness,
+                is_stock,
+                unit,
+                cost AS 'cost [pydecimal]',
+                add_cost AS 'add_cost [pydecimal]',
+                edg_cost AS 'edg_cost [pydecimal]',
+                loss AS 'loss [pydecimal]',
+                discount AS 'discount [pydecimal]'
+            FROM
+                group_materials
+            WHERE
+                group_material_id=(?)
+        """
+        return super().from_catalogue(sql, (rowid,))
+
+
+class GroupProductsTable(CatalogueTable):
     def __init__(self, connection):
         super().__init__(connection)
         self.name = "group_products"
@@ -868,6 +1006,90 @@ class GroupProductsTable(SQLTableBase):
                     GROUP BY a.group_product_id
                 ) a USING(group_product_id)
         """
+
+    def from_catalogue(self, rowid: int, fk: int=None) -> int:
+        """Insert a row from catalogue table to this table.
+
+        Parameters
+        ----------
+        rowid : int
+            Primary key of a row in catalogue table.
+
+        Returns
+        -------
+        int
+            Primary key of the inserted row.
+        """
+        sql = """
+            INSERT INTO group_products(
+                group_id,
+                code,
+                category,
+                desc,
+                prod,
+                width,
+                height,
+                depth,
+                inst_unit,
+                work_time)
+            SELECT
+                (?),
+                code,
+                category,
+                desc,
+                prod,
+                width,
+                height,
+                depth,
+                inst_unit AS 'cost [pydecimal]',
+                work_time AS 'cost [pydecimal]'
+            FROM
+                products
+            WHERE
+                product_id=(?)
+        """
+        return super().from_catalogue(sql, (fk, rowid))
+
+    def to_catalogue(self, rowid: int) -> int:
+        """Insert a row from this table to catalogue table.
+
+        Parameters
+        ----------
+        rowid : int
+            Primary key of a row in this table.
+
+        Returns
+        -------
+        int
+            Primary key of the inserted row.
+        """
+        sql = """
+            INSERT INTO products(
+                code,
+                category,
+                desc,
+                prod,
+                width,
+                height,
+                depth,
+                inst_unit,
+                work_time)
+            SELECT
+                code,
+                category,
+                desc,
+                prod,
+                width,
+                height,
+                depth,
+                inst_unit AS 'cost [pydecimal]',
+                work_time AS 'cost [pydecimal]'
+            FROM
+                group_products
+            WHERE
+                group_product_id=(?)
+        """
+        return super().from_catalogue(sql, (rowid,))
 
 
 class GroupPartsTable(SQLTableBase):
@@ -1133,6 +1355,86 @@ class GroupPartsTable(SQLTableBase):
                         END
                     ) = m.code
         """
+
+    def from_catalogue(self, rowid: int, fk: int=None) -> int:
+        """Insert a row from catalogue table to this table.
+
+        Parameters
+        ----------
+        rowid : int
+            Primary key of a row in catalogue table.
+
+        Returns
+        -------
+        int
+            Primary key of the inserted row.
+        """
+        sql = """
+            INSERT INTO group_parts(
+                product_id,
+                part,
+                count,
+                code,
+                desc,
+                default_mat,
+                code_width,
+                code_length,
+                code_cost)
+            SELECT
+                (?),
+                part,
+                count,
+                code,
+                desc,
+                default_mat,
+                code_width,
+                code_length,
+                code_cost
+            FROM
+                parts
+            WHERE
+                part_id=(?)
+        """
+        return super().from_catalogue(sql, (fk, rowid))
+
+    def to_catalogue(self, rowid: int) -> int:
+        """Insert a row from this table to catalogue table.
+
+        Parameters
+        ----------
+        rowid : int
+            Primary key of a row in this table.
+
+        Returns
+        -------
+        int
+            Primary key of the inserted row.
+        """
+        sql = """
+            INSERT INTO parts(
+                part,
+                count,
+                code,
+                desc,
+                default_mat,
+                code_width,
+                code_length,
+                code_cost)
+            SELECT
+                part,
+                count,
+                code,
+                desc,
+                default_mat,
+                code_width,
+                code_length,
+                code_cost
+            FROM
+                group_parts
+            WHERE
+                group_part_id=(?)
+        """
+        return super().from_catalogue(sql, (rowid,))
 
 
 class MaterialsTable(SQLTableBase):
