@@ -1,6 +1,6 @@
-from decimal import Decimal
 import unittest
 import sqlite3
+from decimal import Decimal
 
 import tablebase as tb
 
@@ -330,6 +330,8 @@ class TestPartsTable(unittest.TestCase):
         """Setup a SQLite database in memory for testing."""
         self.con = tb.connect(":memory:")
         self.con.execute("PRAGMA foreign_keys = OFF")
+        sqlite3.enable_callback_tracebacks(True)
+        tb.SQLTableBase.print_errors = True
         self.table = tb.GroupPartsTable(self.con)
         self.products_table = tb.GroupProductsTable(self.con)
         self.predefs_table = tb.GroupPredefsTable(self.con)
@@ -340,6 +342,7 @@ class TestPartsTable(unittest.TestCase):
         self.table.create()
 
     def tearDown(self) -> None:
+        sqlite3.enable_callback_tracebacks(False)
         self.con.close()
 
     def test_materials_create(self):
@@ -367,6 +370,58 @@ class TestPartsTable(unittest.TestCase):
         self.table.update(rowid, 3, 4)
         result = self.table.select()
         self.assertEqual(result[0][10], Decimal('4') * Decimal('11.12'))
+
+    def test_to_catalague_materials(self):
+        cat: tb.CatalogueTable = self.materials_table.get_catalogue()
+        rowid = self.materials_table.insert_empty(12)
+        self.materials_table.update(rowid, 6, 16)
+        cat_rowid = self.materials_table.to_catalogue(rowid)
+        result = cat.select(filter={0: ["=", cat_rowid]})
+        self.assertEqual(result[0][5], 16)
+
+    def test_from_catalague_materials(self):
+        cat: tb.CatalogueTable = self.materials_table.get_catalogue()
+        rowid = cat.insert_empty(None)
+        cat.update(rowid, 5, 12)
+        grp_rowid = self.materials_table.from_catalogue(rowid, 4)
+        result = self.materials_table.select(4, filter={0: ["=", grp_rowid]})
+        self.assertEqual(result[0][6], 12)
+
+    def test_to_catalague_products(self):
+        cat: tb.CatalogueTable = self.products_table.get_catalogue()
+        rowid = self.products_table.insert_empty(12)
+        self.products_table.update(rowid, 4, "ToCatalogue")
+        cat_rowid = self.products_table.to_catalogue(rowid)
+        result = cat.select(filter={0: ["=", cat_rowid]})
+        self.assertEqual(result[0][2], "ToCatalogue")
+
+    def test_from_catalague_products(self):
+        cat: tb.CatalogueTable = self.products_table.get_catalogue()
+        rowid = cat.insert_empty(None)
+        cat.update(rowid, 2, "Tuoteryhmä")
+        grp_rowid = self.products_table.from_catalogue(rowid, 4)
+        result = self.products_table.select(filter={0: ["=", grp_rowid]})
+        self.assertEqual(result[0][4], "Tuoteryhmä")
+
+    def test_to_catalague_parts(self):
+        cat: tb.CatalogueTable = self.table.get_catalogue()
+        rowid = self.table.insert_empty(22)
+        self.table.update(rowid, 5, "ToCatalogue")
+        cat_rowid = self.table.to_catalogue(rowid)
+        result = cat.select(filter={0: ["=", cat_rowid]})
+        self.assertEqual(result[0][5], "ToCatalogue")
+
+    def test_from_catalague_parts(self):
+        cat: tb.CatalogueTable = self.table.get_catalogue()
+        rowid = cat.insert_empty(None)
+        cat.update(rowid, 5, "Tuoteryhmä")
+
+        # Product must exists to SELECT it's parts.
+        product_id = self.products_table.insert_empty(4)
+
+        grp_rowid = self.table.from_catalogue(rowid, product_id)
+        result = self.table.select(product_id, filter={0: ["=", grp_rowid]})
+        self.assertEqual(result[0][5], "Tuoteryhmä")
 
 
 if __name__ == '__main__':

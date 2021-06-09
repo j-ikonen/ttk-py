@@ -58,6 +58,13 @@ def material_cost(cost, add, edg, loss, discount):
     d = converter_decimal(add)
     return adapter_decimal((a + d + c) * b)
 
+def product_cost(part_cost, work_time, work_cost):
+    """Return the products cost."""
+    a = converter_decimal(part_cost)
+    b = converter_decimal(work_time)
+    c = converter_decimal(work_cost)
+    return adapter_decimal(a + (b * c))
+
 def connect(db_name: str) -> sqlite3.Connection:
     """Return a connection object to sqlite3 database with given name.
 
@@ -86,6 +93,7 @@ def connect(db_name: str) -> sqlite3.Connection:
     con.create_function("dec_mul", 2, decimal_mul, deterministic=True)
     con.create_function("dec_div", 2, decimal_div, deterministic=True)
     con.create_function("material_cost", 5, material_cost, deterministic=True)
+    con.create_function("product_cost", 3, product_cost, deterministic=True)
     con.create_aggregate("dec_sum", 1, DecimalSum)
 
     con.execute("""
@@ -545,6 +553,7 @@ class SQLTableBase:
 class CatalogueTable(SQLTableBase):
     def __init__(self, connection, catalogue):
         super().__init__(connection)
+        catalogue.create()
         self.catalogue = catalogue
     
     def from_catalogue(self, sql: str, values: list=None) -> int:
@@ -582,6 +591,10 @@ class CatalogueTable(SQLTableBase):
             Inserted Primary key.
         """
         return self.execute_dml(sql, values, rowid=True)
+
+    def get_catalogue(self):
+        """Return the catalogue table."""
+        return self.catalogue
 
 
 class OffersTable(SQLTableBase):
@@ -715,11 +728,12 @@ class GroupPredefsTable(SQLTableBase):
 
 class GroupMaterialsTable(CatalogueTable):
     def __init__(self, connection):
-        super().__init__(connection)
+        cat_table = MaterialsTable(connection)
+        super().__init__(connection, cat_table)
         self.name = "group_materials"
         self.sql_create_table = """
             CREATE TABLE IF NOT EXISTS group_materials (
-                group_materials_id INTEGER PRIMARY KEY,
+                group_material_id INTEGER PRIMARY KEY,
                 group_id    INTEGER NOT NULL,
                 code        TEXT,
                 category    TEXT,
@@ -747,11 +761,11 @@ class GroupMaterialsTable(CatalogueTable):
         self.indexes = [
             """CREATE INDEX IF NOT EXISTS idx_gm_code ON group_materials(group_id, code)"""
         ]
-        self.primary_key = "group_materials_id"
+        self.primary_key = "group_material_id"
         self.foreign_key = "group_id"
-        self.read_only = ["group_materials_id", "group_id", "tot_cost"]
+        self.read_only = ["group_material_id", "group_id", "tot_cost"]
         self.default_columns = [
-            ("group_materials", "group_materials_id", "MateriaaliID", "long",),
+            ("group_materials", "group_material_id", "MateriaaliID", "long",),
             ("group_materials", "group_id", "RyhmäID", "long"),
             ("group_materials", "category", "Tuoteryhmä", "string"),
             ("group_materials", "code", "Koodi", "string"),
@@ -768,7 +782,7 @@ class GroupMaterialsTable(CatalogueTable):
             ("group_materials", "tot_cost", "Kokonaishinta", "double:6,2")
         ]
         self.table_keys = [
-            "group_materials_id",        
+            "group_material_id",        
             "group_id",  
             "code",  
             "category",  
@@ -793,7 +807,7 @@ class GroupMaterialsTable(CatalogueTable):
         """Return GroupMaterials SELECT statement with pydecimal formattings."""
         return """
             SELECT
-                group_materials_id,
+                group_material_id,
                 group_id,    
                 code,        
                 category,    
@@ -858,7 +872,7 @@ class GroupMaterialsTable(CatalogueTable):
             WHERE
                 material_id=(?)
         """
-        return super().from_catalogue((fk, rowid), sql)
+        return super().from_catalogue(sql, (fk, rowid))
 
     def to_catalogue(self, rowid: int) -> int:
         """Insert a row from this table to catalogue table.
@@ -905,12 +919,13 @@ class GroupMaterialsTable(CatalogueTable):
             WHERE
                 group_material_id=(?)
         """
-        return super().from_catalogue(sql, (rowid,))
+        return super().to_catalogue(sql, (rowid,))
 
 
 class GroupProductsTable(CatalogueTable):
     def __init__(self, connection):
-        super().__init__(connection)
+        cat_table = ProductsTable(connection)
+        super().__init__(connection, cat_table)
         self.name = "group_products"
         self.sql_create_table = """
             CREATE TABLE IF NOT EXISTS group_products (
@@ -989,23 +1004,27 @@ class GroupProductsTable(CatalogueTable):
                 p.work_time AS 'work_time [pydecimal]',
                 a.part_cost AS 'work_time [pydecimal]',
                 product_cost(
-                    a.part_cost,
-                    work_time,
+                    part_cost,
+                    p.work_time,
                     (
                         SELECT value_decimal
                         FROM variables
                         WHERE variable_id=0
                     )
-                ) tot_cost
+                ) AS 'tot_cost [pydecimal]'
 
             FROM
                 group_products as p
                 LEFT JOIN (
-                    SELECT a.group_product_id, dec_sum(a.cost) AS 'part_cost [pydecimal]'
+                    SELECT a.group_product_id, dec_sum(a.cost) AS part_cost
                     FROM group_parts AS a
                     GROUP BY a.group_product_id
                 ) a USING(group_product_id)
         """
+
+    def get_table_alias(self) -> str:
+        """Return the alias for table name used in SELECT query."""
+        return "p"
 
     def from_catalogue(self, rowid: int, fk: int=None) -> int:
         """Insert a row from catalogue table to this table.
@@ -1089,12 +1108,13 @@ class GroupProductsTable(CatalogueTable):
             WHERE
                 group_product_id=(?)
         """
-        return super().from_catalogue(sql, (rowid,))
+        return super().to_catalogue(sql, (rowid,))
 
 
-class GroupPartsTable(SQLTableBase):
+class GroupPartsTable(CatalogueTable):
     def __init__(self, connection):
-        super().__init__(connection)
+        cat_table = PartsTable(connection)
+        super().__init__(connection, cat_table)
         self.name = "group_parts"
         self.sql_create_table = """
             CREATE TABLE IF NOT EXISTS group_parts (
@@ -1149,7 +1169,6 @@ class GroupPartsTable(SQLTableBase):
             ("group_parts", "pr.width", "Tuote leveys", "long"),
             ("group_parts", "pr.height", "Tuote korkeus", "long"),
             ("group_parts", "pr.depth", "Tuote syvyys", "long"),
-            ("group_parts", "product_code", "Tuote Koodi", "string"),
         ]
         self.table_keys = [
             "group_part_id",          
@@ -1181,14 +1200,16 @@ class GroupPartsTable(SQLTableBase):
         }
 
     def select(self, fk: int=None, filter: dict=None) -> list:
-        """Update the changed coded parts values before returning the select list."""
-        # SELECT parts of the product.
+        """Update parts values before returning the select list.
+        
+        Returns the parts only if it's foreign key
+        product exists in group_products table.
+        """
+        # SELECT all parts of product with fk as id.
         parts = super().select(fk, None)
-        # Parse part codes to list of values to update.
-        # print("\nPARTS:\n{}".format(parts))
+        # Parse the codes in parts of this product and return changed values.
         new_values = self.parse_codes(parts)
-        # print("\nNEW VALUES:\n{}".format(new_values))
-        # UPDATE with rows in update queue.
+        # UPDATE the changed values.
         self.execute_dml(
             """
             UPDATE
@@ -1371,7 +1392,7 @@ class GroupPartsTable(SQLTableBase):
         """
         sql = """
             INSERT INTO group_parts(
-                product_id,
+                group_product_id,
                 part,
                 count,
                 code,
@@ -1434,7 +1455,7 @@ class GroupPartsTable(SQLTableBase):
             WHERE
                 group_part_id=(?)
         """
-        return super().from_catalogue(sql, (rowid,))
+        return super().to_catalogue(sql, (rowid,))
 
 
 class MaterialsTable(SQLTableBase):
@@ -1556,6 +1577,7 @@ class ProductsTable(SQLTableBase):
             ("products", "work_time", "Työaika", "double:6,2")
         ]
         self.table_keys = [
+            "product_id",
             "code",        
             "category",    
             "desc",        
@@ -1571,6 +1593,7 @@ class ProductsTable(SQLTableBase):
         """Return a SELECT FROM query string."""
         return """
             SELECT
+                product_id,
                 code,
                 category,
                 desc,
@@ -1628,10 +1651,11 @@ class PartsTable(SQLTableBase):
             ("parts", "code_cost", "Koodi Hinta", "string")
         ]
         self.table_keys = [
+            "part_id",
+            "product_id",
             "part",
-            "code",
-            "product_code",
             "count",
+            "code",
             "desc",
             "default_mat",
             "code_width",
