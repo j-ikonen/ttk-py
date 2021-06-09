@@ -332,14 +332,14 @@ class TestPartsTable(unittest.TestCase):
         self.con.execute("PRAGMA foreign_keys = OFF")
         sqlite3.enable_callback_tracebacks(True)
         tb.SQLTableBase.print_errors = True
-        self.table = tb.GroupPartsTable(self.con)
+        self.parts_table = tb.GroupPartsTable(self.con)
         self.products_table = tb.GroupProductsTable(self.con)
         self.predefs_table = tb.GroupPredefsTable(self.con)
         self.materials_table = tb.GroupMaterialsTable(self.con)
         self.predefs_table.create()
         self.materials_table.create()
         self.products_table.create()
-        self.table.create()
+        self.parts_table.create()
 
     def tearDown(self) -> None:
         sqlite3.enable_callback_tracebacks(False)
@@ -352,23 +352,23 @@ class TestPartsTable(unittest.TestCase):
         # Parts select uses INNER JOIN with products.
         # SELECT of parts requires an existing product.
         pr_rowid = self.products_table.insert_empty(12)
-        rowid = self.table.insert_empty(pr_rowid)
-        result = self.table.select()
+        rowid = self.parts_table.insert_empty(pr_rowid)
+        result = self.parts_table.select()
         self.assertEqual(result[0][0], rowid)
 
     def test_update(self):
         pr_rowid = self.products_table.insert_empty(12)
-        rowid = self.table.insert_empty(pr_rowid)
-        self.table.update(rowid, 13, "=määrä * 11.12")
-        result = self.table.select()
+        rowid = self.parts_table.insert_empty(pr_rowid)
+        self.parts_table.update(rowid, 13, "=määrä * 11.12")
+        result = self.parts_table.select()
         self.assertEqual(result[0][13], "=määrä * 11.12")
 
     def test_code_parse(self):
         pr_rowid = self.products_table.insert_empty(12)
-        rowid = self.table.insert_empty(pr_rowid)
-        self.table.update(rowid, 13, "=määrä * 11.12")
-        self.table.update(rowid, 3, 4)
-        result = self.table.select()
+        rowid = self.parts_table.insert_empty(pr_rowid)
+        self.parts_table.update(rowid, 13, "=määrä * 11.12")
+        self.parts_table.update(rowid, 3, 4)
+        result = self.parts_table.select()
         self.assertEqual(result[0][10], Decimal('4') * Decimal('11.12'))
 
     def test_to_catalague_materials(self):
@@ -404,24 +404,48 @@ class TestPartsTable(unittest.TestCase):
         self.assertEqual(result[0][4], "Tuoteryhmä")
 
     def test_to_catalague_parts(self):
-        cat: tb.CatalogueTable = self.table.get_catalogue()
-        rowid = self.table.insert_empty(22)
-        self.table.update(rowid, 5, "ToCatalogue")
-        cat_rowid = self.table.to_catalogue(rowid)
+        cat: tb.CatalogueTable = self.parts_table.get_catalogue()
+        rowid = self.parts_table.insert_empty(22)
+        self.parts_table.update(rowid, 5, "ToCatalogue")
+        cat_rowid = self.parts_table.to_catalogue(rowid)
         result = cat.select(filter={0: ["=", cat_rowid]})
         self.assertEqual(result[0][5], "ToCatalogue")
 
     def test_from_catalague_parts(self):
-        cat: tb.CatalogueTable = self.table.get_catalogue()
+        cat: tb.CatalogueTable = self.parts_table.get_catalogue()
         rowid = cat.insert_empty(None)
         cat.update(rowid, 5, "Tuoteryhmä")
 
         # Product must exists to SELECT it's parts.
         product_id = self.products_table.insert_empty(4)
 
-        grp_rowid = self.table.from_catalogue(rowid, product_id)
-        result = self.table.select(product_id, filter={0: ["=", grp_rowid]})
+        grp_rowid = self.parts_table.from_catalogue(rowid, product_id)
+        result = self.parts_table.select(product_id, filter={0: ["=", grp_rowid]})
         self.assertEqual(result[0][5], "Tuoteryhmä")
+
+    def test_materials_count(self):
+        self.materials_table.insert_empty(0)
+        self.materials_table.insert_empty(0)
+        self.materials_table.insert_empty(0)
+        self.materials_table.insert_empty(1)
+        self.materials_table.insert_empty(1)
+        self.materials_table.insert_empty(0)
+        a = self.materials_table.select(0, count=True)
+        b = self.materials_table.select(1, count=True)
+        self.assertEqual(a[0][0], 4)
+        self.assertEqual(b[0][0], 2)
+
+    def test_materials_undo_insert(self):
+        self.materials_table.insert_empty(0)
+        self.materials_table.insert_empty(0)
+        a = self.materials_table.select(0, count=True)
+        self.assertEqual(a[0][0], 2)
+        self.materials_table.undo(0)
+        a = self.materials_table.select(0, count=True)
+        self.assertEqual(a[0][0], 1)
+        self.materials_table.undo(0)
+        a = self.materials_table.select(0, count=True)
+        self.assertEqual(a[0][0], 0)
 
 
 if __name__ == '__main__':

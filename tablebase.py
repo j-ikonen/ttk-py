@@ -184,6 +184,8 @@ class SQLTableBase:
         self.variables_table_keys = [
             "variable_id", "label", "value_decimal", "value_int", "value_txt"
         ]
+        self.undostack = {}     # foreign_key: undo sql statement
+        self.redostack = {}
 
         self.name = None
         self.sql_create_table = None
@@ -346,7 +348,60 @@ class SQLTableBase:
         )
 
         ret_rowid = False if many else True
-        return self.execute_dml(sql, values, many, ret_rowid)
+
+        # Push undo statement to undostack.
+
+        # Get Fk or None for stack key
+        fk = values[1] if self.foreign_key is not None else None
+        # Check for existing rows if upsert is True.
+        if upsert:
+            undo_keystr = ",".join(self.get_insert_keys(True))
+            sql_sel = "SELECT {k} FROM {t} WHERE {pk}=(?)".format(
+                k=undo_keystr, pk=self.primary_key, t=self.name
+            )
+            existing = self.execute_dql(sql_sel, (values[0],))
+            # For undoing REPLACE statement.
+            if len(existing) > 0:
+                sql_undo_insert = "INSERT INTO {t}({k}) VALUES ({b})".format(
+                    t=self.name, k=undo_keystr, b=binds
+                )
+                # push INSERT existing
+                try:
+                    self.undostack[fk].append((sql_undo_insert, existing))
+                except KeyError:
+                    self.undostack[fk] = []
+                    self.undostack[fk].append((sql_undo_insert, existing))
+
+
+        result = self.execute_dml(sql, values, many, ret_rowid)
+        if include_rowid and not many:
+            pk = values[0]
+        elif not many:
+            pk = result
+        elif not include_rowid and many:
+            pk = [row[0] for row in values]
+        else:
+            pk = None
+
+        # push DELETE at pk
+        if pk is not None:
+            pklen = 1
+            if isinstance(pk, list):
+                pklen = len(pk)
+            else:
+                pk = [pk]
+
+            sql_undo_delete = """DELETE FROM {t} WHERE {pk}=(?)""".format(
+                t=self.name, pk=self.primary_key)
+
+            for n in range(pklen):
+                try:
+                    self.undostack[fk].append((sql_undo_delete, (pk[n],)))
+                except KeyError:
+                    self.undostack[fk] = []
+                    self.undostack[fk].append((sql_undo_delete, (pk[n],)))
+
+        return result
 
     def insert_empty(self, fk: int=None) -> int:
         """Insert an empty row.
@@ -365,10 +420,22 @@ class SQLTableBase:
         sql_val = "({k}) VALUES (?)"
         if fk is None:
             sql = sql_ins.format(t=self.name) + " DEFAULT VALUES"
-            return self.execute_dml(sql, rowid=True)
+            values = None
         else:
             sql = sql_ins.format(t=self.name) + sql_val.format(k=self.foreign_key)
-            return self.execute_dml(sql, (fk,), rowid=True)
+            values = (fk,)
+        rowid = self.execute_dml(sql, values, rowid=True)
+
+        # Push undo statement to undostack.
+        sql_undo = """DELETE FROM {t} WHERE {pk}=(?)""".format(
+            t=self.name, pk=self.primary_key)
+        try:
+            self.undostack[fk].append((sql_undo, (rowid,)))
+        except KeyError:
+            self.undostack[fk] = []
+            self.undostack[fk].append((sql_undo, (rowid,)))
+
+        return rowid
 
     def update(self, pk: int, col: int, value) -> bool:
         """Update a single value in the table.
@@ -402,7 +469,10 @@ class SQLTableBase:
         values = (pk,)
         return self.execute_dml(sql, values)
 
-    def select(self, fk: int=None, filter: dict=None) -> list:
+    def undo(self, fk: int=None) -> bool:
+        return True
+
+    def select(self, fk: int=None, filter: dict=None, count: bool=False) -> list:
         """Get list of rows from the table.
 
         Filters results by using foreign key or filter dictionary.
@@ -414,6 +484,8 @@ class SQLTableBase:
             Foreign key used for filtering the results, by default None
         filter : dict, optional
             A dictionary as a filter in format {key: [operator, value]}, by default None
+        count : bool, optional
+            Set true to SELECT count of entries matching given filter and foreign key.
 
         Returns
         -------
@@ -423,7 +495,7 @@ class SQLTableBase:
         cond = ""
         values = []
         keys = self.table_keys
-        sql_sel = self.get_select_query()
+        sql_sel = self.get_select_query(count)
         table_alias = self.get_table_alias()
 
         # Add the foreign key to filter for parsing.
@@ -529,12 +601,19 @@ class SQLTableBase:
         """
         return self.table_keys if inc_rowid else self.table_keys[1:]
 
-    def get_select_query(self):
+    def get_select_query(self, count: bool=False):
         """Return a SQL SELECT FROM [* JOIN] string.
 
         Meant to be overridden when necessary to format selected keys
         as required for each table.
+        
+        Parameters
+        ----------
+        count : bool, optional
+            Set True to return query for count of entries instead of content.
         """
+        if count:
+            return "SELECT COUNT(*) FROM {t}".format(t=self.name)
         return "SELECT {k} FROM {t}".format(k=",".join(self.table_keys), t=self.name)
 
     def get_table_alias(self) -> str:
@@ -803,8 +882,16 @@ class GroupMaterialsTable(CatalogueTable):
         """Overridden member function to remove tot_cost column from insert."""
         return self.table_keys[:-1] if inc_rowid else self.table_keys[1:-1]
 
-    def get_select_query(self):
-        """Return GroupMaterials SELECT statement with pydecimal formattings."""
+    def get_select_query(self, count: bool=False):
+        """Return GroupMaterials SELECT statement with pydecimal formattings.
+        
+        Parameters
+        ----------
+        count : bool, optional
+            Set True to return query for count of entries instead of content.
+        """
+        if count:
+            return super().get_select_query(count)
         return """
             SELECT
                 group_material_id,
@@ -986,8 +1073,16 @@ class GroupProductsTable(CatalogueTable):
             "work_time"
         ]
 
-    def get_select_query(self):
-        """Return GroupProducts SELECT statement with pydecimal formattings."""
+    def get_select_query(self, count: bool=False):
+        """Return GroupProducts SELECT statement with pydecimal formattings.
+        
+        Parameters
+        ----------
+        count : bool, optional
+            Set True to return query for count of entries instead of content.
+        """
+        if count:
+            return super().get_select_query(count)
         return """
             SELECT
                 p.group_product_id,
@@ -1328,8 +1423,21 @@ class GroupPartsTable(CatalogueTable):
         """Return the alias used for this tables name."""
         return "pa"
 
-    def get_select_query(self):
-        """Return GroupParts SELECT statement with pydecimal formattings."""
+    def get_select_query(self, count: bool=False):
+        """Return GroupParts SELECT statement with pydecimal formattings.
+
+        Parameters
+        ----------
+        count : bool, optional
+            Set True to return query for count of entries instead of content.
+        """
+        if count:
+            return """
+                SELECT
+                    COUNT(*)
+                FROM
+                    group_parts AS pa
+            """
         return """
             SELECT
                 pa.group_part_id,
@@ -1517,8 +1625,16 @@ class MaterialsTable(SQLTableBase):
             "discount",
         ]
 
-    def get_select_query(self):
-        """Return a SELECT FROM query string."""
+    def get_select_query(self, count: bool=False):
+        """Return a SELECT FROM query string.
+        
+        Parameters
+        ----------
+        count : bool, optional
+            Set True to return query for count of entries instead of content.
+        """
+        if count:
+            return super().get_select_query(count)
         return """
             SELECT
                 material_id,
@@ -1589,8 +1705,16 @@ class ProductsTable(SQLTableBase):
             "work_time"
         ]
 
-    def get_select_query(self):
-        """Return a SELECT FROM query string."""
+    def get_select_query(self, count: bool=False):
+        """Return a SELECT FROM query string.
+        
+        Parameters
+        ----------
+        count : bool, optional
+            Set True to return query for count of entries instead of content.
+        """
+        if count:
+            return super().get_select_query(count)
         return """
             SELECT
                 product_id,
