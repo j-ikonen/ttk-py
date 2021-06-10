@@ -96,6 +96,19 @@ def connect(db_name: str) -> sqlite3.Connection:
     con.create_function("product_cost", 3, product_cost, deterministic=True)
     con.create_aggregate("dec_sum", 1, DecimalSum)
 
+    try:
+        con.execute("DROP TABLE undolog")
+    except sqlite3.Error:
+        pass
+
+    con.execute("""
+        CREATE TABLE undolog (
+            seq INTEGER PRIMARY KEY AUTOINCEMENT,
+            fk INTEGER,
+            tablename TEXT,
+            sql TEXT
+        )
+    """)
     con.execute("""
         CREATE TABLE IF NOT EXISTS columns (
             columns_id  INTEGER PRIMARY KEY,
@@ -166,6 +179,11 @@ class SQLTableBase:
 
     setup_done = False
     print_errors = False
+    _undo = {}
+    _undo['freeze'] = -1
+    _undo['active'] = True
+    _undo['pending'] = []
+    _undo['firstlog'] = 0
 
     def __init__(self, connection):
         self.con: sqlite3.Connection = connection
@@ -184,7 +202,7 @@ class SQLTableBase:
         self.variables_table_keys = [
             "variable_id", "label", "value_decimal", "value_int", "value_txt"
         ]
-        self.undostack = {}     # foreign_key: undo sql statement
+        self.undostack = {}     # {foreign_key: [(begin rowid, end rowid), ...], ...}
         self.redostack = {}
 
         self.name = None
@@ -347,7 +365,7 @@ class SQLTableBase:
             u=rep_str, t=self.name, k=keys_str, b=binds
         )
 
-        ret_rowid = False if many else True
+        # ret_rowid = False if many else True
 
         # Push undo statement to undostack.
 
@@ -373,7 +391,7 @@ class SQLTableBase:
                     self.undostack[fk].append((sql_undo_insert, existing))
 
 
-        result = self.execute_dml(sql, values, many, ret_rowid)
+        result = self.execute_dml(sql, values, many, not many)
         if include_rowid and not many:
             pk = values[0]
         elif not many:
@@ -470,7 +488,32 @@ class SQLTableBase:
         return self.execute_dml(sql, values)
 
     def undo(self, fk: int=None) -> bool:
-        return True
+        """Undo the last action.
+
+        Get last statement from undostack. Execute the statement.
+        Move the executed statement to redostack.
+        Each foreign key in the table has their own undo and redo stacks.
+        For tables with no foreign key there are only single undo and redo stacks.
+
+        Parameters
+        ----------
+        fk : int, optional
+            Key to the specific undostack, by default None
+
+        Returns
+        -------
+        bool
+            True on success.
+        """
+        try:
+            (sql, values) = self.undostack[fk].pop()
+        except (IndexError, KeyError) as e:
+            if self.print_errors:
+                print("\n{}: {}".format(type(e), e))
+                print("No action to undo.")
+            return False
+        else:
+            return self.execute_dml(sql, values)
 
     def select(self, fk: int=None, filter: dict=None, count: bool=False) -> list:
         """Get list of rows from the table.
@@ -628,6 +671,112 @@ class SQLTableBase:
         """
         return self.name
 
+    def create_undo_triggers(self):
+        """Format and create the undolog triggers."""
+        ins_keys = self.get_insert_keys(True)
+        set_strings = map(
+            lambda k: "{key}='||quote(old.{key})||'".format(key=k),
+            ins_keys
+        )
+        keys = ins_keys
+        value_strings = map(
+            lambda k: "'||old.{key}||'".format(key=k),
+            ins_keys
+        )
+        script = """
+        CREATE TEMP TRIGGER {t}_it AFTER INSERT ON {t} BEGIN
+            INSERT INTO undolog VALUES(
+                NULL,
+                new.{fk},
+                '{t}',
+                'DELETE FROM {t} WHERE {pk}='||new.{pk}
+                );
+        END;
+        CREATE TEMP TRIGGER {t}_ut AFTER UPDATE ON {t} BEGIN
+            INSERT INTO undolog VALUES(
+                NULL,
+                new.{fk},
+                '{t}',
+                'UPDATE {t} SET {s} WHERE {pk}='||old.{pk}
+            );
+        END;
+        CREATE TEMP TRIGGER {t}_dt BEFORE DELETE ON {t} BEGIN
+            INSERT INTO undolog VALUES(
+                NULL,
+                new.{fk},
+                '{t}',
+                'INSERT INTO {t}({k}) VALUES({v})'
+            );
+        END;
+        """.format(
+            t=self.name,
+            fk=self.foreign_key,
+            pk=self.primary_key,
+            s=','.join(set_strings),
+            k=','.join(keys),
+            v=','.join(value_strings)
+        )
+        self.con.executescript(script)
+
+    def undo_freeze(self):
+        """Stop accepting changes to undolog.
+
+        Unfreezing deletes all entries to undolog during the time between
+        undo_freeze and undo_unfreeze calls.
+        """
+        _undo = SQLTableBase._undo
+        if _undo['freeze'] >= 0:
+            raise Exception("Recursive call to SQLTableBase.undo_freeze")
+
+        _undo['freeze'] = self.get_undo_maxseq()
+
+    def undo_unfreeze(self):
+        """Begin accepting undo actions again."""
+        _undo = SQLTableBase._undo
+        if _undo['freeze'] < 0:
+            raise Exception("Called SQLTableBase.undo_unfreeze while not frozen.")
+
+        self.execute_dml(
+            "DELETE FROM undolog WHERE seq>(?)",
+            (_undo['freeze'],)
+        )
+        _undo['freeze'] = -1
+
+    def undo_barrier(self, fk: int):
+        """Create an undo barrier."""
+        _undo = SQLTableBase._undo
+        SQLTableBase.pending = []
+        end = self.get_undo_maxseq()
+        if _undo['freeze'] >= 0 and end > _undo['freeze']:
+            end = _undo['freeze']
+        begin = _undo['firstlog']
+        self.start_interval()
+        
+        if begin == _undo['firstlog']:
+            return
+        
+        try:
+            self.undostack[fk].append((begin, end))
+        except KeyError:
+            self.undostack[fk] = [(begin, end)]
+        self.redostack[fk] = []
+    
+    def start_interval(self):
+        pass
+
+    @staticmethod
+    def get_undofreeze():
+        return SQLTableBase.undofreeze
+
+    @staticmethod
+    def set_undofreeze(begin: int):
+        """Set the undofreeze class variable value."""
+        SQLTableBase.undofreeze = begin
+
+    def get_undo_maxseq(self) -> int:
+        """Return the max undolog 'seq' value."""
+        return self.execute_dql("""
+            SELECT coalesce(max(seq), 0) FROM undolog""", None, True).fetchone()[0]
 
 class CatalogueTable(SQLTableBase):
     def __init__(self, connection, catalogue):

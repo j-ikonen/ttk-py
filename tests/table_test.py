@@ -1,3 +1,4 @@
+from typing import KeysView
 import unittest
 import sqlite3
 from decimal import Decimal
@@ -435,7 +436,7 @@ class TestPartsTable(unittest.TestCase):
         self.assertEqual(a[0][0], 4)
         self.assertEqual(b[0][0], 2)
 
-    def test_materials_undo_insert(self):
+    def test_materials_undo_insert_empty(self):
         self.materials_table.insert_empty(0)
         self.materials_table.insert_empty(0)
         a = self.materials_table.select(0, count=True)
@@ -446,6 +447,77 @@ class TestPartsTable(unittest.TestCase):
         self.materials_table.undo(0)
         a = self.materials_table.select(0, count=True)
         self.assertEqual(a[0][0], 0)
+
+    def test_materials_undo_insert(self):
+        values = [
+            1,
+            12,
+            "code",
+            "category",
+            "desc",
+            "prod",
+            16,
+            "is_stock",
+            "unit",
+            Decimal('1.1'),
+            Decimal('1.2'),
+            Decimal('1.3'),
+            Decimal('0.085'),
+            Decimal('0.25')]
+        self.materials_table.insert(values, include_rowid=True)
+        values[0] = 2
+        values[2] = "another_code"
+        self.materials_table.insert(values, include_rowid=True)
+        a = self.materials_table.select(12, count=True)
+        self.assertEqual(a[0][0], 2)
+        self.materials_table.undo(12)
+        a = self.materials_table.select(12, count=True)
+        self.assertEqual(a[0][0], 1)
+        self.materials_table.undo(12)
+        a = self.materials_table.select(12, count=True)
+        self.assertEqual(a[0][0], 0)
+
+    def test_materials_undo_insert_without_rowid(self):
+        values = [
+            12,
+            "code",
+            "category",
+            "desc",
+            "prod",
+            16,
+            "is_stock",
+            "unit",
+            Decimal('1.1'),
+            Decimal('1.2'),
+            Decimal('1.3'),
+            Decimal('0.085'),
+            Decimal('0.25')]
+        self.materials_table.insert(values)
+        values[1] = "another_code"
+        self.materials_table.insert(values)
+        a = self.materials_table.select(12, count=True)
+        self.assertEqual(a[0][0], 2)
+        self.materials_table.undo(12)
+        a = self.materials_table.select(12, count=True)
+        self.assertEqual(a[0][0], 1)
+        self.materials_table.undo(12)
+        a = self.materials_table.select(12, count=True)
+        self.assertEqual(a[0][0], 0)
+
+    def test_trigger_auto_gen(self):
+        set_strings = map(
+            lambda k: "{key}='||quote(old.{key})||'".format(key=k),
+            self.materials_table.get_insert_keys(True)
+        )
+        s = """'UPDATE {t} SET {sv} WHERE {pk}='||old.{pk}""".format(
+            t=self.materials_table.name,
+            sv=','.join(set_strings),
+            pk=self.materials_table.primary_key
+        )
+        print(s)
+        self.assertEqual(1, 1)
+
+
 
 
 if __name__ == '__main__':
