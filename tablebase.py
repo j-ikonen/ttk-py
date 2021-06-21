@@ -103,7 +103,7 @@ def connect(db_name: str) -> sqlite3.Connection:
 
     con.execute("""
         CREATE TABLE undolog (
-            seq INTEGER PRIMARY KEY AUTOINCEMENT,
+            seq INTEGER PRIMARY KEY AUTOINCREMENT,
             fk INTEGER,
             tablename TEXT,
             sql TEXT
@@ -222,6 +222,8 @@ class SQLTableBase:
                 self.con.execute(self.sql_create_table)
                 for idx in self.indexes:
                     self.con.execute(idx)
+
+                self.create_undo_triggers()
 
                 # Insert default columns values if required.
                 count = self.con.execute(
@@ -365,60 +367,7 @@ class SQLTableBase:
             u=rep_str, t=self.name, k=keys_str, b=binds
         )
 
-        # ret_rowid = False if many else True
-
-        # Push undo statement to undostack.
-
-        # Get Fk or None for stack key
-        fk = values[1] if self.foreign_key is not None else None
-        # Check for existing rows if upsert is True.
-        if upsert:
-            undo_keystr = ",".join(self.get_insert_keys(True))
-            sql_sel = "SELECT {k} FROM {t} WHERE {pk}=(?)".format(
-                k=undo_keystr, pk=self.primary_key, t=self.name
-            )
-            existing = self.execute_dql(sql_sel, (values[0],))
-            # For undoing REPLACE statement.
-            if len(existing) > 0:
-                sql_undo_insert = "INSERT INTO {t}({k}) VALUES ({b})".format(
-                    t=self.name, k=undo_keystr, b=binds
-                )
-                # push INSERT existing
-                try:
-                    self.undostack[fk].append((sql_undo_insert, existing))
-                except KeyError:
-                    self.undostack[fk] = []
-                    self.undostack[fk].append((sql_undo_insert, existing))
-
-
         result = self.execute_dml(sql, values, many, not many)
-        if include_rowid and not many:
-            pk = values[0]
-        elif not many:
-            pk = result
-        elif not include_rowid and many:
-            pk = [row[0] for row in values]
-        else:
-            pk = None
-
-        # push DELETE at pk
-        if pk is not None:
-            pklen = 1
-            if isinstance(pk, list):
-                pklen = len(pk)
-            else:
-                pk = [pk]
-
-            sql_undo_delete = """DELETE FROM {t} WHERE {pk}=(?)""".format(
-                t=self.name, pk=self.primary_key)
-
-            for n in range(pklen):
-                try:
-                    self.undostack[fk].append((sql_undo_delete, (pk[n],)))
-                except KeyError:
-                    self.undostack[fk] = []
-                    self.undostack[fk].append((sql_undo_delete, (pk[n],)))
-
         return result
 
     def insert_empty(self, fk: int=None) -> int:
@@ -443,15 +392,6 @@ class SQLTableBase:
             sql = sql_ins.format(t=self.name) + sql_val.format(k=self.foreign_key)
             values = (fk,)
         rowid = self.execute_dml(sql, values, rowid=True)
-
-        # Push undo statement to undostack.
-        sql_undo = """DELETE FROM {t} WHERE {pk}=(?)""".format(
-            t=self.name, pk=self.primary_key)
-        try:
-            self.undostack[fk].append((sql_undo, (rowid,)))
-        except KeyError:
-            self.undostack[fk] = []
-            self.undostack[fk].append((sql_undo, (rowid,)))
 
         return rowid
 
@@ -505,15 +445,12 @@ class SQLTableBase:
         bool
             True on success.
         """
-        try:
-            (sql, values) = self.undostack[fk].pop()
-        except (IndexError, KeyError) as e:
-            if self.print_errors:
-                print("\n{}: {}".format(type(e), e))
-                print("No action to undo.")
-            return False
-        else:
-            return self.execute_dml(sql, values)
+        self.undo_step(fk, True)
+        return True
+    
+    def redo(self, fk: int=None) -> bool:
+        self.undo_step(fk, False)
+        return True
 
     def select(self, fk: int=None, filter: dict=None, count: bool=False) -> list:
         """Get list of rows from the table.
@@ -680,14 +617,21 @@ class SQLTableBase:
         )
         keys = ins_keys
         value_strings = map(
-            lambda k: "'||old.{key}||'".format(key=k),
+            lambda k: "'||quote(old.{key})||'".format(key=k),
             ins_keys
         )
+        if self.foreign_key is None:
+            fk_str = "NULL"
+            dfk_str = "NULL"
+        else:
+            fk_str = "quote(new.{})".format(self.foreign_key)
+            dfk_str = "quote(old.{})".format(self.foreign_key)
+
         script = """
         CREATE TEMP TRIGGER {t}_it AFTER INSERT ON {t} BEGIN
             INSERT INTO undolog VALUES(
                 NULL,
-                new.{fk},
+                {fk},
                 '{t}',
                 'DELETE FROM {t} WHERE {pk}='||new.{pk}
                 );
@@ -695,7 +639,7 @@ class SQLTableBase:
         CREATE TEMP TRIGGER {t}_ut AFTER UPDATE ON {t} BEGIN
             INSERT INTO undolog VALUES(
                 NULL,
-                new.{fk},
+                {fk},
                 '{t}',
                 'UPDATE {t} SET {s} WHERE {pk}='||old.{pk}
             );
@@ -703,14 +647,15 @@ class SQLTableBase:
         CREATE TEMP TRIGGER {t}_dt BEFORE DELETE ON {t} BEGIN
             INSERT INTO undolog VALUES(
                 NULL,
-                new.{fk},
+                {dfk},
                 '{t}',
                 'INSERT INTO {t}({k}) VALUES({v})'
             );
         END;
         """.format(
             t=self.name,
-            fk=self.foreign_key,
+            fk=fk_str,
+            dfk=dfk_str,
             pk=self.primary_key,
             s=','.join(set_strings),
             k=','.join(keys),
@@ -743,40 +688,96 @@ class SQLTableBase:
         _undo['freeze'] = -1
 
     def undo_barrier(self, fk: int):
-        """Create an undo barrier."""
+        """Create an undo barrier.
+        
+        TODO: SAVE FIRSTLOG FOR EACH FK
+        
+        """
         _undo = SQLTableBase._undo
         SQLTableBase.pending = []
+
         end = self.get_undo_maxseq()
         if _undo['freeze'] >= 0 and end > _undo['freeze']:
             end = _undo['freeze']
+
         begin = _undo['firstlog']
         self.start_interval()
-        
+
+        # Nothing to undo after last start interval.
         if begin == _undo['firstlog']:
             return
-        
+
         try:
             self.undostack[fk].append((begin, end))
         except KeyError:
             self.undostack[fk] = [(begin, end)]
         self.redostack[fk] = []
-    
+
+        for k, v in self.undostack.items():
+            print("\nfk: {}".format(k))
+            for interval in v:
+                print("\tinterval: {}".format(interval))
+
     def start_interval(self):
-        pass
-
-    @staticmethod
-    def get_undofreeze():
-        return SQLTableBase.undofreeze
-
-    @staticmethod
-    def set_undofreeze(begin: int):
-        """Set the undofreeze class variable value."""
-        SQLTableBase.undofreeze = begin
+        """Record the starting seq value of the interval."""
+        _undo = SQLTableBase._undo
+        _undo['firstlog'] = self.execute_dql(
+            "SELECT coalesce(max(seq),0)+1 FROM undolog")[0][0]
 
     def get_undo_maxseq(self) -> int:
         """Return the max undolog 'seq' value."""
         return self.execute_dql("""
-            SELECT coalesce(max(seq), 0) FROM undolog""", None, True).fetchone()[0]
+            SELECT coalesce(max(seq),0) FROM undolog""", None, True).fetchone()[0]
+
+    def undo_step(self, fk: int, is_undo: bool=True):
+        """Do undo or redo action.
+
+        Parameters
+        ----------
+        fk : int, optional
+            Key to the specific undostack, by default None
+        is_undo : bool, optional
+            True for undo step, False for redo step.
+        """
+        _undo = SQLTableBase._undo
+        if is_undo:
+            (begin, end) = self.undostack[fk].pop()
+        else:
+            (begin, end) = self.redostack[fk].pop()
+
+        result = self.execute_dql("""
+            SELECT sql FROM undolog
+            WHERE
+                tablename=(?) AND
+                fk=(?) AND
+                seq>=(?) AND
+                seq<=(?)
+            ORDER BY seq DESC
+        """, (self.name, fk, begin, end))
+
+        self.execute_dml("""
+            DELETE FROM undolog
+            WHERE
+                tablename=(?) AND
+                fk=(?) AND
+                seq>=(?) AND
+                seq<=(?)
+        """, (self.name, fk, begin, end))
+
+        self.start_interval()
+
+        for (sql,) in result:
+            self.execute_dml(sql)
+        
+        end = self.get_undo_maxseq()
+        begin = _undo['firstlog']
+
+        if is_undo:
+            self.redostack[fk].append((begin, end))
+        else:
+            self.undostack[fk].append((begin, end))
+        self.start_interval()
+
 
 class CatalogueTable(SQLTableBase):
     def __init__(self, connection, catalogue):
