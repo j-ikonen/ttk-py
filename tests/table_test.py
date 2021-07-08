@@ -437,7 +437,7 @@ class TestPartsTable(unittest.TestCase):
         self.assertEqual(b[0][0], 2)
 
     def test_materials_undo_insert_empty(self):
-        self.materials_table.undo_barrier(0)
+        # self.materials_table.undo_barrier(0)
         self.materials_table.insert_empty(0)
         self.materials_table.undo_barrier(0)
         self.materials_table.insert_empty(0)
@@ -452,7 +452,42 @@ class TestPartsTable(unittest.TestCase):
         a = self.materials_table.select(0, count=True)
         self.assertEqual(a[0][0], 0)
 
-    def test_materials_undo_insert(self):
+    def test_multiple_undo_redo_insert_empty(self):
+        # self.materials_table.undo_barrier(0)
+        self.materials_table.insert_empty(0)
+        self.materials_table.undo_barrier(0)
+        self.materials_table.insert_empty(0)
+        self.materials_table.undo_barrier(0)
+
+        self.products_table.insert_empty(0)
+        self.products_table.undo_barrier(0)
+        self.products_table.insert_empty(0)
+        self.products_table.undo_barrier(0)
+
+        self.products_table.insert_empty(1)
+        self.products_table.undo_barrier(1)
+
+        a = self.materials_table.select(0, count=True)
+        self.assertEqual(a[0][0], 2)
+        self.materials_table.undo(0)
+        a = self.materials_table.select(0, count=True)
+        self.assertEqual(a[0][0], 1)
+        self.materials_table.undo(0)
+        a = self.materials_table.select(0, count=True)
+        self.assertEqual(a[0][0], 0)
+
+        a = self.products_table.select(0, count=True)
+        self.assertEqual(a[0][0], 2)
+
+        self.products_table.undo(0)
+        a = self.products_table.select(0, count=True)
+        self.assertEqual(a[0][0], 1)
+
+        self.products_table.undo(1)
+        a = self.products_table.select(1, count=True)
+        self.assertEqual(a[0][0], 0)
+
+    def test_materials_undo_redo_insert(self):
         values = [
             1,
             12,
@@ -474,16 +509,31 @@ class TestPartsTable(unittest.TestCase):
         values[2] = "another_code"
         self.materials_table.insert(values, include_rowid=True)
         self.materials_table.undo_barrier(12)
+
         a = self.materials_table.select(12, count=True)
         self.assertEqual(a[0][0], 2)
+
         self.materials_table.undo(12)
         a = self.materials_table.select(12, count=True)
         self.assertEqual(a[0][0], 1)
+
         self.materials_table.undo(12)
         a = self.materials_table.select(12, count=True)
         self.assertEqual(a[0][0], 0)
 
-    def test_materials_undo_insert_without_rowid(self):
+        self.materials_table.redo(12)
+        a = self.materials_table.select(12, count=True)
+        self.assertEqual(a[0][0], 1)
+
+        self.materials_table.redo(12)
+        a = self.materials_table.select(12, count=True)
+        self.assertEqual(a[0][0], 2)
+
+        self.materials_table.undo(12)
+        a = self.materials_table.select(12, count=True)
+        self.assertEqual(a[0][0], 1)
+
+    def test_materials_undo_redo_insert_without_rowid(self):
         values = [
             12,
             "code",
@@ -515,6 +565,39 @@ class TestPartsTable(unittest.TestCase):
         self.materials_table.undo(12)
         a = self.materials_table.select(12, count=True)
         self.assertEqual(a[0][0], 0)
+
+        self.materials_table.redo(12)
+        a = self.materials_table.select(12, count=True)
+        self.assertEqual(a[0][0], 1)
+
+        self.materials_table.redo(12)
+        a = self.materials_table.select(12, count=True)
+        self.assertEqual(a[0][0], 2)
+
+        self.materials_table.undo(12)
+        a = self.materials_table.select(12, count=True)
+        self.assertEqual(a[0][0], 1)
+
+
+class TestVariables(unittest.TestCase):
+    def setUp(self) -> None:
+        """Setup a SQLite database in memory for testing."""
+        self.con = tb.connect(":memory:")
+        self.con.execute("PRAGMA foreign_keys = OFF")
+        sqlite3.enable_callback_tracebacks(True)
+
+    def tearDown(self) -> None:
+        sqlite3.enable_callback_tracebacks(False)
+        self.con.close()
+
+    def test_get_variable(self):
+        var = tb.Variables.get(self.con, tb.VarID.INSTALL_UNIT_MULT)
+        self.assertEqual(var, Decimal('0.0'))
+
+    def test_set_variable(self):
+        tb.Variables.set(self.con, tb.VarID.WORK_COST, Decimal('32.50'))
+        var = tb.Variables.get(self.con, tb.VarID.WORK_COST)
+        self.assertEqual(var, Decimal('32.50'))
 
 
 if __name__ == '__main__':

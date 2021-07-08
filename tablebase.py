@@ -1,10 +1,87 @@
+"""Classes for handling local database operations.
+
+Catalogue tables work as a local database for now.
+Could be implemented to connect to remote at a later time.
+"""
+
 import sqlite3
 from decimal import Decimal
 from asteval import Interpreter
 
 
-VAR_ID_WORK_COST = 0
-VAR_ID_INSTALL_UNIT_MULT = 1
+class VarID:
+    """Use as primary key to find the variables in local database table 'variables'."""
+    WORK_COST = 0
+    INSTALL_UNIT_MULT = 1
+
+    COL = {
+        WORK_COST: "value_decimal",
+        INSTALL_UNIT_MULT: "value_decimal"
+    }
+
+    @classmethod
+    def col(cls, id, set=False) -> str:
+        col_name = cls.COL[id]
+        if set:
+            return col_name
+        else:
+            if col_name == "value_decimal":
+                col_name = "value_decimal AS 'value_decimal [pydecimal]'"
+            return col_name
+
+
+class Variables:
+    """Get and set the local variables table values."""
+    PRINT_ERRORS = False
+
+    @classmethod
+    def print_errors(cls, value=True):
+        cls.PRINT_ERRORS = value
+
+    @classmethod
+    def get(cls, con: sqlite3.Connection, var_id: VarID):
+        """Return the value for var_id."""
+        col_name = VarID.col(var_id)
+        sql = """
+            SELECT {c}
+            FROM variables
+            WHERE variable_id = (?)
+        """.format(c=col_name)
+        try:
+            with con:
+                cur = con.execute(sql, (var_id,))
+                return cur.fetchone()[0]
+
+        except sqlite3.Error as e:
+            if cls.print_errors:
+                print("\n{}: {}".format(type(e), e))
+                print("In SQLTableBase.execute_dql")
+                print("Error with sql: {}".format(sql))
+                print("using values: {}".format((var_id,)))
+            return None
+
+    @classmethod
+    def set(cls, con: sqlite3.Connection, var_id: VarID, value):
+        """Set the value for var_id."""
+        col_name = VarID.col(var_id, True)
+        sql = """
+            UPDATE variables
+            SET {c}=(?)
+            WHERE variable_id=(?)
+        """.format(c=col_name)
+        values = (value, var_id)
+        try:
+            with con:
+                con.execute(sql, values)
+                return True
+
+        except sqlite3.Error as e:
+            if cls.print_errors:
+                print("\n{}: {}".format(type(e), e))
+                print("In SQLTableBase.execute_dql")
+                print("Error with sql: {}".format(sql))
+                print("using values: {}".format(values))
+            return False
 
 
 class DecimalSum:
@@ -157,8 +234,8 @@ def connect(db_name: str) -> sqlite3.Connection:
         ) VALUES(?,?,?,?,?)
         """,
         [
-            [VAR_ID_WORK_COST, "Työn hinta", Decimal('0.0'), None, None],
-            [VAR_ID_INSTALL_UNIT_MULT, "Asennusyksikön kerroin", Decimal('0.0'), None, None]
+            [VarID.WORK_COST, "Työn hinta", Decimal('0.0'), None, None],
+            [VarID.INSTALL_UNIT_MULT, "Asennusyksikön kerroin", Decimal('0.0'), None, None]
         ]
     )
     con.commit()
@@ -183,7 +260,7 @@ class SQLTableBase:
     _undo['freeze'] = -1
     _undo['active'] = True
     _undo['pending'] = []
-    _undo['firstlog'] = 0
+    _undo['firstlog'] = {}  # {fk: seq}
 
     def __init__(self, connection):
         self.con: sqlite3.Connection = connection
@@ -476,7 +553,7 @@ class SQLTableBase:
         values = []
         keys = self.table_keys
         sql_sel = self.get_select_query(count)
-        table_alias = self.get_table_alias()
+        table_alias = self.get_table_alias() + "."
 
         # Add the foreign key to filter for parsing.
         if fk is not None and self.foreign_key is not None:
@@ -488,7 +565,7 @@ class SQLTableBase:
 
         if filter is not None:
             # Parse a WHERE string from filter dictionary.
-            where_str = "{t}.{k} {op} (?)"
+            where_str = "{t}{k} {op} (?)"
             for n, (key, value) in enumerate(filter.items()):
                 cond += where_str.format(t=table_alias, k=keys[key], op=value[0])
                 values.append(value[1])
@@ -586,7 +663,7 @@ class SQLTableBase:
 
         Meant to be overridden when necessary to format selected keys
         as required for each table.
-        
+
         Parameters
         ----------
         count : bool, optional
@@ -688,11 +765,7 @@ class SQLTableBase:
         _undo['freeze'] = -1
 
     def undo_barrier(self, fk: int):
-        """Create an undo barrier.
-        
-        TODO: SAVE FIRSTLOG FOR EACH FK
-        
-        """
+        """Create an undo barrier."""
         _undo = SQLTableBase._undo
         SQLTableBase.pending = []
 
@@ -700,12 +773,20 @@ class SQLTableBase:
         if _undo['freeze'] >= 0 and end > _undo['freeze']:
             end = _undo['freeze']
 
-        begin = _undo['firstlog']
-        self.start_interval()
+        try:
+            begin = _undo['firstlog'][fk]
+        except KeyError:
+            _undo['firstlog'][fk] = end
+            begin = _undo['firstlog'][fk]
+
+        self.start_interval(fk)
 
         # Nothing to undo after last start interval.
-        if begin == _undo['firstlog']:
+        if begin == _undo['firstlog'][fk]:
             return
+
+        if begin > end:
+            begin = end
 
         try:
             self.undostack[fk].append((begin, end))
@@ -718,10 +799,10 @@ class SQLTableBase:
             for interval in v:
                 print("\tinterval: {}".format(interval))
 
-    def start_interval(self):
+    def start_interval(self, fk: int):
         """Record the starting seq value of the interval."""
         _undo = SQLTableBase._undo
-        _undo['firstlog'] = self.execute_dql(
+        _undo['firstlog'][fk] = self.execute_dql(
             "SELECT coalesce(max(seq),0)+1 FROM undolog")[0][0]
 
     def get_undo_maxseq(self) -> int:
@@ -750,8 +831,7 @@ class SQLTableBase:
             WHERE
                 tablename=(?) AND
                 fk=(?) AND
-                seq>=(?) AND
-                seq<=(?)
+                seq>=(?) AND seq<=(?)
             ORDER BY seq DESC
         """, (self.name, fk, begin, end))
 
@@ -760,23 +840,22 @@ class SQLTableBase:
             WHERE
                 tablename=(?) AND
                 fk=(?) AND
-                seq>=(?) AND
-                seq<=(?)
+                seq>=(?) AND seq<=(?)
         """, (self.name, fk, begin, end))
 
-        self.start_interval()
+        self.start_interval(fk)
 
         for (sql,) in result:
             self.execute_dml(sql)
-        
+
         end = self.get_undo_maxseq()
-        begin = _undo['firstlog']
+        begin = _undo['firstlog'][fk]
 
         if is_undo:
             self.redostack[fk].append((begin, end))
         else:
             self.undostack[fk].append((begin, end))
-        self.start_interval()
+        self.start_interval(fk)
 
 
 class CatalogueTable(SQLTableBase):
@@ -1232,7 +1311,7 @@ class GroupProductsTable(CatalogueTable):
             Set True to return query for count of entries instead of content.
         """
         if count:
-            return super().get_select_query(count)
+            return "SELECT COUNT(*) FROM group_products as p"
         return """
             SELECT
                 p.group_product_id,
