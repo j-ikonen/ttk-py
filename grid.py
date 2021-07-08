@@ -441,6 +441,112 @@ class DbGrid(wxg.Grid):
         menu.Destroy()
         evt.Skip()
 
+    def on_show_column(self, evt):
+        """Show or hide the column."""
+        is_checked = evt.IsChecked()
+        col = self.id_columns.index(evt.GetId())
+
+        if is_checked:
+            width = self.db.get_column_value(self.table_name, "width", col)
+            self.db.set_visible(self.table_name, col, True)
+            self.SetColSize(col, width)
+        else:
+            self.HideCol(col)
+            self.db.set_visible(self.table_name, col, False)
+        evt.Skip()
+
+    def on_label_lclick(self, evt):
+        """Set focus on this grid."""
+        self.SetFocus()
+        evt.Skip()
+
+    def set_fk(self, value: int):
+        """Set the foreign key for the grid."""
+        self.GetTable().set_fk(value)
+
+    def get_fk(self) -> int:
+        """Return the value of foreign key."""
+        return self.GetTable().get_fk()
+
+    def get_pk(self, row: int) -> int:
+        """Return the primary key from the given row."""
+        return self.GetTable().get_pk_value(row)
+
+    def on_cell_changing(self, evt):
+        """Veto cell change event if change is not allowed."""
+        # A required foreign key is not set.
+        if tb.has_fk(self.table_name) and self.get_fk() is None:
+            print(f"\nError: Can not change value in grid for table '{self.table_name}'.")
+            print("\tForeign key needs to be set.")
+            evt.Veto()
+
+        self.save_action()
+        evt.Skip()
+
+    def on_cell_changed(self, evt):
+        """Refresh the grid on changed cell."""
+        self.ForceRefresh()
+        evt.Skip()
+
+    def on_col_size(self, evt):
+        """Update the columns table with new column width."""
+        col = evt.GetRowOrCol()
+        width = self.GetColSize(col)
+        if width != 0:
+            self.save_width(col, width)
+        self.PostSizeEventToParent()
+        evt.Skip()
+
+    def on_col_move(self, evt):
+        """Veto moves of hidden columns and do CallAfter to save new positions."""
+        col = evt.GetCol()
+        if self.GetColSize(col) == 0:
+            evt.Veto()
+        pos = self.GetColPos(col)
+        wx.CallAfter(self.col_moved, col, pos)
+        evt.Skip()
+
+    def col_moved(self, col_id, old_pos):
+        positions = []
+        for col in range(self.GetNumberCols()):
+            colpos = self.GetColPos(col)
+            positions.append((colpos, col, self.table_name))
+        self.db.set_column_values("col_order", positions)
+
+    def on_select_cell(self, evt):
+        """Set the primary key of selected row as foreign key of any child grids."""
+        # self.ClearSelection()
+        rowid = self.get_pk(evt.GetRow())
+        for fn in self.child_set_fks:
+            fn(rowid)
+        evt.Skip()
+
+    # def on_show_editor(self, evt):
+    #     """Veto cell editing for read only columns."""
+    #     col = evt.GetCol()
+    #     if col in self.read_only:
+    #         print(f"Column {col} is read only. Value can not be changed.")
+    #         evt.Veto()
+
+    def save_action(self):
+        """Save the action to undostack."""
+        fk = self.get_fk()
+        if fk not in self.undostack:
+            self.undostack[fk] = []
+
+        data = self.GetTable().data
+        datacopy = []
+        for row, rd in enumerate(data):
+            rowcopy = []
+            for col, value in enumerate(rd):
+                rowcopy.append(value)
+            datacopy.append(rowcopy)
+        self.undostack[fk].append(datacopy)
+
+    def save_width(self, col, width):
+        """Set the width of the column in columns table."""
+        self.db.set_column_value(self.table_name, "width", col, width)
+
     def set_widths(self):
         """Sets the widths of columns from database values."""
         for col in range(self.GetNumberCols()):
