@@ -574,7 +574,7 @@ class SQLTableBase:
             else:
                 filter[fk_idx] = ["=", fk]
 
-        if filter is not None:
+        if filter is not None and len(filter) > 0:
             # Parse a WHERE string from filter dictionary.
             where_str = "{t}{k} {op} (?)"
             for n, (key, value) in enumerate(filter.items()):
@@ -710,6 +710,18 @@ class SQLTableBase:
         """Return the type string of the column."""
         return self.get_column_setup("type", col)
 
+    def get_column_width(self, col: int) -> int:
+        """Return the type string of the column."""
+        return self.get_column_setup("width", col)
+
+    def get_column_order(self) -> list:
+        """Return a list of column positions."""
+        return self.get_column_setup("col_order")
+
+    def get_column_read_only(self) -> list:
+        """Return a list of column read only states."""
+        return self.get_column_setup("ro")
+
     def create_undo_triggers(self):
         """Format and create the undolog triggers."""
         ins_keys = self.get_insert_keys(True)
@@ -823,6 +835,20 @@ class SQLTableBase:
         #     # print("\nfk: {}".format(k))
         #     for interval in v:
         #         # print("\tinterval: {}".format(interval))
+
+    def can_undo(self, fk: int) -> bool:
+        """Return True if there is an action that can be undone."""
+        try:
+            return len(self.undostack[fk]) > 0
+        except KeyError:
+            return False
+
+    def can_redo(self, fk: int) -> bool:
+        """Return True if there is an action that can be redone."""
+        try:
+            return len(self.redostack[fk]) > 0
+        except KeyError:
+            return False
 
     def start_interval(self, fk: int):
         """Record the starting seq value of the interval."""

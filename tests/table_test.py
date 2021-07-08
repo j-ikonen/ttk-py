@@ -161,6 +161,13 @@ class TestOffersTable(unittest.TestCase):
         result = self.table.select(None, {3: ["like", "suku%"]})
         self.assertEqual(result[0][3], "SukuNimi")
 
+    def test_select_with_empty_filter(self):
+        rowid = self.table.insert_empty(None)
+        self.table.update(rowid, 3, "SukuNimi")
+        result = self.table.select(None, {})
+        # Use row idx 2 since earlier test functions filled the table a bit.
+        self.assertEqual(result[2][3], "SukuNimi")
+
     def test_select_with_fk(self):
         rowid = self.table.insert_empty(None)
         self.table.update(rowid, 3, "SukuNimi")
