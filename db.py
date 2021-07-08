@@ -696,6 +696,20 @@ class SQLTableBase:
         """
         return self.name
 
+    def get_num_columns(self) -> int:
+        """Return the number of columns."""
+        sql = "SELECT COUNT(*) FROM columns WHERE tablename=(?)"
+        num = self.execute_dql(sql, (self.name,))[0][0]
+        return num
+
+    def get_column_label(self, col: int) -> str:
+        """Return the label of the column."""
+        return self.get_column_setup("label", col)
+
+    def get_column_type(self, col: int) -> str:
+        """Return the type string of the column."""
+        return self.get_column_setup("type", col)
+
     def create_undo_triggers(self):
         """Format and create the undolog triggers."""
         ins_keys = self.get_insert_keys(True)
@@ -805,10 +819,10 @@ class SQLTableBase:
             self.undostack[fk] = [(begin, end)]
         self.redostack[fk] = []
 
-        for k, v in self.undostack.items():
-            print("\nfk: {}".format(k))
-            for interval in v:
-                print("\tinterval: {}".format(interval))
+        # for k, v in self.undostack.items():
+        #     # print("\nfk: {}".format(k))
+        #     for interval in v:
+        #         # print("\tinterval: {}".format(interval))
 
     def start_interval(self, fk: int):
         """Record the starting seq value of the interval."""

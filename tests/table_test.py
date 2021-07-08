@@ -577,6 +577,17 @@ class TestPartsTable(unittest.TestCase):
         a = self.materials_table.select(12, count=True)
         self.assertEqual(a[0][0], 1)
 
+    def test_get_num_columns(self):
+        num = self.products_table.get_num_columns()
+        self.assertEqual(num, 14)
+
+    def test_get_column_label(self):
+        label = self.products_table.get_column_label(4)
+        self.assertEqual(label, "Tuoteryhmä")
+
+    def test_get_column_type(self):
+        typestring = self.products_table.get_column_type(4)
+        self.assertEqual(typestring, "string")
 
 class TestVariables(unittest.TestCase):
     def setUp(self) -> None:
