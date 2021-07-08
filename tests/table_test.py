@@ -1,9 +1,8 @@
-from typing import KeysView
 import unittest
 import sqlite3
 from decimal import Decimal
 
-import tablebase as tb
+import db as tb
 
 
 class TestOffersTable(unittest.TestCase):

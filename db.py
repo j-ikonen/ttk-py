@@ -1,9 +1,10 @@
 """Classes for handling local database operations.
 
-Catalogue tables work as a local database for now.
+Use Variables and VarID classes to get and set values from variables table.
+Use connect function to create a sqlite3 connection object required by
+tables. Catalogue tables work as a local database for now.
 Could be implemented to connect to remote at a later time.
 """
-
 import sqlite3
 from decimal import Decimal
 from asteval import Interpreter
@@ -21,6 +22,16 @@ class VarID:
 
     @classmethod
     def col(cls, id, set=False) -> str:
+        """Return the column name used by given 'id'.
+
+        Parameters
+        ----------
+        id : int
+            ID to row of a variable.
+        set : bool, default: False
+            Set to True to return column name for UPDATE statement instead of
+            SELECT statement.
+        """
         col_name = cls.COL[id]
         if set:
             return col_name
