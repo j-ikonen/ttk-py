@@ -1,5 +1,7 @@
 """Classes for handling grids."""
 
+from decimal import Decimal
+from grid_decimal_editor import GridDecimalEditor
 import wx
 import wx.grid as wxg
 
@@ -25,9 +27,11 @@ class GridBase(wxg.GridTableBase):
         super().__init__()
 
         self.db = db
-        self.fk = fk
+        self.fk = None
         self.filter = None
         self.data = None
+
+        self.set_fk(fk)
 
     def GetNumberRows(self):
         """Return the number of rows on display.
@@ -57,6 +61,8 @@ class GridBase(wxg.GridTableBase):
         try:
             return self.data[row][col]
         except IndexError as e:
+            # if self.GetTypeName(row, col) == "decimal":
+            #     return Decimal("0.0")
             return None
 
     def GetColLabelValue(self, col):
@@ -101,6 +107,8 @@ class GridBase(wxg.GridTableBase):
 
         # Set value to a valid row with Primary Key.
         if rowid is not None:
+            if isinstance(value, float):
+                value = Decimal(value)
             success = self.db.update(rowid, col, value)
 
             if success:
@@ -169,9 +177,22 @@ class GridBase(wxg.GridTableBase):
     def update_data(self):
         """Update the displayed data from database."""
         # if not self.update_locked():
-        oldn = len(self.data)
+        try:
+            oldn = len(self.data)
+        except TypeError:
+            oldn = 0
+
         self.data = self.db.select(self.fk, self.filter)
-        newn = len(self.data)
+        try:
+            print("Update gen cell: {} of type: {}".format(self.data[0][-1], type(self.data[-1][-1])))
+        except IndexError:
+            pass
+
+        try:
+            newn = len(self.data)
+        except TypeError:
+            newn = 0
+
         self.update_rows(oldn, newn)
 
     def update_rows(self, old_row_count, new_row_count):
@@ -190,12 +211,15 @@ class GridBase(wxg.GridTableBase):
 
     def get_rowid(self, row):
         """Return the rowid of given row."""
-        return self.data[row][0]
+        try:
+            return self.data[row][0]
+        except IndexError:
+            return None
 
     def delete_row_data(self, row: int):
         """Delete the data at given row."""
         self.db.delete(self.get_rowid(row))
-    
+
     def is_init(self):
         """Return True if this grid table is connected to a source."""
         return self.fk is not None or self.filter is not None
@@ -213,11 +237,13 @@ class DbGrid(wxg.Grid):
         self.child_set_fks = []
         self.db = db
         self.copied_rows = []
+        self.read_only = self.db.get_column_read_only()
 
         table = GridBase(db, fk)
         self.SetTable(table, True, self.GridSelectRows)
         self.SetRowLabelSize(35)
         self.EnableDragColMove(True)
+        self.RegisterDataType("decimal", None, GridDecimalEditor())
 
         self.set_widths()
         self.set_order()
@@ -251,7 +277,7 @@ class DbGrid(wxg.Grid):
     def delete_row(self, row):
         """Delete a row and it's data from grid."""
         self.GetTable().delete_row_data(row)
-        self.undo_barrier()
+        # self.update_content()
 
     def can_undo(self):
         """Return True if action can be undone."""
@@ -267,6 +293,23 @@ class DbGrid(wxg.Grid):
             return
 
         self.db.undo(self.get_fk())
+        self.update_content()
+        self.ForceRefresh()
+
+    def can_redo(self):
+        """Return True if action can be redone."""
+        return self.db.can_redo(self.get_fk())
+    
+    def on_redo(self, evt):
+        """Handle the menu event."""
+        self.redo()
+    
+    def redo(self):
+        """Redo an undone action."""
+        if not self.can_redo():
+            return
+        
+        self.db.redo(self.get_fk())
         self.update_content()
         self.ForceRefresh()
 
@@ -308,10 +351,11 @@ class DbGrid(wxg.Grid):
         selected_rows.sort(reverse=True)
         for row in selected_rows:
             self.delete_row(row)
-        
+
         self.undo_barrier()
+        self.update_content()
         # self.ForceRefresh()
-    
+
     def can_save(self):
         """Return True if this can save object to a catalogue table."""
         return hasattr(self.db, "to_catalogue")
@@ -347,9 +391,12 @@ class DbGrid(wxg.Grid):
             self.Bind(wx.EVT_MENU, self.on_copy, id=wx.ID_COPY)
             self.Bind(wx.EVT_MENU, self.on_paste, id=wx.ID_PASTE)
             self.Bind(wx.EVT_MENU, self.on_delete, id=wx.ID_DELETE)
+            self.Bind(wx.EVT_MENU, self.on_undo, id=wx.ID_UNDO)
+            self.Bind(wx.EVT_MENU, self.on_redo, id=wx.ID_REDO)
             self.Bind(wx.EVT_MENU, self.on_save, id=self.id_save)
 
         mi_undo: wx.MenuItem = menu.Append(wx.ID_UNDO)
+        mi_redo: wx.MenuItem = menu.Append(wx.ID_REDO)
         menu.Append(wx.ID_CUT)
         menu.Append(wx.ID_COPY)
         mi_paste = menu.Append(wx.ID_PASTE)
@@ -368,11 +415,15 @@ class DbGrid(wxg.Grid):
         if not self.can_undo():
             mi_undo.Enable(False)
 
+        if not self.can_redo():
+            mi_redo.Enable(False)
+
         if not self.can_paste():
             mi_paste.Enable(False)
 
         if no_row_selected:
             mi_delete.Enable(False)
+
 
         self.PopupMenu(menu)
         menu.Destroy()
@@ -386,6 +437,8 @@ class DbGrid(wxg.Grid):
 
         mod = evt.GetModifiers()
         if mod == wx.MOD_CONTROL:
+            if mod == wx.MOD_SHIFT:
+                pass
 
             # CTRL+A
             if keycode == 65:
@@ -413,10 +466,16 @@ class DbGrid(wxg.Grid):
         elif mod == wx.MOD_ALT:
             pass
 
-        else:
+        elif mod == wx.MOD_NONE:
             # Delete
             if keycode == wx.WXK_DELETE:
                 self.delete()
+        
+        elif mod == wx.MOD_CONTROL | wx.MOD_SHIFT:
+            
+            # CTRL + SHIFT + Z
+            if keycode == 90:
+                self.redo()
 
         evt.Skip()
 
@@ -492,11 +551,11 @@ class DbGrid(wxg.Grid):
         """Veto cell change event if change is not allowed."""
         # A required foreign key is not set.
         table: GridBase = self.GetTable()
-        if table.is_init():
+        if not table.is_init():
             print(f"\nError: Can not change value in grid for {type(self.db)}.")
             print("\tForeign key or filter needs to be set.")
             evt.Veto()
-        
+
         evt.Skip()
 
     def on_cell_changed(self, evt):
@@ -540,7 +599,7 @@ class DbGrid(wxg.Grid):
     # def on_show_editor(self, evt):
     #     """Veto cell editing for read only columns."""
     #     col = evt.GetCol()
-    #     if col in self.read_only:
+    #     if self.read_only[col]:
     #         print(f"Column {col} is read only. Value can not be changed.")
     #         evt.Veto()
 

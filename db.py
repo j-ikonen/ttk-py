@@ -4,6 +4,9 @@ Use Variables and VarID classes to get and set values from variables table.
 Use connect function to create a sqlite3 connection object required by
 tables. Catalogue tables work as a local database for now.
 Could be implemented to connect to remote at a later time.
+
+TODO:
+    Setup the grid to handle Decimal types.
 """
 import sqlite3
 from decimal import Decimal
@@ -1164,12 +1167,12 @@ class GroupMaterialsTable(CatalogueTable):
             ("group_materials", "thickness", "Paksuus", "long"),
             ("group_materials", "is_stock", "Onko varasto", "choice:varasto,tilaus,tarkista"),
             ("group_materials", "unit", "Hintayksikkö", "choice:€/m2,€/kpl"),
-            ("group_materials", "cost", "Hinta", "double:6,2"),
-            ("group_materials", "add_cost", "Lisähinta", "double:6,2"),
-            ("group_materials", "edg_cost", "R.Nauhan hinta", "double:6,2"),
-            ("group_materials", "loss", "Hukka", "double:6,2"),
-            ("group_materials", "discount", "Alennus", "double:6,2"),
-            ("group_materials", "tot_cost", "Kokonaishinta", "double:6,2")
+            ("group_materials", "cost", "Hinta", "decimal"),
+            ("group_materials", "add_cost", "Lisähinta", "decimal"),
+            ("group_materials", "edg_cost", "R.Nauhan hinta", "decimal"),
+            ("group_materials", "loss", "Hukka", "decimal"),
+            ("group_materials", "discount", "Alennus", "decimal"),
+            ("group_materials", "tot_cost", "Kokonaishinta", "decimal")
         ]
         self.table_keys = [
             "group_material_id",        
@@ -1214,11 +1217,11 @@ class GroupMaterialsTable(CatalogueTable):
                 thickness,   
                 is_stock,    
                 unit,        
-                cost AS 'cost [pydecimal]',        
-                add_cost AS 'add_cost [pydecimal]',    
-                edg_cost AS 'edg_cost [pydecimal]',    
-                loss AS 'loss [pydecimal]',        
-                discount AS 'discount [pydecimal]',    
+                cost AS 'cost [pydecimal]',
+                add_cost AS 'add_cost [pydecimal]',
+                edg_cost AS 'edg_cost [pydecimal]',
+                loss AS 'loss [pydecimal]',
+                discount AS 'discount [pydecimal]',
                 tot_cost AS 'tot_cost [pydecimal]'
             FROM group_materials
         """
