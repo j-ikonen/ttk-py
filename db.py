@@ -153,19 +153,43 @@ def product_cost(part_cost, work_time, work_cost):
     c = converter_decimal(work_cost)
     return adapter_decimal(a + (b * c))
 
-def connect(db_name: str) -> sqlite3.Connection:
-    """Return a connection object to sqlite3 database with given name.
+def connect(
+    db_name: str,
+    fk_on: bool=True,
+    cb_trace: bool=False,
+    print_err: bool=False
+) -> sqlite3.Connection:
+    """Create the connection to SQL database.
 
     Custom types must be declared in data queries to get
     the correct type instead of bytes.
-        SELECT a AS 'a [pydecimal]' FROM table
-    
+        SELECT column_name AS 'column_name [pydecimal]' FROM table
+
     Do adapter/converter registering for custom types:
         pydecimal
     Create functions:
-        dec_add, dec_sub, dec_mul, dec_div
+        dec_add, dec_sub, dec_mul, dec_div, material_cost, product_cost
     Create aggregates:
         dec_sum
+    Create tables for variables and columns if they do not exist.
+    Delete and create a new undolog table.
+
+    Parameters
+    ----------
+    db_name : str
+        Name of the database. Use ':memory:' to start an in memory database.
+    fk_on : bool, optional
+        Set False to turn off foreign keys. Default True
+    cb_trace : bool, optional
+        Set True to enable callback tracebacks.
+        Use for debugging custom SQLite functions and types. Default False.
+    print_err : bool, optional
+        Set True to print error messages to console.
+
+    Returns
+    -------
+    sqlite3.Connection
+        The connection object needed to init the table classes.
     """
     # Converter and adapter for Decimal type.
     sqlite3.register_adapter(Decimal, adapter_decimal)
@@ -173,7 +197,15 @@ def connect(db_name: str) -> sqlite3.Connection:
 
     # Custom type is parsed from table declaration.
     con = sqlite3.connect(db_name, detect_types=sqlite3.PARSE_COLNAMES)
-    con.execute("PRAGMA foreign_keys = ON")
+    if fk_on:
+        con.execute("PRAGMA foreign_keys = ON")
+    else:
+        con.execute("PRAGMA foreign_keys = OFF")
+
+    if cb_trace:
+        sqlite3.enable_callback_tracebacks(True)
+
+    SQLTableBase.print_errors = print_err
 
     # Create functions to handle math in queries for custom types.
     con.create_function("dec_add", -1, decimal_add, deterministic=True)
@@ -210,8 +242,7 @@ def connect(db_name: str) -> sqlite3.Connection:
             ro          INTEGER DEFAULT 0,
             visible     INTEGER DEFAULT 1,
             UNIQUE (tablename, key),
-            UNIQUE (tablename, col_idx),
-            UNIQUE (tablename, col_order)
+            UNIQUE (tablename, col_idx)
         )"""
     )
     con.execute("""

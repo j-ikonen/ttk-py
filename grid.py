@@ -1,6 +1,5 @@
 """Classes for handling grids."""
 
-from old.newgrid import SHOW_COL_HELP
 import wx
 import wx.grid as wxg
 
@@ -196,6 +195,10 @@ class GridBase(wxg.GridTableBase):
     def delete_row_data(self, row: int):
         """Delete the data at given row."""
         self.db.delete(self.get_rowid(row))
+    
+    def is_init(self):
+        """Return True if this grid table is connected to a source."""
+        return self.fk is not None or self.filter is not None
 
 
 class DbGrid(wxg.Grid):
@@ -309,17 +312,22 @@ class DbGrid(wxg.Grid):
         self.undo_barrier()
         # self.ForceRefresh()
     
+    def can_save(self):
+        """Return True if this can save object to a catalogue table."""
+        return hasattr(self.db, "to_catalogue")
+
     def on_save(self, evt):
         """Handle the menu event."""
-        pass
+        self.save()
 
     def save(self):
-        """."""
-        pass
+        """Save the selected rows to a catalogue table."""
+        for row in self.GetSelectedRows():
+            self.db.to_catalogue(self.get_rowid(row))
 
     def on_context_menu(self, evt):
         """Open the cell context menu."""
-        self.SetFocus()
+        self.SetFocus()     # Set focus on this grid.
         menu = wx.Menu()
         row = evt.GetRow()
         col = evt.GetCol()
@@ -331,6 +339,7 @@ class DbGrid(wxg.Grid):
             self.ClearSelection()
             self.SetGridCursor(row, col)
 
+        # Init event bindings on first open of menu.
         if not hasattr(self, "id_save"):
             self.id_save = wx.NewIdRef()
             self.Bind(wx.EVT_MENU, self.on_undo, id=wx.ID_UNDO)
@@ -339,7 +348,7 @@ class DbGrid(wxg.Grid):
             self.Bind(wx.EVT_MENU, self.on_paste, id=wx.ID_PASTE)
             self.Bind(wx.EVT_MENU, self.on_delete, id=wx.ID_DELETE)
             self.Bind(wx.EVT_MENU, self.on_save, id=self.id_save)
-        
+
         mi_undo: wx.MenuItem = menu.Append(wx.ID_UNDO)
         menu.Append(wx.ID_CUT)
         menu.Append(wx.ID_COPY)
@@ -347,14 +356,15 @@ class DbGrid(wxg.Grid):
         menu.AppendSeparator()
         mi_delete = menu.Append(wx.ID_DELETE, "Poista\tDelete")
 
-        # Only add db items if the grid table has database table.
-        if self.db.has_database_table(self.table_name):
+        # Only add catalogue menu items if this grid has a connected catalogue table.
+        if self.can_save():
             menu.AppendSeparator()
             mi_save = menu.Append(self.id_save, "Tallenna", "Tallenna valinta tietokantaan")
 
             if no_row_selected:
                 mi_save.Enable(False)
 
+        # Disable menu items that cannot be done.
         if not self.can_undo():
             mi_undo.Enable(False)
 
@@ -365,7 +375,6 @@ class DbGrid(wxg.Grid):
             mi_delete.Enable(False)
 
         self.PopupMenu(menu)
-
         menu.Destroy()
         evt.Skip()
 
@@ -374,21 +383,25 @@ class DbGrid(wxg.Grid):
         keycode = evt.GetUnicodeKey()
         if keycode == wx.WXK_NONE:
             keycode = evt.GetKeyCode()
-        
+
         mod = evt.GetModifiers()
         if mod == wx.MOD_CONTROL:
 
             # CTRL+A
             if keycode == 65:
-                pass
+                self.SelectAll()
 
             # CTRL+C
             elif keycode == 67:
-                pass
+                self.copy()
 
             # CTRL+V
             elif keycode == 86:
-                pass
+                self.paste()
+
+            # CTRL+X
+            elif keycode == 88:
+                self.cut()
 
             # CTRL+Z
             elif keycode == 90:
@@ -432,6 +445,7 @@ class DbGrid(wxg.Grid):
             is_shown = False if self.GetColSize(col) == 0 else True
             label = self.GetColLabelValue(col)
             positions[pos] = (col, label, is_shown)
+
         SHOW_COL_HELP = "Muuta sarakkeen näkyvyyttä"
         for (col, label, is_shown) in positions:
             menu.AppendCheckItem(self.id_columns[col], label, SHOW_COL_HELP)
@@ -446,13 +460,15 @@ class DbGrid(wxg.Grid):
         is_checked = evt.IsChecked()
         col = self.id_columns.index(evt.GetId())
 
+        # Show column
         if is_checked:
-            width = self.db.get_column_value(self.table_name, "width", col)
-            self.db.set_visible(self.table_name, col, True)
-            self.SetColSize(col, width)
+            self.db.set_column_setup("width", col, 45)
+            self.SetColSize(col, 45)
+
+        # Hide column
         else:
-            self.HideCol(col)
-            self.db.set_visible(self.table_name, col, False)
+            self.db.set_column_setup("width", col, 0)
+            self.SetColSize(col, 0)
         evt.Skip()
 
     def on_label_lclick(self, evt):
@@ -468,23 +484,24 @@ class DbGrid(wxg.Grid):
         """Return the value of foreign key."""
         return self.GetTable().get_fk()
 
-    def get_pk(self, row: int) -> int:
+    def get_rowid(self, row: int) -> int:
         """Return the primary key from the given row."""
-        return self.GetTable().get_pk_value(row)
+        return self.GetTable().get_rowid(row)
 
     def on_cell_changing(self, evt):
         """Veto cell change event if change is not allowed."""
         # A required foreign key is not set.
-        if tb.has_fk(self.table_name) and self.get_fk() is None:
-            print(f"\nError: Can not change value in grid for table '{self.table_name}'.")
-            print("\tForeign key needs to be set.")
+        table: GridBase = self.GetTable()
+        if table.is_init():
+            print(f"\nError: Can not change value in grid for {type(self.db)}.")
+            print("\tForeign key or filter needs to be set.")
             evt.Veto()
-
-        self.save_action()
+        
         evt.Skip()
 
     def on_cell_changed(self, evt):
         """Refresh the grid on changed cell."""
+        self.undo_barrier()
         self.ForceRefresh()
         evt.Skip()
 
@@ -492,8 +509,8 @@ class DbGrid(wxg.Grid):
         """Update the columns table with new column width."""
         col = evt.GetRowOrCol()
         width = self.GetColSize(col)
-        if width != 0:
-            self.save_width(col, width)
+        # if width != 0:
+        self.save_width(col, width)
         self.PostSizeEventToParent()
         evt.Skip()
 
@@ -507,16 +524,15 @@ class DbGrid(wxg.Grid):
         evt.Skip()
 
     def col_moved(self, col_id, old_pos):
-        positions = []
+        """Save the new position after the move has happened."""
         for col in range(self.GetNumberCols()):
-            colpos = self.GetColPos(col)
-            positions.append((colpos, col, self.table_name))
-        self.db.set_column_values("col_order", positions)
+            pos = self.GetColPos(col)
+            self.db.set_column_setup("col_order", col, pos)
 
     def on_select_cell(self, evt):
         """Set the primary key of selected row as foreign key of any child grids."""
         # self.ClearSelection()
-        rowid = self.get_pk(evt.GetRow())
+        rowid = self.get_rowid(evt.GetRow())
         for fn in self.child_set_fks:
             fn(rowid)
         evt.Skip()
@@ -528,24 +544,9 @@ class DbGrid(wxg.Grid):
     #         print(f"Column {col} is read only. Value can not be changed.")
     #         evt.Veto()
 
-    def save_action(self):
-        """Save the action to undostack."""
-        fk = self.get_fk()
-        if fk not in self.undostack:
-            self.undostack[fk] = []
-
-        data = self.GetTable().data
-        datacopy = []
-        for row, rd in enumerate(data):
-            rowcopy = []
-            for col, value in enumerate(rd):
-                rowcopy.append(value)
-            datacopy.append(rowcopy)
-        self.undostack[fk].append(datacopy)
-
     def save_width(self, col, width):
         """Set the width of the column in columns table."""
-        self.db.set_column_value(self.table_name, "width", col, width)
+        self.db.set_column_setup("width", col, width)
 
     def set_widths(self):
         """Sets the widths of columns from database values."""
@@ -554,11 +555,7 @@ class DbGrid(wxg.Grid):
 
     def set_width(self, col):
         """Sets the width of a column from database value."""
-        # if self.db.get_column_visible(col):
-        # Width of 0 should be equal as a hidden column.
-        self.SetColSize(col, self.get_column_width(col))
-        # else:
-        #     self.HideCol(col)
+        self.SetColSize(col, self.db.get_column_width(col))
 
     def set_order(self):
         """Set the order of the columns."""
@@ -592,10 +589,14 @@ class DbGrid(wxg.Grid):
 
 
 if __name__ == '__main__':
+    con = db.connect(":memory:", False, True, True)
+    table = db.GroupMaterialsTable(con)
+    table.create()
+
     app = wx.App()
 
     frame = wx.Frame(None, size=(1200, 600), title="GridTest")
-    grid = DbGrid(frame)
+    grid = DbGrid(frame, table, 1)
 
     frame.Show()
     app.MainLoop()
