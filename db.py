@@ -13,6 +13,29 @@ from decimal import Decimal
 from asteval import Interpreter
 
 
+class Database:
+    def __init__(self, name=":memory:", fk_on=True, cb_trace=False, print_err=False):
+        """Handler for database table classes."""
+        self.con = connect(name, fk_on, cb_trace, print_err)
+        self.offers = OffersTable(self.con)
+        self.groups = GroupsTable(self.con)
+        self.group_predefs = GroupPredefsTable(self.con)
+        self.group_materials = GroupMaterialsTable(self.con)
+        self.group_products = GroupProductsTable(self.con)
+        self.group_parts = GroupPartsTable(self.con)
+
+        self.materials = self.group_materials.get_catalogue_table()
+        self.products = self.group_products.get_catalogue_table()
+        self.parts = self.group_parts.get_catalogue_table()
+
+        self.offers.create()
+        self.groups.create()
+        self.group_predefs.create()
+        self.group_materials.create()
+        self.group_products.create()
+        self.group_parts.create()
+
+
 class VarID:
     """Use as primary key to find the variables in local database table 'variables'."""
     WORK_COST = 0
@@ -338,6 +361,14 @@ class SQLTableBase:
 
     def create(self):
         """Create the table and it's indexes."""
+        
+        # print("Existing columns entries: ")
+        # coldata = self.con.execute(
+        #     "SELECT * FROM columns"
+        # )
+        # for row in coldata:
+        #     print(row)
+        
         try:
             with self.con:
                 # Create table and indexes.
@@ -345,7 +376,10 @@ class SQLTableBase:
                 for idx in self.indexes:
                     self.con.execute(idx)
 
-                self.create_undo_triggers()
+                try:
+                    self.create_undo_triggers()
+                except sqlite3.OperationalError as e:
+                    print("Could not create undo triggers: {}".format(e))
 
                 # Insert default columns values if required.
                 count = self.con.execute(
@@ -355,12 +389,15 @@ class SQLTableBase:
                 if count != len(self.default_columns):
                     for n, col in enumerate(self.default_columns):
                         ro = 1 if col[self.KEY] in self.read_only else 0
-                        self.con.execute(
-                            "INSERT INTO columns ({k}) VALUES (?,?,?,?,?,?,?,?,?)".format(
-                                k=",".join(self.columns_table_keys[1:])
-                            ),
-                            list(col) + [n, n, 60, ro, 1]
-                        )
+                        try:
+                            self.con.execute(
+                                "INSERT INTO columns ({k}) VALUES (?,?,?,?,?,?,?,?,?)".format(
+                                    k=",".join(self.columns_table_keys[1:])
+                                ),
+                                list(col) + [n, n, 60, ro, 1]
+                            )
+                        except sqlite3.IntegrityError:
+                            pass
 
         except sqlite3.OperationalError as e:
             if SQLTableBase.print_errors:
@@ -952,12 +989,17 @@ class SQLTableBase:
         """
         return data[1:]
 
+
 class CatalogueTable(SQLTableBase):
     def __init__(self, connection, catalogue):
         super().__init__(connection)
         catalogue.create()
         self.catalogue = catalogue
     
+    def get_catalogue_table(self):
+        """Return the connected catalogue table."""
+        return self.catalogue
+
     def from_catalogue(self, sql: str, values: list=None) -> int:
         """INSERT a row from catalogue table.
 
@@ -1076,9 +1118,9 @@ class GroupsTable(SQLTableBase):
         self.foreign_key = "offer_id"
         self.read_only = ["group_id", "offer_id"]
         self.default_columns = [
-            ("offers", "group_id", "RyhmäID", "string"),
-            ("offers", "offer_id", "TarjousID", "string"),
-            ("offers", "name", "Ryhmän nimi", "string")
+            ("groups", "group_id", "RyhmäID", "string"),
+            ("groups", "offer_id", "TarjousID", "string"),
+            ("groups", "name", "Ryhmän nimi", "string")
         ]
         self.table_keys = [
             "group_id",

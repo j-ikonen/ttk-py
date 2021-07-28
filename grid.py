@@ -1,10 +1,11 @@
 """Classes for handling grids."""
 
 from decimal import Decimal
-from grid_decimal_editor import GridDecimalEditor
+
 import wx
 import wx.grid as wxg
 
+from grid_decimal_editor import GridDecimalEditor
 import db
 
 
@@ -535,6 +536,7 @@ class DbGrid(wxg.Grid):
 
         self.PopupMenu(menu)
         menu.Destroy()
+        self.PostSizeEventToParent()
         evt.Skip()
 
     def on_show_column(self, evt):
