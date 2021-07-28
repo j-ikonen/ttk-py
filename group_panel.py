@@ -1,4 +1,5 @@
 import wx
+import wx.grid as wxg
 
 from db import Database
 from grid import DbGrid
@@ -17,18 +18,36 @@ class GroupPanel(wx.Panel):
         self.products = DbGrid(self, db.group_products)
         self.parts = DbGrid(self, db.group_parts)
 
-        sizer_v = wx.BoxSizer(wx.VERTICAL)
+        self.txt_predefs = wx.StaticText(self, label="Esimääritykset")
+        self.txt_materials = wx.StaticText(self, label="Materiaalit")
+        self.txt_products = wx.StaticText(self, label="Tuotteet")
+        self.txt_parts = wx.StaticText(self, label="Osat")
+        self.txt_parts_parent = wx.StaticText(self, label="[ei valintaa]")
+
+        sizer_vr = wx.BoxSizer(wx.VERTICAL)
+        sizer_vl = wx.BoxSizer(wx.VERTICAL)
         sizer_h = wx.BoxSizer(wx.HORIZONTAL)
+        sizer_parts_label = wx.BoxSizer(wx.HORIZONTAL)
 
-        sizer_v.Add(self.materials, 1, wx.EXPAND|wx.BOTTOM, Sizes.s)
-        sizer_v.Add(self.products, 1, wx.EXPAND)
-        sizer_v.Add(self.parts, 1, wx.EXPAND|wx.TOP, Sizes.s)
+        sizer_vr.Add(self.txt_materials, 0, wx.EXPAND)
+        sizer_vr.Add(self.materials, 1, wx.EXPAND|wx.BOTTOM, Sizes.s)
+        sizer_vr.Add(self.txt_products, 0, wx.EXPAND)
+        sizer_vr.Add(self.products, 1, wx.EXPAND|wx.BOTTOM, Sizes.s)
 
-        sizer_h.Add(self.predefs, 0, wx.EXPAND|wx.RIGHT, Sizes.s)
-        sizer_h.Add(sizer_v, 1, wx.EXPAND)
+        sizer_parts_label.Add(self.txt_parts, 0, wx.EXPAND|wx.RIGHT, Sizes.m)
+        sizer_parts_label.Add(self.txt_parts_parent, 0, wx.EXPAND)
+        sizer_vr.Add(sizer_parts_label)
+        sizer_vr.Add(self.parts, 1, wx.EXPAND)
+
+        sizer_vl.Add(self.txt_predefs, 0, wx.EXPAND)
+        sizer_vl.Add(self.predefs, 1, wx.EXPAND)
+
+        sizer_h.Add(sizer_vl, 0, wx.EXPAND|wx.ALL, Sizes.s)
+        sizer_h.Add(sizer_vr, 1, wx.EXPAND|wx.RIGHT|wx.TOP|wx.BOTTOM, Sizes.s)
+
+        self.Bind(wxg.EVT_GRID_SELECT_CELL, self.on_select_product, self.products)
 
         self.SetSizer(sizer_h)
-
 
     def set_id(self, id: int):
         self.group_id = id
@@ -36,6 +55,31 @@ class GroupPanel(wx.Panel):
         self.predefs.set_fk(id)
         self.materials.set_fk(id)
         self.products.set_fk(id)
+        self.parts.set_fk(None)
+
+    def on_select_product(self, evt):
+        row = evt.GetRow()
+        if row == self.products.GetNumberRows() - 1:
+            self.txt_parts_parent.SetLabel("[ei valintaa]")
+            # self.parts.set_fk(None)
+        else:
+            try:
+                self.parts.set_fk(self.products.GetTable().GetValue(row, 0))
+            except IndexError:
+                self.txt_parts_parent.SetLabel("[ei valintaa]")
+            else:
+                self.txt_parts_parent.SetLabel(
+                    "[{}]".format(self.products.GetCellValue(row, 2))
+                )
+        evt.Skip()
+
+    def on_change_fk_test(self, evt):
+        if self.group_id == 1:
+            self.set_id(2)
+        elif self.group_id == 2:
+            self.set_id(1)
+        else:
+            self.set_id(1)
 
 
 if __name__ == '__main__':
@@ -44,13 +88,18 @@ if __name__ == '__main__':
     app = wx.App()
 
     frame = wx.Frame(None, title="GroupPanelTest")
-
-    Sizes.scale(frame)
-    frame_size = (Sizes.frame_w, Sizes.frame_h)
+    panel = GroupPanel(frame, db)
+    button = wx.Button(frame, label="Change Foreign Key")
+    frame.Bind(wx.EVT_BUTTON, panel.on_change_fk_test)
+    sizer = wx.BoxSizer(wx.VERTICAL)
+    sizer.Add(button, 0)
+    sizer.Add(panel, 1)
+    frame.SetSizer(sizer)
 
     # frame.SetClientSize(frame.FromDIP(wx.Size(1200, 600)))
+    Sizes.scale(frame)
+    frame_size = (Sizes.frame_w, Sizes.frame_h)
     frame.SetClientSize(frame_size)
-    panel = GroupPanel(frame, db)
 
     frame.Show()
     app.MainLoop()

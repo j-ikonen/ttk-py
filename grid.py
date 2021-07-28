@@ -191,10 +191,10 @@ class GridBase(wxg.GridTableBase):
             oldn = 0
 
         self.data = self.db.select(self.fk, self.filter)
-        try:
-            print("Update gen cell: {} of type: {}".format(self.data[0][-1], type(self.data[-1][-1])))
-        except IndexError:
-            pass
+        # try:
+        #     print("Update gen cell: {} of type: {}".format(self.data[0][-1], type(self.data[-1][-1])))
+        # except IndexError:
+        #     pass
 
         try:
             newn = len(self.data)
@@ -378,6 +378,7 @@ class DbGrid(wxg.Grid):
 
         self.undo_barrier()
         self.update_content()
+        self.ClearSelection()
         # self.ForceRefresh()
 
     def can_save(self):
@@ -563,6 +564,7 @@ class DbGrid(wxg.Grid):
     def set_fk(self, value: int):
         """Set the foreign key for the grid."""
         self.GetTable().set_fk(value)
+        self.ForceRefresh()
 
     def get_fk(self) -> int:
         """Return the value of foreign key."""
