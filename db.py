@@ -623,6 +623,8 @@ class SQLTableBase:
             # SELECT whole table.
             sql = sql_sel
             values = None
+
+        sql += " ORDER BY {k} {d}".format(k=self.primary_key, d="ASC")
         return self.execute_dql(sql, values)
 
     def get_column_setup(self, key: str, col: int=None):
@@ -942,6 +944,13 @@ class SQLTableBase:
             self.undostack[fk].append((begin, end))
         self.start_interval(fk)
 
+    def format_for_insert(self, data):
+        """Format a row for insert.
+        
+        Deletes non-insertable values from the row. Overwrite if more than ID needs
+        to be deleted.
+        """
+        return data[1:]
 
 class CatalogueTable(SQLTableBase):
     def __init__(self, connection, catalogue):
@@ -1191,6 +1200,14 @@ class GroupMaterialsTable(CatalogueTable):
             "discount",
             "tot_cost"
         ]
+
+    def format_for_insert(self, data):
+        """Format a row for insert.
+        
+        Deletes non-insertable values from the row. Overwrite if more than ID needs
+        to be deleted.
+        """
+        return data[1:-1]
 
     def get_insert_keys(self, inc_rowid=False):
         """Overridden member function to remove tot_cost column from insert."""

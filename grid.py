@@ -173,6 +173,13 @@ class GridBase(wxg.GridTableBase):
         """Set the conditions for search and update the grid."""
         self.filter = flt
         self.update_data()
+    
+    def insert_rows(self, rows: list):
+        """Set multiple rows of data to the grid."""
+        temp = []
+        for row in rows:
+            temp.append(self.db.format_for_insert(row))    
+        self.db.insert(temp, True)
 
     def update_data(self):
         """Update the displayed data from database."""
@@ -318,29 +325,45 @@ class DbGrid(wxg.Grid):
         self.cut()
 
     def cut(self):
-        """."""
-        self.undo_barrier()
+        """Copy and delete the selected rows."""
+        self.copy()
+        self.delete()
+        self.ClearSelection()
 
     def on_copy(self, evt):
         """Handle the menu event."""
-        pass
+        self.copy()
 
     def copy(self):
-        """."""
-        pass
+        """Save the current values in selected rows to 'copied_rows'."""
+        selected: list = self.GetSelectedRows()
+        selected.sort()
+        self.copied_rows = []
+        for row in selected:
+            copied_row = []
+            for col in range(self.GetNumberCols()):
+                copied_row.append(self.GetTable().GetValue(row, col))
+            self.copied_rows.append(copied_row)
+        print("COPIED ROWS:")
+        for row in self.copied_rows:
+            print(row)
 
     def can_paste(self):
         """Return True if copied values can be pasted."""
-        pass
+        return len(self.copied_rows) > 0
 
     def on_paste(self, evt):
         """Handle the menu event."""
-        pass
+        self.paste()
 
     def paste(self):
-        """."""
+        """Insert copied or cut rows to the grid."""
+        table: GridBase = self.GetTable()
+        table.insert_rows(self.copied_rows)
+        self.copied_rows = []
         self.undo_barrier()
-    
+        self.update_content()
+
     def on_delete(self, evt):
         """Handle the menu event."""
         self.delete()
