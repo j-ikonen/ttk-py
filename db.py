@@ -35,6 +35,37 @@ class Database:
         self.group_products.create()
         self.group_parts.create()
 
+        self.search_tables = {
+            "offers": self.offers,
+            "materials": self.materials,
+            "products": self.products,
+            "parts": self.parts
+        }
+
+    def get_table_labels(self):
+        return [
+            "Tarjoukset",
+            "Materiaalit",
+            "Tuotteet",
+            "Osat"
+        ]
+
+    def get_table_keys(self):
+        return [
+            "offers",
+            "materials",
+            "products",
+            "parts"
+        ]
+
+    def get_columns_search(self, name):
+        try:
+            table = self.search_tables[name]
+        except KeyError as e:
+            print("No such table is defined for search: {}".format(e))
+            raise e
+        return table.get_column_search()
+
 
 class VarID:
     """Use as primary key to find the variables in local database table 'variables'."""
@@ -716,6 +747,18 @@ class SQLTableBase:
         """.format(k=key)
         values = (value, self.name, col)
         return self.execute_dml(sql, values)
+
+    def get_column_search(self):
+        """Get a list of (key, label) tuples of the columns of this table.
+
+        Returns
+        -------
+        list
+            List of tuples. (key, label)"""
+        sql = """
+            SELECT key, label FROM columns WHERE tablename=(?) ORDER BY col_idx ASC
+        """
+        return self.execute_dql(sql, (self.name,))
 
     def col2key(self, col: int) -> str:
         """Return a key matching the given column from display.

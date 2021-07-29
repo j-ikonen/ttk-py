@@ -257,10 +257,11 @@ class DbGrid(wxg.Grid):
         self.set_order()
 
         # Set column attributes.
-        for col in self.db.get_column_read_only():
-            attr = wxg.GridCellAttr()
-            attr.SetReadOnly(True)
-            self.SetColAttr(col, attr)
+        for col, ro in enumerate(self.db.get_column_read_only()):
+            if ro == 1:
+                attr = wxg.GridCellAttr()
+                attr.SetReadOnly(True)
+                self.SetColAttr(col, attr)
 
         self.Bind(wx.EVT_KEY_DOWN, self.on_key_down)
         self.Bind(wxg.EVT_GRID_CELL_RIGHT_CLICK, self.on_context_menu)
