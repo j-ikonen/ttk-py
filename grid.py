@@ -1,4 +1,9 @@
-"""Classes for handling grids."""
+"""Classes for handling grids.
+
+TODO: GridBase.insert_rows should be changed to insert the whole row or multiple rows at once
+when db module supports it.
+
+"""
 
 from decimal import Decimal
 
@@ -177,10 +182,10 @@ class GridBase(wxg.GridTableBase):
     
     def insert_rows(self, rows: list):
         """Set multiple rows of data to the grid."""
-        temp = []
         for row in rows:
-            temp.append(self.db.format_for_insert(row))    
-        self.db.insert(temp, True)
+            pk = self.db.insert_empty(self.get_fk())
+            for col, value in enumerate(row):
+                self.db.update(pk, col, value)
 
     def update_data(self):
         """Update the displayed data from database."""
@@ -346,9 +351,9 @@ class DbGrid(wxg.Grid):
             for col in range(self.GetNumberCols()):
                 copied_row.append(self.GetTable().GetValue(row, col))
             self.copied_rows.append(copied_row)
-        print("COPIED ROWS:")
-        for row in self.copied_rows:
-            print(row)
+        # print("COPIED ROWS:")
+        # for row in self.copied_rows:
+        #     print(row)
 
     def can_paste(self):
         """Return True if copied values can be pasted."""
@@ -565,6 +570,11 @@ class DbGrid(wxg.Grid):
     def set_fk(self, value: int):
         """Set the foreign key for the grid."""
         self.GetTable().set_fk(value)
+        self.ForceRefresh()
+
+    def set_filter(self, value: dict):
+        """Set the filter for the grid."""
+        self.GetTable().set_filter(value)
         self.ForceRefresh()
 
     def get_fk(self) -> int:

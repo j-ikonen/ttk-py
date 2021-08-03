@@ -41,7 +41,7 @@ class GridDecimalEditor(wxg.GridCellEditor):
             self._tc.PushEventHandler(evtHandler)
 
     def on_char(self, evt):
-        print("Pressed key {}".format(evt.GetKeyCode()))
+        # print("Pressed key {}".format(evt.GetKeyCode()))
         key = evt.GetKeyCode()
         mod = evt.GetModifiers()
         sel = self._tc.GetSelection()

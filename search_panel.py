@@ -69,6 +69,9 @@ class SearchPanel(wx.Panel):
         """Return selected table index."""
         choice = self.choice_table.GetSelection()
         return choice if choice is not wx.NOT_FOUND else None
+    
+    def selected_operator(self) -> str:
+        return self.choice_op.GetStringSelection()
 
     def on_choice_table(self, evt):
         """Handle choice table event."""
@@ -84,11 +87,22 @@ class SearchPanel(wx.Panel):
     def on_choice_column(self, evt):
         """Handle choice column event."""
         # print("Selected column: {}".format(self.col_labels[evt.GetInt()]))
-        print("choice_col")
+        # print("choice_col")
+        evt.Skip()
 
     def on_search(self, evt):
-        """Handle search event."""
+        """Handle search event.
+        
+        {key: [operator, value]}
+        """
         print("search")
+        # table = self.db.get_table(self.table_keys[self.selected_table()])
+        self.grid.set_filter({
+            self.selected_column(): [
+                self.selected_operator(),
+                self.search.GetValue()
+            ]
+        })
 
     def on_add_term(self, evt):
         """Handle add term event."""
@@ -98,7 +112,7 @@ class SearchPanel(wx.Panel):
 if __name__ == '__main__':
     app = wx.App()
 
-    database = Database()
+    database = Database(print_err=True)
     frame = wx.Frame(None, title="SearchPanelTest")
     panel = SearchPanel(frame, database)
 

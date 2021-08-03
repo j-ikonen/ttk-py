@@ -5,8 +5,8 @@ Use connect function to create a sqlite3 connection object required by
 tables. Catalogue tables work as a local database for now.
 Could be implemented to connect to remote at a later time.
 
-TODO:
-    Setup the grid to handle Decimal types.
+TODO: Add a paste_row method to SQLTableBase that sets unique columns to None and
+inserts.
 """
 import sqlite3
 from decimal import Decimal
@@ -41,6 +41,9 @@ class Database:
             "products": self.products,
             "parts": self.parts
         }
+
+    def get_table(self, key: str):
+        return self.search_tables[key]
 
     def get_table_labels(self):
         return [
@@ -172,7 +175,7 @@ def adapter_decimal(decimal: Decimal):
 def converter_decimal(decimal: bytes):
     """Convert bytes from sqlite to Decimal."""
     try:
-        return Decimal(decimal.decode('ascii'))
+        return Decimal(decimal.decode('ascii')).quantize(Decimal('.01'))
     except AttributeError:
         return Decimal('0.00')
 
