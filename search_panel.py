@@ -96,7 +96,6 @@ class SearchPanel(wx.Panel):
 
 
 if __name__ == '__main__':
-
     app = wx.App()
 
     database = Database()

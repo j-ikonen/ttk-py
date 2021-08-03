@@ -1254,8 +1254,8 @@ class GroupMaterialsTable(CatalogueTable):
         self.default_columns = [
             ("group_materials", "group_material_id", "MateriaaliID", "long",),
             ("group_materials", "group_id", "RyhmäID", "long"),
-            ("group_materials", "category", "Tuoteryhmä", "string"),
             ("group_materials", "code", "Koodi", "string"),
+            ("group_materials", "category", "Tuoteryhmä", "string"),
             ("group_materials", "desc", "Kuvaus", "string"),
             ("group_materials", "prod", "Valmistaja", "string"),
             ("group_materials", "thickness", "Paksuus", "long"),
@@ -1457,7 +1457,7 @@ class GroupProductsTable(CatalogueTable):
         ]
         self.primary_key = "group_product_id"
         self.foreign_key = "group_id"
-        self.read_only = ["group_product_id", "group_id", "tot_cost"]
+        self.read_only = ["group_product_id", "group_id", "part_cost", "tot_cost"]
         self.default_columns = [
             ("group_products", "group_product_id", "TuoteID", "long"),
             ("group_products", "group_id", "RyhmäID", "long"),
@@ -1482,10 +1482,10 @@ class GroupProductsTable(CatalogueTable):
             "category",
             "desc",
             "prod",
-            "inst_unit",
             "width",
             "height",
             "depth",
+            "inst_unit",
             "work_time"
         ]
 
@@ -1658,7 +1658,18 @@ class GroupPartsTable(CatalogueTable):
         ]
         self.primary_key = "group_part_id"
         self.foreign_key = "group_product_id"
-        self.read_only = ["group_part_id", "group_product_id"]
+        self.read_only = [
+            "group_part_id",
+            "group_product_id",
+            "width",
+            "length",
+            "cost",
+            # "m.thickness",
+            # "m.tot_cost",
+            # "pr.width",
+            # "pr.height",
+            # "pr.depth"
+        ]
         self.default_columns = [
             ("group_parts", "group_part_id", "OsaID", "string"),
             ("group_parts", "group_product_id", "TuoteID", "string"),
@@ -1675,11 +1686,11 @@ class GroupPartsTable(CatalogueTable):
             ("group_parts", "code_length", "Koodi Pituus", "string"),
             ("group_parts", "code_cost", "Koodi Hinta", "string"),
             ("group_parts", "used_mat", "Käyt. Mat.", "string"),
-            ("group_parts", "m.thickness", "Paksuus", "long"),
-            ("group_parts", "m.tot_cost", "Mat. Hinta", "double:6,2"),
-            ("group_parts", "pr.width", "Tuote leveys", "long"),
-            ("group_parts", "pr.height", "Tuote korkeus", "long"),
-            ("group_parts", "pr.depth", "Tuote syvyys", "long"),
+            # ("group_parts", "m.thickness", "Paksuus", "long"),
+            # ("group_parts", "m.tot_cost", "Mat. Hinta", "double:6,2"),
+            # ("group_parts", "pr.width", "Tuote leveys", "long"),
+            # ("group_parts", "pr.height", "Tuote korkeus", "long"),
+            # ("group_parts", "pr.depth", "Tuote syvyys", "long")
         ]
         self.table_keys = [
             "group_part_id",          
@@ -1718,6 +1729,8 @@ class GroupPartsTable(CatalogueTable):
         """
         # SELECT all parts of product with fk as id.
         parts = super().select(fk, None)
+        # for part in parts:
+        #     print(part)
         # Parse the codes in parts of this product and return changed values.
         new_values = self.parse_codes(parts)
         # UPDATE the changed values.
@@ -1866,7 +1879,7 @@ class GroupPartsTable(CatalogueTable):
                 pa.default_mat,
                 pa.width,
                 pa.length,
-                pa.cost AS 'inst_unit [pydecimal]',
+                pa.cost AS 'pa.cost [pydecimal]',
                 pa.code_width,
                 pa.code_length,
                 pa.code_cost,
@@ -1877,28 +1890,23 @@ class GroupPartsTable(CatalogueTable):
                         d.material
                 END used_mat,
                 m.thickness,
-                m.tot_cost AS 'inst_unit [pydecimal]',
+                m.tot_cost AS 'm.tot_cost [pydecimal]',
                 pr.width,
                 pr.height,
                 pr.depth,
-                pr.code as product_code
+                pr.group_id,
+                d.material,
+                m.code
 
             FROM group_parts AS pa
                 INNER JOIN group_products AS pr
                     ON pr.group_product_id=pa.group_product_id
 
-                LEFT JOIN group_predefs d
+                LEFT JOIN group_predefs AS d
                     ON pr.group_id=d.group_id AND pa.part=d.part
 
-                LEFT JOIN group_materials m
-                    ON (
-                        CASE
-                            WHEN pa.use_predef=0 THEN
-                                pa.default_mat
-                            ELSE
-                                d.material
-                        END
-                    ) = m.code
+                LEFT JOIN group_materials AS m
+                    ON pr.group_id=m.group_id AND pa.default_mat=m.code
         """
 
     def from_catalogue(self, rowid: int, fk: int=None) -> int:
