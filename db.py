@@ -68,6 +68,43 @@ class Database:
             print("No such table is defined for search: {}".format(e))
             raise e
         return table.get_column_search()
+    
+    def get_groups(self, offer_id: int) -> list:
+        """Return the group ids, names and costs."""
+        # groups = self.groups.select(offer_id)   # [(group_id, offer_id, name), ...]
+        costs = self.group_products.execute_dql(
+            """
+            SELECT
+                group_id,
+                name,
+                dec_sum(
+                    product_cost(
+                        a.part_cost,
+                        p.work_time,
+                        (
+                            SELECT value_decimal
+                            FROM variables
+                            WHERE variable_id=0
+                        )
+                    )
+                ) AS 'tot_cost [PYDECIMAL]'
+            FROM
+                groups AS g
+                LEFT JOIN group_products as p USING(group_id)
+                LEFT JOIN (
+                    SELECT a.group_product_id, dec_sum(a.cost) AS part_cost
+                    FROM group_parts AS a
+                    GROUP BY a.group_product_id
+                ) a USING(group_product_id)
+            WHERE offer_id = (?)
+            GROUP BY group_id
+            """,
+            (offer_id,)
+        )
+        print(costs)
+        return costs
+
+
 
 
 class VarID:
@@ -1516,9 +1553,9 @@ class GroupProductsTable(CatalogueTable):
                 p.depth,    
                 p.inst_unit AS 'inst_unit [pydecimal]',
                 p.work_time AS 'work_time [pydecimal]',
-                a.part_cost AS 'work_time [pydecimal]',
+                a.part_cost AS 'part_cost [pydecimal]',
                 product_cost(
-                    part_cost,
+                    a.part_cost,
                     p.work_time,
                     (
                         SELECT value_decimal
