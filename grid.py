@@ -134,13 +134,12 @@ class GridBase(wxg.GridTableBase):
     def AppendRows(self, numRows):
         """Append rows to the grid."""
         msg = wxg.GridTableMessage(self, wxg.GRIDTABLE_NOTIFY_ROWS_APPENDED, numRows)
-        self.GetView().ProcessTableMessage(msg)
-        # self.GetView().PostSizeEventToParent()
+        return self.GetView().ProcessTableMessage(msg)
 
     def DeleteRows(self, pos, numRows):
         """Delete rows from the grid at pos."""
         msg = wxg.GridTableMessage(self, wxg.GRIDTABLE_NOTIFY_ROWS_DELETED, pos, numRows)
-        self.GetView().ProcessTableMessage(msg)
+        return self.GetView().ProcessTableMessage(msg)
         # self.GetView().PostSizeEventToParent()
 
     def GetValueAsDouble(self, row, col):
@@ -687,7 +686,7 @@ class DbGrid(wxg.Grid):
     def update_content(self):
         """Update the contents of this grid."""
         self.GetTable().update_data()
-        print("UPDATE CONTENT: {}".format(type(self.db)))
+        # print("UPDATE CONTENT: {}".format(type(self.db)))
 
     def register_child(self, obj) -> bool:
         """Register a child obj for setting it's foreign key by this grids selection.

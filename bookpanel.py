@@ -36,7 +36,7 @@ class BookPanel(wx.Panel):
         self.search.select_offer(offer_id)
         self.offer.set_offer_id(offer_id)
         self.selected_offer = offer_id
-    
+
     def select_group(self, group_id: int):
         """Select the active group."""
         self.group.set_id(group_id)
@@ -58,13 +58,11 @@ if __name__ == '__main__':
     part_id = database.group_parts.insert_empty(pr_id)
     database.group_parts.update(part_id, 10, Decimal("123.45"))
 
-    frame = wx.Frame(None, title="OfferPanelTest")
+    frame = wx.Frame(None, title="BookPanelTest")
     panel = BookPanel(frame, database)
 
     panel.select_offer(offer_id)
     panel.select_group(group_id)
-    # panel.set_offer_id(offer_id)
-    # panel.update_list()
 
     Sizes.scale(frame)
     frame_size = (Sizes.frame_w, Sizes.frame_h)

@@ -16,6 +16,8 @@ from asteval import Interpreter
 class Database:
     def __init__(self, name=":memory:", fk_on=True, cb_trace=False, print_err=False):
         """Handler for database table classes."""
+        self.open_offers = []
+
         self.con = connect(name, fk_on, cb_trace, print_err)
         self.offers = OffersTable(self.con)
         self.groups = GroupsTable(self.con)
@@ -37,10 +39,23 @@ class Database:
 
         self.search_tables = {
             "offers": self.offers,
+            "groups": self.groups,
             "materials": self.materials,
             "products": self.products,
             "parts": self.parts
         }
+        self.catalogue_tables = {
+            "materials": self.group_materials,
+            "products": self.group_products,
+            "parts": self.group_parts,
+        }
+    
+    def open_offer(self, offer_id):
+        """Open the given offer."""
+        self.open_offers.append(offer_id)
+    
+    def get_cattable(self, key: str):
+        return self.catalogue_tables[key]
 
     def get_table(self, key: str):
         return self.search_tables[key]
@@ -48,6 +63,7 @@ class Database:
     def get_table_labels(self):
         return [
             "Tarjoukset",
+            "Ryhmät",
             "Materiaalit",
             "Tuotteet",
             "Osat"
@@ -56,6 +72,7 @@ class Database:
     def get_table_keys(self):
         return [
             "offers",
+            "groups",
             "materials",
             "products",
             "parts"
@@ -104,7 +121,14 @@ class Database:
         print(costs)
         return costs
 
-
+    def copy_group(self, group_id: int, offer_id: int):
+        """Copy given group and it's content to an offer."""
+        print("UNIMPLEMENTED")
+    
+    def get_open_offer_labels(self):
+        """Return a list of labels of the open offers."""
+        print("UNIMPLEMENTED")
+        return ["Tarjous"]
 
 
 class VarID:

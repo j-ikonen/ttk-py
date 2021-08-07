@@ -24,6 +24,7 @@ class SearchPanel(wx.Panel):
         self.choice_op = wx.Choice(self, choices=operators)
         self.search = wx.SearchCtrl(self, size=(Sizes.search,-1))
         self.btn_add_term = wx.Button(self, label="+", size=(Sizes.btn_s, -1))
+        self.btn_to_offer = wx.Button(self, label="Lisää tarjoukseen.")
         self.grid = DbGrid(self, db.search_tables[self.table_keys[open_table]])
         # ADD CHECKLISTBOX FOR DISPLAYING SEARCH TERMS
         # ADD BUTTON TO REMOVE SELECTED SEARCH TERMS
@@ -33,6 +34,7 @@ class SearchPanel(wx.Panel):
         self.choice_op.Select(0)
 
         self.btn_add_term.SetToolTip("Lisää hakuehto.")
+        self.btn_to_offer.SetToolTip("Lisää valitut rivit aktiiviseen tarjoukseen tai ryhmään.")
         self.choice_table.SetToolTip("Valitse etsittävä taulukko.")
         self.choice_column.SetToolTip("Valitse etsittävä sarake.")
         self.choice_op.SetToolTip("Valitse operaattori.")
@@ -42,6 +44,7 @@ class SearchPanel(wx.Panel):
         self.Bind(wx.EVT_CHOICE, self.on_choice_column, self.choice_column)
         self.Bind(wx.EVT_SEARCH, self.on_search, self.search)
         self.Bind(wx.EVT_BUTTON, self.on_add_term, self.btn_add_term)
+        self.Bind(wx.EVT_BUTTON, self.on_to_offer, self.btn_to_offer)
 
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer_bar = wx.BoxSizer(wx.HORIZONTAL)
@@ -51,6 +54,7 @@ class SearchPanel(wx.Panel):
         sizer_bar.Add(self.choice_op, 0)
         sizer_bar.Add(self.search, 0, wx.EXPAND)
         sizer_bar.Add(self.btn_add_term, 0)
+        sizer_bar.Add(self.btn_to_offer, 0)
 
         sizer.Add(sizer_bar, 0, wx.EXPAND)
         sizer.Add(self.grid, 1, wx.EXPAND)
@@ -122,6 +126,29 @@ class SearchPanel(wx.Panel):
         """Update the panel content."""
         self.grid.update_content()
 
+    def on_to_offer(self, evt):
+        """Handle event for adding selected rows to the selected group or offer."""
+        selected_ids = [self.grid.get_rowid(row) for row in self.grid.GetSelectedRows()]
+        self.grid.ClearSelection()
+        key = self.table_keys[self.selected_table()]
+
+        if key == "offers":
+            for offer_id in selected_ids:
+                self.db.open_offer(offer_id)
+
+        elif key == "groups":
+            for group_id in selected_ids:
+                self.db.copy_group(group_id)
+
+        else:
+            target_table = self.db.get_cattable(key)
+            for rowid in selected_ids:
+                target_table.from_catalogue(rowid, self.selected_group)
+
+    def get_db_table(self):
+        """Return the active database table."""
+        return self.db.search_tables[self.table_keys[self.selected_table()]]
+        
 
 if __name__ == '__main__':
     app = wx.App()
