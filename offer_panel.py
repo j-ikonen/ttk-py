@@ -61,6 +61,11 @@ class OfferPanel(wx.Panel):
         col: dv.DataViewColumn = self.list.GetColumn(0)
         col.SetWidth(width)
 
+    def update(self):
+        """Update the panel content."""
+        self.grid.update_content()
+        self.update_list()
+
 
 if __name__ == '__main__':
     app = wx.App()

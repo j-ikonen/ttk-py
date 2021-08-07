@@ -6,6 +6,7 @@ when db module supports it.
 """
 
 from decimal import Decimal
+from types import FunctionType
 
 import wx
 import wx.grid as wxg
@@ -36,8 +37,9 @@ class GridBase(wxg.GridTableBase):
         self.fk = None
         self.filter = None
         self.data = None
+        # self.AppendRows(1)
 
-        self.set_fk(fk)
+        # self.set_fk(fk)
 
     def GetNumberRows(self):
         """Return the number of rows on display.
@@ -103,7 +105,7 @@ class GridBase(wxg.GridTableBase):
             rowid = self.db.insert_empty(self.fk)
 
             # Debug to make sure database receives correct type.
-            print("Updating value: '{}' of type: {} at col: {}".format(
+            print("Inserting a new row with value: '{}' of type: {} at col: {}".format(
                 value, type(value), col
             ))
 
@@ -196,6 +198,9 @@ class GridBase(wxg.GridTableBase):
             oldn = 0
 
         self.data = self.db.select(self.fk, self.filter)
+        # print("\nDATA FROM SELECT")
+        # print(self.data)
+        # print("\n")
         # try:
         #     print("Update gen cell: {} of type: {}".format(self.data[0][-1], type(self.data[-1][-1])))
         # except IndexError:
@@ -207,20 +212,26 @@ class GridBase(wxg.GridTableBase):
             newn = 0
 
         self.update_rows(oldn, newn)
+        self.GetView().ForceRefresh()
+        # self.DeleteRows(0, self.GetNumberRows() - 1)
+        # self.AppendRows(newn + 1)
 
     def update_rows(self, old_row_count, new_row_count):
         """Update the number of rows in grid."""
         diff = new_row_count - old_row_count
-
+        # print("Old rowcount: {}".format(old_row_count))
+        # print("New rowcount: {}".format(new_row_count))
+        # print("Current rows: {}".format(self.GetNumberRows()))
         # Positive difference adds rows.
+
         if diff > 0:
             self.AppendRows(diff)
         elif diff < 0:
             self.DeleteRows(0, abs(diff))
 
         # Alternate by deleting all rows and reinserting new amount.
-        # self.DeleteRows(0, self.GetNumberRows()-1)
-        # self.AppendRows(new_row_count)
+        # self.DeleteRows(0, self.GetNumberRows())
+        # self.AppendRows(self.GetNumberRows())
 
     def get_rowid(self, row):
         """Return the rowid of given row."""
@@ -248,12 +259,16 @@ class DbGrid(wxg.Grid):
         # List of different objects member functions that are used to
         # update their foreign keys with the primary key of this grid.
         self.child_set_fks = []
+        self.on_cell_change = []
         self.db = db
         self.copied_rows = []
         self.read_only = self.db.get_column_read_only()
 
         table = GridBase(db, fk)
         self.SetTable(table, True, self.GridSelectRows)
+        self.AppendRows(1)
+        # table.set_fk(fk)
+        self.set_fk(fk)
         self.SetRowLabelSize(35)
         self.EnableDragColMove(True)
         self.RegisterDataType("decimal", None, GridDecimalEditor())
@@ -571,6 +586,8 @@ class DbGrid(wxg.Grid):
         """Set the foreign key for the grid."""
         self.GetTable().set_fk(value)
         self.ForceRefresh()
+        # self.PostSizeEventToParent()
+        # self.Layout()
 
     def set_filter(self, value: dict):
         """Set the filter for the grid."""
@@ -600,7 +617,15 @@ class DbGrid(wxg.Grid):
         """Refresh the grid on changed cell."""
         self.undo_barrier()
         self.ForceRefresh()
+        
+        for fn in self.on_cell_change:
+            fn()
+
         evt.Skip()
+
+    def register_on_cell_change(self, fn: FunctionType):
+        """Register a function to run when cell is changed in this grid."""
+        self.on_cell_change.append(fn)
 
     def on_col_size(self, evt):
         """Update the columns table with new column width."""
@@ -662,6 +687,7 @@ class DbGrid(wxg.Grid):
     def update_content(self):
         """Update the contents of this grid."""
         self.GetTable().update_data()
+        print("UPDATE CONTENT: {}".format(type(self.db)))
 
     def register_child(self, obj) -> bool:
         """Register a child obj for setting it's foreign key by this grids selection.
@@ -694,6 +720,7 @@ if __name__ == '__main__':
 
     frame = wx.Frame(None, size=(1200, 600), title="GridTest")
     grid = DbGrid(frame, table, 1)
+    # grid.set_fk(1)
 
     frame.Show()
     app.MainLoop()

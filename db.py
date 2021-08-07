@@ -1940,13 +1940,22 @@ class GroupPartsTable(CatalogueTable):
 
             FROM group_parts AS pa
                 INNER JOIN group_products AS pr
-                    ON pr.group_product_id=pa.group_product_id
+                    ON pa.group_product_id=pr.group_product_id
 
                 LEFT JOIN group_predefs AS d
                     ON pr.group_id=d.group_id AND pa.part=d.part
 
                 LEFT JOIN group_materials AS m
-                    ON pr.group_id=m.group_id AND pa.default_mat=m.code
+                    ON 
+                        pr.group_id=m.group_id AND 
+                        m.code = (
+                            CASE
+                                WHEN pa.use_predef=0 THEN
+                                    pa.default_mat
+                                ELSE
+                                    d.material
+                            END
+                        )
         """
 
     def from_catalogue(self, rowid: int, fk: int=None) -> int:

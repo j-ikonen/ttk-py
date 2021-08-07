@@ -14,9 +14,11 @@ class SearchPanel(wx.Panel):
         self.table_labels = db.get_table_labels()
         self.col_keys = []
         self.col_labels = []
+        operators = ("like", "=", "!=", ">", ">=", "<", "<=")
+        self.selected_offer: int = None
+        self.selected_group: int = None
         self.set_columns(open_table)
 
-        operators = ("like", "=", "!=", ">", ">=", "<", "<=")
         self.choice_table = wx.Choice(self, choices=self.table_labels)
         self.choice_column = wx.Choice(self, choices=self.col_labels)
         self.choice_op = wx.Choice(self, choices=operators)
@@ -107,6 +109,18 @@ class SearchPanel(wx.Panel):
     def on_add_term(self, evt):
         """Handle add term event."""
         print("add term")
+
+    def select_offer(self, offer_id: int):
+        """Select the offer for copying groups from database."""
+        self.selected_offer = offer_id
+
+    def select_group(self, group_id: int):
+        """Select the group where copied materials, products and parts from database go."""
+        self.selected_group = group_id
+
+    def update(self):
+        """Update the panel content."""
+        self.grid.update_content()
 
 
 if __name__ == '__main__':

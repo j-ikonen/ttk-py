@@ -24,6 +24,15 @@ class GroupPanel(wx.Panel):
         self.txt_parts = wx.StaticText(self, label="Osat")
         self.txt_parts_parent = wx.StaticText(self, label="[ei valintaa]")
 
+        self.predefs.register_on_cell_change(self.parts.update_content)
+        self.predefs.register_on_cell_change(self.products.update_content)
+        self.materials.register_on_cell_change(self.parts.update_content)
+        self.materials.register_on_cell_change(self.products.update_content)
+        self.products.register_on_cell_change(self.parts.update_content)
+        # Recalculate possible changes in part costs due to product size change.
+        self.products.register_on_cell_change(self.products.update_content)
+        self.parts.register_on_cell_change(self.products.update_content)
+
         sizer_vr = wx.BoxSizer(wx.VERTICAL)
         sizer_vl = wx.BoxSizer(wx.VERTICAL)
         sizer_h = wx.BoxSizer(wx.HORIZONTAL)
@@ -61,7 +70,7 @@ class GroupPanel(wx.Panel):
         row = evt.GetRow()
         if row == self.products.GetNumberRows() - 1:
             self.txt_parts_parent.SetLabel("[ei valintaa]")
-            # self.parts.set_fk(None)
+            self.parts.set_fk(None)
         else:
             try:
                 self.parts.set_fk(self.products.GetTable().GetValue(row, 0))
@@ -80,6 +89,13 @@ class GroupPanel(wx.Panel):
             self.set_id(1)
         else:
             self.set_id(1)
+
+    def update(self):
+        """Update the panel content."""
+        self.predefs.update_content()
+        self.materials.update_content()
+        self.products.update_content()
+        self.parts.update_content()
 
 
 if __name__ == '__main__':
