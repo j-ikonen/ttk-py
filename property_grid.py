@@ -106,9 +106,9 @@ class PropertyGridBase(wxg.GridTableBase):
         except TypeError:
             return False
 
-    def set_fk(self, value: int, pk: int=None):
+    def set_fk(self, fk: int, pk: int=None):
         """Set the foreign key value and update the grid."""
-        self.fk = value
+        self.fk = fk
         self.pk = pk
         self.update_data()
 
@@ -133,8 +133,9 @@ class PropertyGridBase(wxg.GridTableBase):
 
     def update_data(self):
         """Update the displayed data from database."""
+        pk_filter = {0: ["=", self.pk]}
         try:
-            self.data = list(self.db.select(self.fk, None)[0])
+            self.data = list(self.db.select(self.fk, pk_filter)[0])
             # for n, value in enumerate(self.data):
             #     if isinstance(value, Decimal):
             #         self.data[n] = value.quantize(Decimal('.01'))
@@ -396,6 +397,11 @@ class PropertyGrid(wxg.Grid):
     def set_fk(self, value: int):
         """Set the foreign key for the grid."""
         self.GetTable().set_fk(value)
+        self.ForceRefresh()
+    
+    def set_keys(self, fk: int, pk: int):
+        """Set the foreign and primary key."""
+        self.GetTable().set_fk(fk, pk)
         self.ForceRefresh()
 
     def get_fk(self) -> int:

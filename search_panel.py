@@ -17,6 +17,8 @@ class SearchPanel(wx.Panel):
         operators = ("like", "=", "!=", ">", ">=", "<", "<=")
         self.selected_offer: int = None
         self.selected_group: int = None
+        self.on_open_offer = []
+        self.on_copy_group = []
         self.set_columns(open_table)
 
         self.choice_table = wx.Choice(self, choices=self.table_labels)
@@ -61,6 +63,10 @@ class SearchPanel(wx.Panel):
         
         self.SetSizer(sizer)
 
+        self.search.SetValue("%")
+        self.on_search(None)
+
+
     def set_columns(self, table_idx):
         """Set the column keys and labels."""
         columns = self.db.get_columns_search(self.table_keys[table_idx])
@@ -101,7 +107,7 @@ class SearchPanel(wx.Panel):
         
         {key: [operator, value]}
         """
-        print("search")
+        # print("search")
         # table = self.db.get_table(self.table_keys[self.selected_table()])
         self.grid.set_filter({
             self.selected_column(): [
@@ -135,10 +141,14 @@ class SearchPanel(wx.Panel):
         if key == "offers":
             for offer_id in selected_ids:
                 self.db.open_offer(offer_id)
+                for fn in self.on_open_offer:
+                    fn()
 
         elif key == "groups":
             for group_id in selected_ids:
                 self.db.copy_group(group_id)
+                for fn in self.on_copy_group:
+                    fn()
 
         else:
             target_table = self.db.get_cattable(key)
@@ -148,7 +158,15 @@ class SearchPanel(wx.Panel):
     def get_db_table(self):
         """Return the active database table."""
         return self.db.search_tables[self.table_keys[self.selected_table()]]
-        
+
+    def register_on_open_offer(self, fn):
+        """Register a function to run when an offer is opened."""
+        self.on_open_offer.append(fn)
+
+    def register_on_copy_group(self, fn):
+        """Register a function to run when a group is copied."""
+        self.on_copy_group.append(fn)
+
 
 if __name__ == '__main__':
     app = wx.App()

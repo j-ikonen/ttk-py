@@ -27,7 +27,9 @@ class OfferPanel(wx.Panel):
     def set_offer_id(self, value: int):
         """Set the offer ID value."""
         self.offer_id = value
-        self.grid.set_fk(self.offer_id)
+        self.grid.set_keys(None, self.offer_id)
+        self.update()
+        # self.Layout()
         # self.Refresh()
     
     def init_list(self) -> dv.DataViewListCtrl:
@@ -41,7 +43,7 @@ class OfferPanel(wx.Panel):
         if self.offer_id is None:
             return
 
-        groups = self.db.get_groups(self.offer_id)  # [(id, name, cost), ...]
+        groups = self.db.get_group_costs(self.offer_id)  # [(id, name, cost), ...]
         total = Decimal("0.00")
         width = 0
         font = wx.Font()

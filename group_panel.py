@@ -65,6 +65,7 @@ class GroupPanel(wx.Panel):
         self.materials.set_fk(id)
         self.products.set_fk(id)
         self.parts.set_fk(None)
+        self.update()
 
     def on_select_product(self, evt):
         row = evt.GetRow()
@@ -92,6 +93,18 @@ class GroupPanel(wx.Panel):
 
     def update(self):
         """Update the panel content."""
+        # if self.group_id is None:
+        #     self.predefs.Hide()
+        #     self.materials.Hide()
+        #     self.products.Hide()
+        #     self.parts.Hide()
+
+        # elif not self.predefs.IsShown():
+        #     self.predefs.Show()
+        #     self.materials.Show()
+        #     self.products.Show()
+        #     self.parts.Show()
+
         self.predefs.update_content()
         self.materials.update_content()
         self.products.update_content()

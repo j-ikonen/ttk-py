@@ -86,7 +86,7 @@ class Database:
             raise e
         return table.get_column_search()
     
-    def get_groups(self, offer_id: int) -> list:
+    def get_group_costs(self, offer_id: int) -> list:
         """Return the group ids, names and costs."""
         # groups = self.groups.select(offer_id)   # [(group_id, offer_id, name), ...]
         costs = self.group_products.execute_dql(
@@ -118,17 +118,32 @@ class Database:
             """,
             (offer_id,)
         )
-        print(costs)
+        # print(costs)
         return costs
 
     def copy_group(self, group_id: int, offer_id: int):
         """Copy given group and it's content to an offer."""
         print("UNIMPLEMENTED")
     
+    def get_group_labels(self, offer_id: int):
+        """Return a list of (group_id, name) of the given offer."""
+        sql = """
+            SELECT group_id, name
+            FROM groups
+            WHERE offer_id = (?)
+            ORDER BY group_id ASC
+        """
+        return self.groups.execute_dql(sql, (offer_id,))
+
     def get_open_offer_labels(self):
-        """Return a list of labels of the open offers."""
-        print("UNIMPLEMENTED")
-        return ["Tarjous"]
+        """Return a list of (offer_id, name) of the open offers."""
+        sql = """
+            SELECT offer_id, name
+            FROM offers
+            WHERE offer_id in ({})
+            ORDER BY offer_id ASC
+        """.format(",".join(["?"] * len(self.open_offers)))
+        return self.offers.execute_dql(sql, self.open_offers)
 
 
 class VarID:

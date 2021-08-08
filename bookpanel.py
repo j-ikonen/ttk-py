@@ -36,15 +36,22 @@ class BookPanel(wx.Panel):
         self.search.select_offer(offer_id)
         self.offer.set_offer_id(offer_id)
         self.selected_offer = offer_id
+        self.Refresh()
 
     def select_group(self, group_id: int):
         """Select the active group."""
+        if group_id is None:
+            self.group.Hide()
+        elif not self.group.isShown():
+            self.group.Show()
+
         self.group.set_id(group_id)
         self.search.select_group(group_id)
 
     def on_page_changed(self, evt):
         page = self.book.GetPage(evt.GetSelection())
         page.update()
+        # self.GetParent().update_choices()
 
 
 if __name__ == '__main__':
