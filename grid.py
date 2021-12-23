@@ -12,11 +12,12 @@ import wx
 import wx.grid as wxg
 
 from grid_decimal_editor import GridDecimalEditor
-import db
+from db.super import SQLTableBase
+from db.database import connect
 
 
 class GridBase(wxg.GridTableBase):
-    def __init__(self, db: db.SQLTableBase, fk: int=None):
+    def __init__(self, db: SQLTableBase, fk: int=None):
         """Custom GridTableBase for grids using database as data source.
 
         Setting self.data as None will show an empty noneditable grid.
@@ -26,7 +27,7 @@ class GridBase(wxg.GridTableBase):
 
         Parameters
         ----------
-        db : db.SQLTableBase
+        db : SQLTableBase
             The class for handling database operations.
         fk : int, optional
             Foreign key to the data this grid represents, by default None
@@ -249,7 +250,7 @@ class GridBase(wxg.GridTableBase):
 
 
 class DbGrid(wxg.Grid):
-    def __init__(self, parent, db: db.SQLTableBase, fk: int=None):
+    def __init__(self, parent, db: SQLTableBase, fk: int=None):
         super().__init__(
             parent,
             style=wx.WANTS_CHARS|
@@ -711,8 +712,10 @@ class DbGrid(wxg.Grid):
 
 
 if __name__ == '__main__':
-    con = db.connect(":memory:", False, True, True)
-    table = db.GroupMaterialsTable(con)
+    con = connect(":memory:", False, True, True)
+
+    from db.material import GroupMaterialsTable
+    table = GroupMaterialsTable(con)
     table.create()
 
     app = wx.App()
