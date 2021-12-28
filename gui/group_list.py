@@ -27,7 +27,7 @@ class GroupList(wx.Panel):
             # pylint: disable=attribute-defined-outside-init
             self.id_del = wx.NewIdRef()
             self.Bind(wx.EVT_MENU, self.on_popup_del, id=self.id_del)
-        
+
         menu = wx.Menu()
         menu.Append(self.id_del, "Poista")
         self.PopupMenu(menu)

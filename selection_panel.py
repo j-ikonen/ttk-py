@@ -1,17 +1,20 @@
+"""Panel for selecting active offers and groups."""
 from decimal import Decimal
 
 import wx
 
+# pylint: disable=import-error
 from bookpanel import BookPanel
 from sizes import Sizes
 from db.database import Database
 
 
 class SelectionPanel(wx.Panel):
+    """Panel for selecting active offers and groups"""
     def __init__(self, parent, db: Database):
         super().__init__(parent)
 
-        self.db = db
+        self.database = db
         self.offers = []    # [(offer_id, name), ...]
         self.groups = []    # [(group_id, name), ...]
         self.book = BookPanel(self, db)
@@ -49,23 +52,23 @@ class SelectionPanel(wx.Panel):
         sizer.Add(self.book, 1, wx.EXPAND)
         self.SetSizer(sizer)
 
-    def select_group(self, group_id: int):
+    def select_group(self, gid: int):
         """Set the given group as active."""
-        self.book.select_group(group_id)
+        self.book.select_group(gid)
 
-    def select_offer(self, offer_id: int):
+    def select_offer(self, qid: int):
         """Set the given offer as active."""
-        self.book.select_offer(offer_id)
+        self.book.select_offer(qid)
 
-    def on_close_offer(self, evt):
+    def on_close_offer(self, _evt):
         """Handle event for opening an offer."""
-        self.db.open_offers.remove(self.book.selected_offer)
+        self.database.open_offers.remove(self.book.selected_offer)
         self.choice_offer.Clear()
         self.update_choices()
 
     def update_choices(self):
         """Update the contents of the choice windows."""
-        self.offers = self.db.get_open_offer_labels()
+        self.offers = self.database.get_open_offer_labels()
         labels = [str(offer[1]) for offer in self.offers]
         self.choice_offer.Set(labels)
 
@@ -77,23 +80,23 @@ class SelectionPanel(wx.Panel):
             self.choice_group.Set([])
             return
 
-        self.groups = self.db.get_group_labels(self.offers[offer_sel][0])
+        self.groups = self.database.get_group_labels(self.offers[offer_sel][0])
         self.choice_group.Set([str(gr[1]) for gr in self.groups])
 
     def on_choice_offer(self, evt):
         """Change the active offer to the one selected in choice."""
         # print("CHOICE OFFER")
         sel = evt.GetSelection()
-        offer_id = self.offers[sel][0]
-        self.select_offer(offer_id)
+        oid = self.offers[sel][0]
+        self.select_offer(oid)
         self.select_group(None)
         self.update_group_choice()
 
     def on_choice_group(self, evt):
         """Change the active group to the on selecte in choice."""
         sel = evt.GetSelection()
-        group_id = self.groups[sel][0]
-        self.select_group(group_id)
+        gid = self.groups[sel][0]
+        self.select_group(gid)
 
 
 if __name__ == '__main__':
