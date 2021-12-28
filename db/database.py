@@ -14,6 +14,12 @@ from asteval import Interpreter
 
 import db.dbtypes as dbt
 from db.super import SQLTableBase
+from db.offer import OffersTable
+from db.group import GroupsTable
+from db.predef import GroupPredefsTable
+from db.material import GroupMaterialsTable, MaterialsTable 
+from db.product import GroupProductsTable, ProductsTable 
+from db.part import GroupPartsTable, PartsTable
 from db.vars import VarID, Variables
 
 

@@ -1,7 +1,8 @@
 import wx
 import wx.grid as wxg
 
-from db import Database
+from db.database import Database
+from db.offer import OffersTable
 from grid import DbGrid
 
 from sizes import Sizes

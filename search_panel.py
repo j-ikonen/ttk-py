@@ -1,7 +1,7 @@
 from grid import DbGrid
 import wx
 
-from db import Database
+from db.database import Database
 from sizes import Sizes
 
 

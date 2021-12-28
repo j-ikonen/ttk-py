@@ -4,7 +4,7 @@ import wx
 
 from bookpanel import BookPanel
 from sizes import Sizes
-from db import Database
+from db.database import Database
 
 
 class SelectionPanel(wx.Panel):

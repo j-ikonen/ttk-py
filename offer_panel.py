@@ -2,7 +2,7 @@ from decimal import Decimal
 import wx
 import wx.dataview as dv
 
-from db import Database
+from db.database import Database
 from sizes import Sizes
 from property_grid import PropertyGrid
 

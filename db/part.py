@@ -1,6 +1,7 @@
 """The parts table class for database."""
 
 from db.super import SQLTableBase, CatalogueTable
+from asteval import Interpreter
 
 
 class GroupPartsTable(CatalogueTable):

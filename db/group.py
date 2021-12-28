@@ -1,6 +1,6 @@
 """The groups table class for database."""
 
-from super import SQLTableBase
+from db.super import SQLTableBase
 
 
 class GroupsTable(SQLTableBase):

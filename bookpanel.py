@@ -5,7 +5,7 @@ import wx
 from search_panel import SearchPanel
 from offer_panel import OfferPanel
 from group_panel import GroupPanel
-from db import Database
+from db.database import Database
 from sizes import Sizes
 
 

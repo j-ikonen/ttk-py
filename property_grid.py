@@ -3,13 +3,13 @@ from decimal import Decimal
 import wx
 import wx.grid as wxg
 
-import db
+from db.super import SQLTableBase
 from grid_decimal_editor import GridDecimalEditor
 from sizes import Sizes
 
 
 class PropertyGridBase(wxg.GridTableBase):
-    def __init__(self, db: db.SQLTableBase, fk: int=None):
+    def __init__(self, db: SQLTableBase, fk: int=None):
         super().__init__()
 
         self.db = db
@@ -155,7 +155,7 @@ class PropertyGridBase(wxg.GridTableBase):
 
 
 class PropertyGrid(wxg.Grid):
-    def __init__(self, parent, db: db.SQLTableBase, fk: int=None):
+    def __init__(self, parent, db: SQLTableBase, fk: int=None):
         super().__init__(parent, style=wx.WANTS_CHARS)
         self.db = db
         self.copied_rows = []
@@ -164,7 +164,8 @@ class PropertyGrid(wxg.Grid):
         table = PropertyGridBase(db, fk)
         self.SetTable(table, True)
         
-        font = wx.Font()
+        font = wx.Font(pointSize = 10, family = wx.DEFAULT,
+                       style = wx.NORMAL, weight = wx.NORMAL)
         dc = wx.ScreenDC()
         dc.SetFont(font)
         widest = 0
@@ -434,8 +435,9 @@ class PropertyGrid(wxg.Grid):
 
 
 if __name__ == '__main__':
+    from db.material import GroupMaterialsTable
     con = db.connect(":memory:", False, True, True)
-    table = db.GroupMaterialsTable(con)
+    table = GroupMaterialsTable(con)
     table.create()
 
     app = wx.App()
