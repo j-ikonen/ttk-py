@@ -4,9 +4,18 @@ import wx.dataview as dv
 
 
 class GroupList(wx.Panel):
-    """A list panel for groups in a quote"""
+    """A list panel for groups in a quote
+
+    Parameters
+    ----------
+    quote: Data class for group names and ids.
+        Must implement functions:
+            list<list<GroupName, GroupID>> get_group_list
+            delete_groups(list_of_group_ids)
+            select_group(group_id)
+    """
     def __init__(self, parent, quote):
-        super().__init__(parent)
+        super().__init__(parent, size=(170, -1))
 
         self.quote = quote
         self.dvlc = dv.DataViewListCtrl(self, style=dv.DV_MULTIPLE)
@@ -14,11 +23,13 @@ class GroupList(wx.Panel):
             mode=dv.DATAVIEW_CELL_ACTIVATABLE)
 
         self.dvlc.Bind(dv.EVT_DATAVIEW_ITEM_CONTEXT_MENU, self.on_context_menu)
+        self.dvlc.Bind(dv.EVT_DATAVIEW_ITEM_ACTIVATED, self.on_activate)
 
         sizer = wx.BoxSizer()
         sizer.Add(self.dvlc, 1, wx.EXPAND)
-
         self.SetSizer(sizer)
+
+        self.update()
 
     def on_context_menu(self, _evt):
         """Open context menu"""
@@ -32,6 +43,11 @@ class GroupList(wx.Panel):
         menu.Append(self.id_del, "Poista")
         self.PopupMenu(menu)
         menu.Destroy()
+
+    def on_activate(self, evt):
+        """."""
+        self.quote.select_group(self.dvlc.GetItemData(evt.GetItem()))
+        # print(f"ACTIVATE: {self.dvlc.GetItemData(evt.GetItem())}")
 
     def on_popup_del(self, _evt):
         """Delete the selected items"""
@@ -68,6 +84,10 @@ if __name__ == '__main__':
         def delete_groups(self, items):
             """."""
             self.data = [i for i in self.data if i[1] not in items]
+
+        def select_group(self):
+            """."""
+            # print("TestQuote.select_group()")
 
     app = wx.App()
 
