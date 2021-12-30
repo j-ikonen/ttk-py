@@ -1,4 +1,4 @@
-""" The superclass for database classes inherit. 
+""" The superclass for database classes inherit.
 
 Use Variables and VarID classes to get and set values from variables table.
 Use connect function to create a sqlite3 connection object required by
@@ -10,17 +10,17 @@ inserts.
 """
 import sqlite3
 from decimal import Decimal
-from asteval import Interpreter
+# from asteval import Interpreter
 
 import db.dbtypes as dbt
 from db.super import SQLTableBase
 from db.offer import OffersTable
 from db.group import GroupsTable
 from db.predef import GroupPredefsTable
-from db.material import GroupMaterialsTable, MaterialsTable 
-from db.product import GroupProductsTable, ProductsTable 
-from db.part import GroupPartsTable, PartsTable
-from db.vars import VarID, Variables
+from db.material import GroupMaterialsTable
+from db.product import GroupProductsTable
+from db.part import GroupPartsTable
+from db.vars import VarID
 
 
 def connect(
@@ -155,8 +155,8 @@ def connect(
 
 
 class Database:
+    """Handler for database table classes."""
     def __init__(self, name=":memory:", fk_on=True, cb_trace=False, print_err=False):
-        """Handler for database table classes."""
         self.open_offers = []
 
         self.con = connect(name, fk_on, cb_trace, print_err)
@@ -190,18 +190,21 @@ class Database:
             "products": self.group_products,
             "parts": self.group_parts,
         }
-    
+
     def open_offer(self, offer_id):
         """Open the given offer."""
         self.open_offers.append(offer_id)
-    
+
     def get_cattable(self, key: str):
+        """Return the catalogue table"""
         return self.catalogue_tables[key]
 
     def get_table(self, key: str):
+        """Return the table"""
         return self.search_tables[key]
 
     def get_table_labels(self):
+        """Return the table labels"""
         return [
             "Tarjoukset",
             "Ryhmät",
@@ -211,6 +214,7 @@ class Database:
         ]
 
     def get_table_keys(self):
+        """Return the table keys."""
         return [
             "offers",
             "groups",
@@ -220,13 +224,14 @@ class Database:
         ]
 
     def get_columns_search(self, name):
+        """."""
         try:
             table = self.search_tables[name]
-        except KeyError as e:
-            print("No such table is defined for search: {}".format(e))
-            raise e
+        except KeyError as err:
+            print(f"No such table is defined for search: {err}")
+            raise err
         return table.get_column_search()
-    
+
     def get_group_costs(self, offer_id: int) -> list:
         """Return the group ids, names and costs."""
         # groups = self.groups.select(offer_id)   # [(group_id, offer_id, name), ...]
@@ -262,10 +267,10 @@ class Database:
         # print(costs)
         return costs
 
-    def copy_group(self, group_id: int, offer_id: int):
+    def copy_group(self, _group_id: int, _offer_id: int):
         """Copy given group and it's content to an offer."""
         print("UNIMPLEMENTED")
-    
+
     def get_group_labels(self, offer_id: int):
         """Return a list of (group_id, name) of the given offer."""
         sql = """
@@ -278,10 +283,11 @@ class Database:
 
     def get_open_offer_labels(self):
         """Return a list of (offer_id, name) of the open offers."""
-        sql = """
+        inlist = ",".join(["?"] * len(self.open_offers))
+        sql = f"""
             SELECT offer_id, name
             FROM offers
-            WHERE offer_id in ({})
+            WHERE offer_id in ({inlist})
             ORDER BY offer_id ASC
-        """.format(",".join(["?"] * len(self.open_offers)))
+        """
         return self.offers.execute_dql(sql, self.open_offers)

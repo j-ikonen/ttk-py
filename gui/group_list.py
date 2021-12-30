@@ -2,6 +2,8 @@
 import wx
 import wx.dataview as dv
 
+import values as val
+
 
 class GroupList(wx.Panel):
     """A list panel for groups in a quote
@@ -29,6 +31,7 @@ class GroupList(wx.Panel):
         sizer.Add(self.dvlc, 1, wx.EXPAND)
         self.SetSizer(sizer)
 
+        self.quote.register(val.GROUP_NAME, self.update)
         self.update()
 
     def on_context_menu(self, _evt):

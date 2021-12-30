@@ -1,8 +1,17 @@
-"""Main application"""
-import wx
+"""Interface for database and container for app state"""
 
-from gui.main_panel import MainPanel
+from db.database import Database
 import values as val
+
+
+class Quote:
+    """Interface for database class."""
+    def __init__(self):
+        self.open_group = None
+        self.sel_group_listeners = []
+        self.group_name_listeners = []
+        self.database = Database()
+
 
 class TestQuote:
     """Mock class for quote."""
@@ -51,24 +60,3 @@ class TestQuote:
             self.group_name_listeners.append(listener)
         else:
             print(f"Undefined target '{tar}' in quote.register.")
-
-
-def main():
-    """Main app"""
-
-    app = wx.App()
-
-    frame = wx.Frame(None, title="TTK-PY", size=(800,600))
-    MainPanel(frame, TestQuote())
-
-    # Sizes.scale(frame)
-    # frame_size = (Sizes.frame_w, Sizes.frame_h)
-    # frame.SetClientSize(frame_size)
-
-
-    frame.Show()
-    app.MainLoop()
-
-
-if __name__ == '__main__':
-    main()
