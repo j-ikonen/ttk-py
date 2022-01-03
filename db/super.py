@@ -168,6 +168,8 @@ class SQLTableBase:
             Return a list of results. On Error return None. If 'cursor' is set True
             returns sqlite3.Cursor object.
         """
+#        print(sql)
+#        print(values)
         try:
             with self.con:
                 if values is None:

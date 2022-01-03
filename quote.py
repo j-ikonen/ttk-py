@@ -9,6 +9,7 @@ class AppState:
     def __init__(self):
         # Group id of the open group, None if no group is open
         self.open_group: int = None
+        self.open_quote: int = None
         # Events for changing state
         self.select_group_events = []
         self.ch_group_name_events = []
@@ -16,26 +17,27 @@ class AppState:
 
     def select_event_list(self, event_id):
         """Return the list of events or None."""
-        events = None
+#        print(f"EVENT_ID: {event_id}, TYPE: {type(event_id)}")
         if event_id is val.EVT_SELECT_GROUP:
-            events = self.select_group_events
+            return self.select_group_events
 
         elif event_id is val.EVT_GROUP_NAME:
-            events = self.ch_group_name_events
+            return self.ch_group_name_events
 
         elif event_id is val.EVT_DELETE_GROUP:
-            events = self.delete_group_events
+            return self.delete_group_events
 
-        return events
+        else:
+            return None
 
     def event(self, event_id):
         """Do the events bound with event_id."""
         events = self.select_event_list(event_id)
-        try:
-            for evt in events:
-                evt()
-        except AttributeError:
-            print(f"Undefined event id {event_id} in state.event")
+#        try:
+        for evt in events:
+            evt()
+#        except AttributeError:
+#            print(f"Undefined event id {event_id} in state.event")
 
     def bind(self, event_id, fun):
         """Register a listener."""
@@ -52,10 +54,20 @@ class Quote:
         self.database: Database = Database("test", True, True, True)
         self.state = AppState()
 
-    def get_group_list(self, quote_id: int):
-        """Return a list of groups in quote as [[group_id, name], ...]"""
+    def get_group_list(self, quote_id: int=None):
+        """Return a list of groups in quote as [[group_id, name], ...]
+
+        Parameters
+        ----------
+        quote_id : int, optional
+            ID of quote whose groups are returned, keep as None to return
+            open quotes groups.
+        """
+        if quote_id is None:
+            quote_id = self.state.open_quote
+
         values = self.database.groups.select(quote_id)
-        return [[row[1], row[2]] for row in values]
+        return [[row[0], row[2]] for row in values]
 
     def set_group_name(self, name):
         """Update the opened groups name."""
@@ -76,8 +88,11 @@ class Quote:
 
     def get_group_name(self, group_id: int=None):
         """Return the name of the group with id, or the open group if id is None."""
-        row = self.database.groups.select(filt={"group_id": ["=", group_id]})
-        return row[2]
+        if group_id is None:
+            group_id = self.state.open_group
+        row = self.database.groups.select(filt={0: ["=", group_id]})
+#        print(f"ROW: {row}")
+        return row[0][2]
 
 
 if __name__ == '__main__':

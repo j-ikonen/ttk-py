@@ -19,15 +19,15 @@ class GroupPanel(wx.Panel):
         sizer.Add(self.title)
         self.SetSizer(sizer)
 
-        self.quote.register(val.SELECT_GROUP, self.update)
+        self.quote.state.bind(val.EVT_SELECT_GROUP, self.update)
 
     def update(self):
         """Call when quote.open_group has changed to update display"""
-        self.title.SetValue(self.quote.get_group_title())
+        self.title.SetValue(self.quote.get_group_name())
 
     def on_title_enter(self, _evt):
         """Update the name of the open group"""
-        if self.quote.open_group is None:
+        if self.quote.state.open_group is None:
             print("No group selected.")
             return
 
