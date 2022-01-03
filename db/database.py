@@ -136,20 +136,24 @@ def connect(
             )
         )"""
     )
-    con.executemany("""
-        INSERT INTO variables(
-            variable_id,
-            label,
-            value_decimal,
-            value_int,
-            value_txt
-        ) VALUES(?,?,?,?,?)
-        """,
-        [
-            [VarID.WORK_COST, "Työn hinta", Decimal('0.0'), None, None],
-            [VarID.INSTALL_UNIT_MULT, "Asennusyksikön kerroin", Decimal('0.0'), None, None]
-        ]
-    )
+    try:
+        con.executemany("""
+            INSERT INTO variables(
+                variable_id,
+                label,
+                value_decimal,
+                value_int,
+                value_txt
+            ) VALUES(?,?,?,?,?)
+            """,
+            [
+                [VarID.WORK_COST, "Työn hinta", Decimal('0.0'), None, None],
+                [VarID.INSTALL_UNIT_MULT, "Asennusyksikön kerroin", Decimal('0.0'), None, None]
+            ]
+        )
+    except sqlite3.IntegrityError:
+        pass
+
     con.commit()
     return con
 
@@ -200,7 +204,13 @@ class Database:
         return self.catalogue_tables[key]
 
     def get_table(self, key: str):
-        """Return the table"""
+        """Return the table.
+
+        Parameters
+        ----------
+        key (str): String key for the table, one of:
+            offers, groups, materials, products, parts
+        """
         return self.search_tables[key]
 
     def get_table_labels(self):

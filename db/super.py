@@ -299,12 +299,12 @@ class SQLTableBase:
         """
         self.undo_step(fk, True)
         return True
-    
+
     def redo(self, fk: int=None) -> bool:
         self.undo_step(fk, False)
         return True
 
-    def select(self, fk: int=None, filter: dict=None, count: bool=False) -> list:
+    def select(self, fk: int=None, filt: dict=None, count: bool=False) -> list:
         """Get list of rows from the table.
 
         Filters results by using foreign key or filter dictionary.
@@ -314,10 +314,10 @@ class SQLTableBase:
         ----------
         fk : int, optional
             Foreign key used for filtering the results, by default None
-        filter : dict, optional
+        filt : dict, optional
             A dictionary as a filter in format {key: [operator, value]}, by default None
         count : bool, optional
-            Set true to SELECT count of entries matching given filter and foreign key.
+            Set true to return the count of entries matching given filter and foreign key.
 
         Returns
         -------
@@ -333,18 +333,18 @@ class SQLTableBase:
         # Add the foreign key to filter for parsing.
         if fk is not None and self.foreign_key is not None:
             fk_idx = keys.index(self.foreign_key)
-            if filter is None:
-                filter = {fk_idx: ["=", fk]}
+            if filt is None:
+                filt = {fk_idx: ["=", fk]}
             else:
-                filter[fk_idx] = ["=", fk]
+                filt[fk_idx] = ["=", fk]
 
-        if filter is not None and len(filter) > 0:
+        if filt is not None and len(filt) > 0:
             # Parse a WHERE string from filter dictionary.
             where_str = "{t}{k} {op} (?)"
-            for n, (key, value) in enumerate(filter.items()):
+            for n, (key, value) in enumerate(filt.items()):
                 cond += where_str.format(t=table_alias, k=keys[key], op=value[0])
                 values.append(value[1])
-                if n < len(filter) - 1:
+                if n < len(filt) - 1:
                     cond += " AND "
             sql_con = " WHERE {}".format(cond)
             sql = sql_sel + sql_con
