@@ -3,6 +3,7 @@ import wx
 
 from gui.main_panel import MainPanel
 from quote import Quote
+from frame import Frame
 
 
 def main():
@@ -10,7 +11,8 @@ def main():
 
     app = wx.App()
 
-    frame = wx.Frame(None, title="TTK-PY", size=(800,600))
+    # frame = wx.Frame(None, title="TTK-PY", size=(800,600))
+    frame = Frame()
     MainPanel(frame, Quote())
 
     # Sizes.scale(frame)

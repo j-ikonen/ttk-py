@@ -4,6 +4,7 @@ from db.super import SQLTableBase
 
 
 class GroupsTable(SQLTableBase):
+    """Information for groups sql table"""
     def __init__(self, connection):
         super().__init__(connection)
         self.name = "groups"
