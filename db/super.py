@@ -302,7 +302,11 @@ class SQLTableBase:
         self.undo_step(foreign_key, False)
         return True
 
-    def select(self, foreign_key: int=None, filt: dict=None, count: bool=False) -> list:
+    def select(self, 
+               foreign_key: int=None,
+               filt: dict=None,
+               count: bool=False,
+               pagination: list=None) -> list:
         """Get list of rows from the table.
 
         Filters results by using foreign key or filter dictionary.
@@ -316,6 +320,8 @@ class SQLTableBase:
             A dictionary as a filter in format {key: [operator, value]}, by default None
         count : bool, optional
             Set true to return the count of entries matching given filter and foreign key.
+        pagination : list, optional
+            Set the limit and offset for pagination [limit, offset]
 
         Returns
         -------
@@ -354,6 +360,10 @@ class SQLTableBase:
 
         direction = "ASC"
         sql += f" ORDER BY {self.primary_key} {direction}"
+
+        if pagination:
+            sql += f" LIMIT {pagination[0]} OFFSET {pagination[1]}"
+
         return self.execute_dql(sql, values)
 
     def get_column_setup(self, key: str, col: int=None):

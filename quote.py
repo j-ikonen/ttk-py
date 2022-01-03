@@ -10,10 +10,12 @@ class AppState:
         # Group id of the open group, None if no group is open
         self.open_group: int = None
         self.open_quote: int = None
+        self.open_quote_label: str = None
         # Events for changing state
         self.select_group_events = []
         self.ch_group_name_events = []
         self.delete_group_events = []
+        self.open_quote_events = []
 
     def select_event_list(self, event_id):
         """Return the list of events or None."""
@@ -26,6 +28,9 @@ class AppState:
 
         elif event_id is val.EVT_DELETE_GROUP:
             return self.delete_group_events
+
+        elif event_id is val.EVT_OPEN_QUOTE:
+            return self.open_quote_events
 
         else:
             return None
@@ -91,8 +96,19 @@ class Quote:
         if group_id is None:
             group_id = self.state.open_group
         row = self.database.groups.select(filt={0: ["=", group_id]})
-#        print(f"ROW: {row}")
         return row[0][2]
+
+    def get_quotes(self, search_term):
+        """Return a list of [quote_id, quote_name] matching the search term."""
+        filt = {1: ["like", f"{search_term}%"]}
+        result = self.database.offers.select(filt=filt, pagination=(10,0))
+        return [[row[0], row[1]] for row in result]
+
+    def open_quote(self, quote_id, label):
+        """Open the given quote."""
+        self.state.open_quote = quote_id
+        self.state.open_quote_label = label
+        self.state.event(val.EVT_OPEN_QUOTE)
 
 
 if __name__ == '__main__':
