@@ -2,11 +2,12 @@
 import wx
 import wx.dataview as dv
 
-import values as val
+#import values as val
 from quote import Quote
+import event as evt
 
 
-class GroupList(wx.Panel):
+class GroupList(wx.Panel, evt.EventHandler):
     """A list panel for groups in a quote
 
     Parameters
@@ -32,11 +33,15 @@ class GroupList(wx.Panel):
         sizer.Add(self.dvlc, 1, wx.EXPAND)
         self.SetSizer(sizer)
 
-        self.quote.state.bind(val.EVT_GROUP_NAME, self.update)
-        self.quote.state.bind(val.EVT_OPEN_QUOTE, self.update)
-        self.quote.state.bind(val.EVT_NEW_GROUP, self.update)
-        self.quote.state.bind(val.EVT_DELETE_GROUP, self.delete)
-        self.update()
+        # self.quote.state.bind(val.EVT_GROUP_NAME, self.update)
+        # self.quote.state.bind(val.EVT_OPEN_QUOTE, self.update)
+        # self.quote.state.bind(val.EVT_NEW_GROUP, self.update)
+        # self.quote.state.bind(val.EVT_DELETE_GROUP, self.delete)
+        # self.bind(evt.GROUP_NAME, self.update_name)
+        # self.bind(evt.GROUP_NEW, self.update)
+        # self.bind(evt.GROUP_DELETE, self.update)
+        # self.bind(evt.QUOTE_OPEN, self.update)
+        self.bind(evt.GROUP_CHANGE, self.update)
 
     def on_context_menu(self, _evt):
         """Open context menu"""
@@ -51,9 +56,9 @@ class GroupList(wx.Panel):
         self.PopupMenu(menu)
         menu.Destroy()
 
-    def on_activate(self, evt):
+    def on_activate(self, event):
         """."""
-        self.quote.select_group(self.dvlc.GetItemData(evt.GetItem()))
+        self.quote.select_group(self.dvlc.GetItemData(event.GetItem()))
 #        print(f"ACTIVATE: {self.dvlc.GetItemData(evt.GetItem())}")
 
     def on_popup_del(self, _evt):
@@ -63,9 +68,8 @@ class GroupList(wx.Panel):
     def delete(self):
         """Delete the selected items"""
         self.quote.delete_groups(self.selected())
-        self.update()
 
-    def update(self):
+    def update(self, _data):
         """Update the contents"""
         self.dvlc.DeleteAllItems()
         try:
@@ -109,7 +113,7 @@ if __name__ == '__main__':
     # frame_size = (Sizes.frame_w, Sizes.frame_h)
     # frame.SetClientSize(frame_size)
 
-    panel.update()
+    panel.update([None])
 
     frame.Show()
     app.MainLoop()

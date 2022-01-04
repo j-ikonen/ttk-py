@@ -8,9 +8,9 @@ from gui.group_panel import GroupPanel
 from gui.table import Table
 from quote import Quote
 import values as val
+import event
 
-
-class MainPanel(wx.Panel):
+class MainPanel(wx.Panel, event.EventHandler):
     """."""
     def __init__(self, parent, quote):
         super().__init__(parent)
@@ -22,12 +22,12 @@ class MainPanel(wx.Panel):
         # self.group_label = wx.StaticText(self, label="Ryhmät:")
         self.new_group_btn = wx.Button(self, label="Uusi")
         self.del_group_btn = wx.Button(self, label="Poista")
-        self.materials_table = Table(self, quote)
 
         self.Bind(wx.EVT_BUTTON, self.on_quote, self.quote_btn)
         self.Bind(wx.EVT_BUTTON, self.on_new_group, self.new_group_btn)
         self.Bind(wx.EVT_BUTTON, self.on_del_group, self.del_group_btn)
-        self.quote.state.bind(val.EVT_OPEN_QUOTE, self.on_open_quote)
+        # self.quote.state.bind(val.EVT_OPEN_QUOTE, self.on_open_quote)
+        self.bind(event.QUOTE_OPEN, self.on_open_quote)
 
         sizer = wx.BoxSizer(wx.HORIZONTAL)
         sizer_left = wx.BoxSizer(wx.VERTICAL)
@@ -55,9 +55,10 @@ class MainPanel(wx.Panel):
                 else:
                     print("No quote selected.")
 
-    def on_open_quote(self):
+    def on_open_quote(self, evt):
         """Handle changing the button label for quote."""
-        label = self.quote.state.open_quote_label
+        # label = self.quote.state.open_quote_label
+        label = evt.data[1]
         if not label:
             label = "Valitse tarjous"
         self.quote_btn.SetLabel(label)
@@ -65,11 +66,11 @@ class MainPanel(wx.Panel):
     def on_new_group(self, _evt):
         """Handle new group event"""
         self.quote.new_group()
-        self.quote.state.event(val.EVT_NEW_GROUP)
+        # self.quote.state.event(val.EVT_NEW_GROUP)
 
     def on_del_group(self, _evt):
         """Handle delete group event"""
-        self.quote.state.event(val.EVT_DELETE_GROUP)
+        # self.quote.state.event(val.EVT_DELETE_GROUP)
 
 
 class QuoteDialog(wx.Dialog):

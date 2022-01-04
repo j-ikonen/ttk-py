@@ -2,6 +2,8 @@
 
 from db.database import Database
 import values as val
+#from event import EventHandler
+import event as evt
 
 
 class AppState:
@@ -9,58 +11,12 @@ class AppState:
     def __init__(self):
         # Group id of the open group, None if no group is open
         self.open_group: int = None
+        self.open_group_label: str = None
         self.open_quote: int = None
         self.open_quote_label: str = None
-        # Events for changing state
-        self.select_group_events = []
-        self.ch_group_name_events = []
-        self.delete_group_events = []
-        self.open_quote_events = []
-        self.new_group_events = []
-        self.table_update_events = []
-
-    def select_event_list(self, event_id):
-        """Return the list of events or None."""
-#        print(f"EVENT_ID: {event_id}, TYPE: {type(event_id)}")
-        if event_id is val.EVT_SELECT_GROUP:
-            return self.select_group_events
-
-        if event_id is val.EVT_GROUP_NAME:
-            return self.ch_group_name_events
-
-        if event_id is val.EVT_DELETE_GROUP:
-            return self.delete_group_events
-
-        if event_id is val.EVT_OPEN_QUOTE:
-            return self.open_quote_events
-
-        if event_id is val.EVT_NEW_GROUP:
-            return self.new_group_events
-
-        if event_id is val.EVT_TABLE_UPDATE:
-            return self.new_group_events
-
-        return None
-
-    def event(self, event_id):
-        """Do the events bound with event_id."""
-        events = self.select_event_list(event_id)
-#        try:
-        for evt in events:
-            evt()
-#        except AttributeError:
-#            print(f"Undefined event id {event_id} in state.event")
-
-    def bind(self, event_id, fun):
-        """Register a listener."""
-        events = self.select_event_list(event_id)
-        try:
-            events.append(fun)
-        except AttributeError:
-            print(f"Undefined event id {event_id} in state.bind")
 
 
-class Quote:
+class Quote(evt.EventHandler):
     """Interface for database class."""
     def __init__(self):
         self.database: Database = Database("test", True, True, True)
@@ -89,23 +45,28 @@ class Quote:
     def set_group_name(self, name):
         """Update the opened groups name."""
         self.database.groups.update(self.state.open_group, 2, name)
-        self.state.event(val.EVT_GROUP_NAME)
+        #self.state.event(val.EVT_GROUP_NAME)
+        self.notify(evt.GROUP_CHANGE, evt.Event(self, [name]))
 
     def delete_groups(self, items: list):
         """Delete groups with ids given in items list"""
         for i in items:
             if i == self.state.open_group:
                 self.state.open_group = None
-                self.state.event(val.EVT_SELECT_GROUP)
+                self.notify(evt.GROUP_SELECT, evt.Event(self, [i]))
+                #self.state.event(val.EVT_SELECT_GROUP)
 
             success = self.database.groups.delete(i)
             if not success:
                 print(f"Failed to delete group with id '{i}'.")
 
+        self.notify(evt.GROUP_CHANGE, evt.Event(self, []))
+
     def select_group(self, group_id):
         """Select a group and run the events bound to it."""
         self.state.open_group = group_id
-        self.state.event(val.EVT_SELECT_GROUP)
+        # self.state.event(val.EVT_SELECT_GROUP)
+        self.notify(evt.GROUP_SELECT, evt.Event(self, [group_id]))
 
     def get_group_name(self, group_id: int=None):
         """Return the name of the group with id, or the open group if id is None."""
@@ -131,7 +92,9 @@ class Quote:
         """Open the given quote."""
         self.state.open_quote = quote_id
         self.state.open_quote_label = label
-        self.state.event(val.EVT_OPEN_QUOTE)
+        # self.state.event(val.EVT_OPEN_QUOTE)
+        self.notify(evt.QUOTE_OPEN, evt.Event(self, [quote_id, label]))
+        self.notify(evt.GROUP_CHANGE, evt.Event(self, []))
 
     def new_quote(self, name: str=""):
         """Create a new quote to db."""
@@ -148,6 +111,7 @@ class Quote:
         foreign_key = self.state.open_quote
         if foreign_key:
             self.database.groups.insert([foreign_key, "Uusi Ryhmä"])
+            self.notify(evt.GROUP_CHANGE, evt.Event(self, []))
         else:
             print("No quote is opened where a new group can be added.")
 
@@ -172,7 +136,11 @@ class Quote:
     def n_cols(self, table_id):
         """Return the number of columns in the table."""
         table = self.select_table(table_id)
-        return table.get_num_columns()
+        try:
+            return table.get_num_columns()
+        except AttributeError:
+            print(f"Table id {table_id} is not a valid table.")
+            return 0
 
     def col_label(self, table_id, col):
         """Return the label for the column."""
@@ -189,12 +157,13 @@ class Quote:
         table = self.select_table(table_id)
         return table.update(primary_key, col, value)
 
-    def table_update(self, table_id, col):
+    def table_update(self, table_id, _col):
         """Handle the update of a value in a table.
 
         Process events related to it.
         """
-        table = self.select_table(table_id)
+        _table = self.select_table(table_id)
+
 
 if __name__ == '__main__':
     from build_test_db import build_test_db

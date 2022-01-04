@@ -2,26 +2,31 @@
 
 import wx
 
-import values as val
+# import values as val
+import event as evt
+from gui.table import Table
 
 
-class GroupPanel(wx.Panel):
+class GroupPanel(wx.Panel, evt.EventHandler):
     """Display data of opened group."""
     def __init__(self, parent, quote):
         super().__init__(parent)
 
         self.quote = quote
         self.title = wx.TextCtrl(self, size=(250, -1), style=wx.TE_PROCESS_ENTER)
+        self.materials_table = Table(self, quote)
 
         self.title.Bind(wx.EVT_TEXT_ENTER, self.on_title_enter)
 
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.Add(self.title)
+        sizer.Add(self.materials_table, 1, wx.EXPAND)
         self.SetSizer(sizer)
 
-        self.quote.state.bind(val.EVT_SELECT_GROUP, self.update)
+        # self.quote.state.bind(val.EVT_SELECT_GROUP, self.update)
+        self.bind(evt.GROUP_SELECT, self.update_group_name)
 
-    def update(self):
+    def update_group_name(self, _event):
         """Call when quote.open_group has changed to update display"""
         self.title.SetValue(self.quote.get_group_name())
 
