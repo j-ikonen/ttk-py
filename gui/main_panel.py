@@ -56,6 +56,7 @@ class QuoteDialog(wx.Dialog):
                          style=wx.RESIZE_BORDER)
 
         self.quote: Quote = quote
+        self.new = wx.Button(self, label="Uusi")
         self.search = wx.SearchCtrl(self)
         self.result: dv.DataViewListCtrl = dv.DataViewListCtrl(self, size=(-1, 350))
         line = wx.StaticLine(self, size=(20, -1), style=wx.LI_HORIZONTAL)
@@ -66,6 +67,7 @@ class QuoteDialog(wx.Dialog):
         btn_ok.SetDefault()
 
         self.Bind(wx.EVT_SEARCH, self.on_search, self.search)
+        self.Bind(wx.EVT_BUTTON, self.on_new, self.new)
 
         sizer = wx.BoxSizer(wx.VERTICAL)
         btn_sizer = wx.StdDialogButtonSizer()
@@ -74,6 +76,7 @@ class QuoteDialog(wx.Dialog):
         btn_sizer.AddButton(btn_no)
         btn_sizer.Realize()
 
+        sizer.Add(self.new, 0, wx.EXPAND)
         sizer.Add(self.search, 0, wx.EXPAND)
         sizer.Add(self.result, 1, wx.EXPAND)
         sizer.Add(line, 0, wx.EXPAND|wx.RIGHT|wx.TOP|wx.LEFT, 5)
@@ -84,16 +87,31 @@ class QuoteDialog(wx.Dialog):
 
     def on_search(self, evt):
         """Handle search event."""
-        self.result.DeleteAllItems()
-        quotes = self.quote.get_quotes(evt.GetString())
-        for row in quotes:
-            self.result.AppendItem([row[1]], row[0])
+        self.do_search(evt.GetString())
+
+    def on_new(self, _evt):
+        """Create a new quote."""
+        name = self.search.GetValue()
+        if name == "":
+            print("Can not create a quote with an empty name string.")
+            return
+        self.quote.new_quote(name)
+        self.do_search(name)
+        self.result.SelectRow(0)
 
     def get_selection(self):
         """Return the selected item as [id, name]."""
         item = self.result.GetSelection()
         row = self.result.ItemToRow(item)
         return [self.result.GetItemData(item), self.result.GetValue(row, 0)]
+
+    def do_search(self, name):
+        """Do a search and fill the result list."""
+        self.result.DeleteAllItems()
+        quotes = self.quote.get_quotes(name)
+        for row in quotes:
+            self.result.AppendItem([row[1]], row[0])
+
 
 if __name__ == '__main__':
     print("main_panel.py")

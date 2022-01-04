@@ -110,6 +110,33 @@ class Quote:
         self.state.open_quote_label = label
         self.state.event(val.EVT_OPEN_QUOTE)
 
+    def new_quote(self, name: str=""):
+        """Create a new quote to db."""
+        primary_key = self.database.offers.insert_empty()
+        if primary_key:
+            if self.database.offers.update(primary_key, val.COL_QUOTE_NAME, name):
+                return primary_key
+
+            self.database.offers.delete(primary_key)
+        return None
+
+    def select_table(self, table: int):
+        """Return the table class for given table id."""
+        if table is val.TBL_QUOTE:
+            return self.database.offers
+        elif table is val.TBL_GROUP:
+            return self.database.groups
+        elif table is val.TBL_PREDEF:
+            return self.database.group_predefs
+        elif table is val.TBL_MATERIAL:
+            return self.database.group_materials
+        elif table is val.TBL_PRODUCT:
+            return self.database.group_products
+        elif table is val.TBL_PART:
+            return self.database.group_parts
+        else:
+            return None
+
 
 if __name__ == '__main__':
     from build_test_db import build_test_db
