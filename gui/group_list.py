@@ -33,6 +33,7 @@ class GroupList(wx.Panel):
         self.SetSizer(sizer)
 
         self.quote.state.bind(val.EVT_GROUP_NAME, self.update)
+        self.quote.state.bind(val.EVT_OPEN_QUOTE, self.update)
         self.update()
 
     def on_context_menu(self, _evt):

@@ -32,14 +32,14 @@ class MainPanel(wx.Panel):
 
     def on_quote(self, _evt):
         """Open the quote control dialog."""
-        print("ONQUOTE")
+        # print("ONQUOTE")
         with QuoteDialog(self, self.quote) as dlg:
             if dlg.ShowModal() == wx.ID_OK:
-                print("DLG OK")
+                # print("DLG OK")
                 sel = dlg.get_selection()
                 self.quote.open_quote(sel[0], sel[1])
-            else:
-                print("DLG CANCEL")
+            # else:
+            #     print("DLG CANCEL")
 
     def on_open_quote(self):
         """Handle changing the button label for quote."""
