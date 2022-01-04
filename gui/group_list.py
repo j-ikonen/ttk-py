@@ -34,6 +34,8 @@ class GroupList(wx.Panel):
 
         self.quote.state.bind(val.EVT_GROUP_NAME, self.update)
         self.quote.state.bind(val.EVT_OPEN_QUOTE, self.update)
+        self.quote.state.bind(val.EVT_NEW_GROUP, self.update)
+        self.quote.state.bind(val.EVT_DELETE_GROUP, self.delete)
         self.update()
 
     def on_context_menu(self, _evt):
@@ -55,6 +57,10 @@ class GroupList(wx.Panel):
 #        print(f"ACTIVATE: {self.dvlc.GetItemData(evt.GetItem())}")
 
     def on_popup_del(self, _evt):
+        """Delete the selected items"""
+        self.delete()
+
+    def delete(self):
         """Delete the selected items"""
         self.quote.delete_groups(self.selected())
         self.update()

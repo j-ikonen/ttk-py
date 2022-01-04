@@ -2,23 +2,22 @@
 import wx
 
 from gui.main_panel import MainPanel
+from gui.frame import Frame
 from quote import Quote
-from frame import Frame
 
 
 def main():
     """Main app"""
 
+    quote = Quote()
+    # Open for testing.
+    quote.state.open_quote = 1
+    quote.state.open_group = 1
+
     app = wx.App()
 
-    # frame = wx.Frame(None, title="TTK-PY", size=(800,600))
     frame = Frame()
-    MainPanel(frame, Quote())
-
-    # Sizes.scale(frame)
-    # frame_size = (Sizes.frame_w, Sizes.frame_h)
-    # frame.SetClientSize(frame_size)
-
+    MainPanel(frame, quote)
 
     frame.Show()
     app.MainLoop()

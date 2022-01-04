@@ -11,7 +11,7 @@ from types import FunctionType
 import wx
 import wx.grid as wxg
 
-from grid_decimal_editor import GridDecimalEditor
+from gui.grid_decimal_editor import GridDecimalEditor
 from db.super import SQLTableBase
 from db.database import connect
 
@@ -22,7 +22,7 @@ class GridBase(wxg.GridTableBase):
 
         Setting self.data as None will show an empty noneditable grid.
         Either filter or foreign key must not be None.
-        To find everything in table with no foreign key set filter as 
+        To find everything in table with no foreign key set filter as
         an empty dictionary.
 
         Parameters

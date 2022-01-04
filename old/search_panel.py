@@ -1,290 +1,183 @@
-"""
-TODO
-    Figure how to simplify table modifying working together with OfferTables.
-    Fix copy of product.
-    Add search result limit and search result page browsing.
-    Add search result count.
-
-"""
-
+from grid import DbGrid
 import wx
 
-import table as tb
-from dbgrid import DbGrid
-
-
-TITLE = "Hae tietokannasta"
-BTN_SEARCH = "Etsi"
-BTN_AC = "Lisää hakuehto"
-BTN_DC = "Poista hakuehto"
-SEARCH_COND = "Hakuehdot"
-BORDER = 5
+from db.database import Database
+from sizes import Sizes
 
 
 class SearchPanel(wx.Panel):
-    def __init__(self, parent, db: tb.OfferTables, table: str="offers"):
+    def __init__(self, parent, db: Database, open_table: int=0, open_column: int=0):
         super().__init__(parent)
 
-        self.db: tb.OfferTables = db
-        self.table_labels = [
-            "Tarjoukset",
-            "Materiaalit",
-            "Tuotteet",
-            "Osat"
-        ]
-        self.tables = [
-            "offers",
-            "materials",
-            "products",
-            "parts"
-        ]
-        self.cond_labels = [[], [], [], []]
-        self.col_widths = [[], [], [], []]
-        self.cond_keys = [
-            tb.offers_keys,
-            tb.materials_keys,
-            tb.products_keys,
-            tb.parts_keys
-        ]
-        self.grids = []
-        self.child_grids = {}
-        self.columns = []
-        self.copy = []
-        for n in range(len(self.cond_keys)):
-            columns = self.db.get_columns(self.tables[n])
-            # print(columns)
-            self.columns.append(columns)
-            for key in self.cond_keys[n]:
-                for col in columns:
-                    if col[tb.KEY] == key:
-                        self.cond_labels[n].append(col[tb.LABEL])
-                        self.col_widths[n].append(col[tb.WIDTH])
-                        break
+        self.db = db
+        self.table_keys = db.get_table_keys()
+        self.table_labels = db.get_table_labels()
+        self.col_keys = []
+        self.col_labels = []
+        operators = ("like", "=", "!=", ">", ">=", "<", "<=")
+        self.selected_offer: int = None
+        self.selected_group: int = None
+        self.on_open_offer = []
+        self.on_copy_group = []
+        self.set_columns(open_table)
 
-        self.op_labels = ["like", "=", "!=", ">", "<", ">=", "<=", "!>", "!<"]
-        self.cond_sizers = []
+        self.choice_table = wx.Choice(self, choices=self.table_labels)
+        self.choice_column = wx.Choice(self, choices=self.col_labels)
+        self.choice_op = wx.Choice(self, choices=operators)
+        self.search = wx.SearchCtrl(self, size=(Sizes.search,-1))
+        self.btn_add_term = wx.Button(self, label="+", size=(Sizes.btn_s, -1))
+        self.btn_to_offer = wx.Button(self, label="Lisää tarjoukseen.")
+        self.grid = DbGrid(self, db.search_tables[self.table_keys[open_table]])
+        # ADD CHECKLISTBOX FOR DISPLAYING SEARCH TERMS
+        # ADD BUTTON TO REMOVE SELECTED SEARCH TERMS
 
-        title = wx.StaticText(self, label=TITLE)
-        self.choice_table = wx.Choice(self, size=(85, -1), choices=self.table_labels)
-        self.btn_add_condition = wx.Button(self, label=BTN_AC)
-        self.btn_search = wx.Button(self, label=BTN_SEARCH)
-        self.btn_show_cond = wx.Button(self, label=SEARCH_COND)
-        product_grid = None
-        for n, tablename in enumerate(self.tables):
-            grid = DbGrid(self, self.db, tablename, 0)
-            self.grids.append(grid)
-            if tablename == "products":
-                product_grid = grid
-                child_grid = DbGrid(self, self.db, "products.parts", 0)
-                self.child_grids[tablename] = child_grid
-                child_grid.set_foreign_key(["product_code"])
-                child_grid.Show(False)
-            if tablename == "offers":
-                grid.set_primary_key(["ID"])
-            elif tablename == "parts":
-                grid.set_primary_key(["part", "product_code"])
-            grid.Show(False)
+        self.choice_table.Select(open_table)
+        self.choice_column.Select(open_column)
+        self.choice_op.Select(0)
 
-        # self.lc_search = dv.DataViewListCtrl(self, style=dv.DV_ROW_LINES|dv.DV_MULTIPLE)
+        self.btn_add_term.SetToolTip("Lisää hakuehto.")
+        self.btn_to_offer.SetToolTip("Lisää valitut rivit aktiiviseen tarjoukseen tai ryhmään.")
+        self.choice_table.SetToolTip("Valitse etsittävä taulukko.")
+        self.choice_column.SetToolTip("Valitse etsittävä sarake.")
+        self.choice_op.SetToolTip("Valitse operaattori.")
+        self.search.SetToolTip("Syötä hakutermi.")
 
-        self.Bind(wx.EVT_CHOICE, self.on_table_choice, self.choice_table)
-        self.Bind(wx.EVT_BUTTON, self.on_add_condition, self.btn_add_condition)
-        self.Bind(wx.EVT_BUTTON, self.on_search, self.btn_search)
-        self.Bind(wx.EVT_BUTTON, self.on_show_conditions, self.btn_show_cond)
-        self.Bind(wx.grid.EVT_GRID_SELECT_CELL, self.on_product_selection, product_grid)
-        # self.Bind(dv.EVT_DATAVIEW_ITEM_CONTEXT_MENU, self.on_dv_menu, self.lc_search)
+        self.Bind(wx.EVT_CHOICE, self.on_choice_table, self.choice_table)
+        self.Bind(wx.EVT_CHOICE, self.on_choice_column, self.choice_column)
+        self.Bind(wx.EVT_SEARCH, self.on_search, self.search)
+        self.Bind(wx.EVT_BUTTON, self.on_add_term, self.btn_add_term)
+        self.Bind(wx.EVT_BUTTON, self.on_to_offer, self.btn_to_offer)
 
-        sizer_top = wx.BoxSizer(wx.HORIZONTAL)
-        # self.sizer_conditions = wx.StaticBoxSizer(wx.VERTICAL, self, SEARCH_COND)
         sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer_bar = wx.BoxSizer(wx.HORIZONTAL)
 
-        sizer_top.Add(title, 0, wx.RIGHT, BORDER)
-        sizer_top.Add(self.choice_table, 0, wx.RIGHT, BORDER)
-        sizer_top.Add(self.btn_search, 0, wx.RIGHT, BORDER)
-        sizer_top.Add(self.btn_add_condition, 0, wx.RIGHT, BORDER)
-        sizer_top.Add(self.btn_show_cond, 0, wx.RIGHT, BORDER)
+        sizer_bar.Add(self.choice_table, 0)
+        sizer_bar.Add(self.choice_column, 0)
+        sizer_bar.Add(self.choice_op, 0)
+        sizer_bar.Add(self.search, 0, wx.EXPAND)
+        sizer_bar.Add(self.btn_add_term, 0)
+        sizer_bar.Add(self.btn_to_offer, 0)
 
-        sizer.Add(sizer_top, 0, wx.ALL, BORDER)
-        for n in range(len(self.table_labels)):
-            box_sizer = wx.StaticBoxSizer(wx.VERTICAL, self, SEARCH_COND)
-            box_sizer.AddSpacer(BORDER)
-            self.cond_sizers.append(box_sizer)
-            self.add_condition(n)
-            sizer.Add(box_sizer, 0, wx.ALL, BORDER)
-        # sizer.Add(self.sizer_conditions, 0, wx.ALL, BORDER)
-
-        for grid in self.grids:
-            sizer.Add(grid, 1, wx.EXPAND|wx.ALL, BORDER)
-
-        for parent_key, grid in self.child_grids.items():
-            sizer.Add(grid, 1, wx.EXPAND|wx.ALL, BORDER)
-
+        sizer.Add(sizer_bar, 0, wx.EXPAND)
+        sizer.Add(self.grid, 1, wx.EXPAND)
+        
         self.SetSizer(sizer)
-        self.set_table_choice(self.tables.index(table))
-        self.Layout()
 
-    def update_depended_grids(self, grid):
-        """Update dependend grids."""
-        table = self.get_table()
-        sel = self.table_selection()
-        if table == "products":
-            self.child_grids["products"].GetTable().update_data_with_row_change(None)
-        self.grids[sel].GetTable().update_data_with_row_change(None)
-
-    def get_table(self):
-        """Return the selected table name or None if nothing is selected."""
-        sel = self.table_selection()
-        if sel == None:
-            return None
-        return self.tables[sel]
-
-    def add_condition(self, table: int):
-        """Add a condition to search condition box in table index."""
-        sizer_table = self.cond_sizers[table]
-        box: wx.StaticBox = sizer_table.GetStaticBox()
-
-        self.Freeze()   # Prevent flicker when creating the new windows.
-
-        btn_del = wx.Button(box, label=BTN_DC)
-        key_choice = wx.Choice(box, size=(120, -1), choices=self.cond_labels[table])
-        op_choice = wx.Choice(box, size=(45, -1), choices=self.op_labels)
-        text = wx.TextCtrl(box, size=(200, -1))
-
-        sizer_con = wx.BoxSizer(wx.HORIZONTAL)
-        sizer_con.Add(btn_del, 0, wx.RIGHT, BORDER)
-        sizer_con.Add(key_choice, 0, wx.RIGHT, BORDER)
-        sizer_con.Add(op_choice, 0, wx.RIGHT, BORDER)
-        sizer_con.Add(text, 0, wx.RIGHT, BORDER)
-        sizer_table.Add(sizer_con, 0, wx.LEFT|wx.BOTTOM|wx.RIGHT, BORDER)
-
-        op_choice.SetSelection(0)
-        key_choice.SetSelection(0)
-        self.Thaw()
-
-        self.Bind(wx.EVT_BUTTON, self.on_btn_del, btn_del)
-
-    def on_btn_del(self, evt):
-        """Delete the search condition row."""
-        sel = self.table_selection()
-        if sel is None:
-            return
-
-        sizer = evt.GetEventObject().GetContainingSizer()   # Get sizer that has button
-        sizer.Clear(True)   # Destroy the windows in the sizer.
-        self.cond_sizers[sel].Remove(sizer) # Destroy the now empty sizer.
-
-        self.Layout()
-
-    def on_product_selection(self, evt):
-        """Update the parts grid with selected products parts."""
-        sel = self.table_selection()
-        if sel is None:
-            return
-
-        parent_table = self.get_table()
-        parent_grid = self.grids[self.tables.index(parent_table)]
-        part_grid: DbGrid = self.child_grids[parent_table]
-        row = evt.GetRow()
-        fk_val = parent_grid.GetCellValue(row, 0)
-
-        part_grid.set_fk_value([fk_val])
-        evt.Skip()
-
-    def on_table_choice(self, evt):
-        """Change the panel to search from chosen table."""
-        sel = self.table_selection()
-        if sel is not None:
-            self.Freeze()
-            for n, sizer in enumerate(self.cond_sizers):
-                box: wx.StaticBox = sizer.GetStaticBox()
-                if n != sel:
-                    box.Show(False)
-                else:
-                    box.Show(True)
-
-            for n, grid in enumerate(self.grids):
-                if sel == n:
-                    grid.Show(True)
-                else:
-                    grid.Show(False)
-            
-            for grid in self.child_grids.values():
-                grid.Show(False)
-
-            if self.tables[sel] in self.child_grids:
-                self.child_grids[self.tables[sel]].Show(True)
-
-            self.Layout()
-            self.Thaw()
-
+        self.search.SetValue("%")
         self.on_search(None)
 
-    def on_add_condition(self, evt):
-        """Add a search condition line."""
-        sel = self.table_selection()
-        if sel is None:
-            return
-        self.add_condition(sel)
+
+    def set_columns(self, table_idx):
+        """Set the column keys and labels."""
+        columns = self.db.get_columns_search(self.table_keys[table_idx])
+        self.col_keys, self.col_labels = zip(*columns)
+
+    def selected_column(self) -> int:
+        """Return selected column index."""
+        choice = self.choice_column.GetSelection()
+        return choice if choice is not wx.NOT_FOUND else None
+
+    def selected_table(self) -> int:
+        """Return selected table index."""
+        choice = self.choice_table.GetSelection()
+        return choice if choice is not wx.NOT_FOUND else None
+    
+    def selected_operator(self) -> str:
+        return self.choice_op.GetStringSelection()
+
+    def on_choice_table(self, evt):
+        """Handle choice table event."""
+        # print("Selected table: {}".format(self.table_labels[evt.GetInt()]))
+        self.set_columns(evt.GetInt())
+        self.choice_column.Set(self.col_labels)
+        self.choice_column.SetSelection(0)
+        self.grid.Destroy()
+        self.grid = DbGrid(self, self.db.search_tables[self.table_keys[evt.GetInt()]])
+        self.GetSizer().Add(self.grid, 1, wx.EXPAND)
         self.Layout()
+
+    def on_choice_column(self, evt):
+        """Handle choice column event."""
+        # print("Selected column: {}".format(self.col_labels[evt.GetInt()]))
+        # print("choice_col")
+        evt.Skip()
 
     def on_search(self, evt):
-        """Search from database with conditions."""
-        sel = self.table_selection()
-        if sel is None:
-            return
+        """Handle search event.
+        
+        {key: [operator, value]}
+        """
+        # print("search")
+        # table = self.db.get_table(self.table_keys[self.selected_table()])
+        self.grid.set_filter({
+            self.selected_column(): [
+                self.selected_operator(),
+                self.search.GetValue()
+            ]
+        })
 
-        conditions = {}
-        sboxs = self.cond_sizers[sel]
-        n = 1
-        while n < sboxs.GetItemCount():
-            sizer = sboxs.GetItem(n).GetSizer()
-            n += 1
+    def on_add_term(self, evt):
+        """Handle add term event."""
+        print("add term")
 
-            choice_key: wx.Choice = sizer.GetItem(1).GetWindow()
-            choice_op: wx.Choice = sizer.GetItem(2).GetWindow()
-            text_ctrl: wx.TextCtrl = sizer.GetItem(3).GetWindow()
+    def select_offer(self, offer_id: int):
+        """Select the offer for copying groups from database."""
+        self.selected_offer = offer_id
 
-            key_idx = choice_key.GetSelection()
-            if key_idx != wx.NOT_FOUND:
-                key = self.cond_keys[sel][key_idx]
-                op = choice_op.GetStringSelection()
-                value = text_ctrl.GetValue()
-                if op == 'like':
-                    value = "%" + value + "%"
-                if key not in conditions:
-                    conditions[key] = [op, value]
+    def select_group(self, group_id: int):
+        """Select the group where copied materials, products and parts from database go."""
+        self.selected_group = group_id
 
-        self.grids[sel].GetTable().update_data_with_row_change(conditions)
+    def update(self):
+        """Update the panel content."""
+        self.grid.update_content()
 
-    def on_show_conditions(self, evt):
-        """Show or hide search conditions."""
-        sel = self.table_selection()
-        if sel is None:
-            return
-        box: wx.StaticBox = self.cond_sizers[sel].GetStaticBox()
-        box.Show(not box.IsShown())
-        self.Layout()
+    def on_to_offer(self, evt):
+        """Handle event for adding selected rows to the selected group or offer."""
+        selected_ids = [self.grid.get_rowid(row) for row in self.grid.GetSelectedRows()]
+        self.grid.ClearSelection()
+        key = self.table_keys[self.selected_table()]
 
-    def table_selection(self):
-        """Return the index of selected item in table choice window."""
-        selection = self.choice_table.GetSelection()
-        if selection == wx.NOT_FOUND:
-            return None
+        if key == "offers":
+            for offer_id in selected_ids:
+                self.db.open_offer(offer_id)
+                for fn in self.on_open_offer:
+                    fn()
+
+        elif key == "groups":
+            for group_id in selected_ids:
+                self.db.copy_group(group_id)
+                for fn in self.on_copy_group:
+                    fn()
+
         else:
-            return selection
+            target_table = self.db.get_cattable(key)
+            for rowid in selected_ids:
+                target_table.from_catalogue(rowid, self.selected_group)
 
-    def set_table_choice(self, table_idx):
-        """Set the index of selected item in table choice window."""
-        self.choice_table.SetSelection(table_idx)
-        self.on_table_choice(None)
+    def get_db_table(self):
+        """Return the active database table."""
+        return self.db.search_tables[self.table_keys[self.selected_table()]]
+
+    def register_on_open_offer(self, fn):
+        """Register a function to run when an offer is opened."""
+        self.on_open_offer.append(fn)
+
+    def register_on_copy_group(self, fn):
+        """Register a function to run when a group is copied."""
+        self.on_copy_group.append(fn)
 
 
 if __name__ == '__main__':
     app = wx.App()
 
-    frame = wx.Frame(None, size=(1500, 800))
-    db = tb.OfferTables()
-    panel = SearchPanel(frame, db)
-    frame.Show()
+    database = Database(print_err=True)
+    frame = wx.Frame(None, title="SearchPanelTest")
+    panel = SearchPanel(frame, database)
 
+    Sizes.scale(frame)
+    frame_size = (Sizes.frame_w, Sizes.frame_h)
+    frame.SetClientSize(frame_size)
+
+    frame.Show()
     app.MainLoop()

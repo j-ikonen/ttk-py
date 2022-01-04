@@ -16,6 +16,8 @@ class AppState:
         self.ch_group_name_events = []
         self.delete_group_events = []
         self.open_quote_events = []
+        self.new_group_events = []
+        self.table_update_events = []
 
     def select_event_list(self, event_id):
         """Return the list of events or None."""
@@ -23,17 +25,22 @@ class AppState:
         if event_id is val.EVT_SELECT_GROUP:
             return self.select_group_events
 
-        elif event_id is val.EVT_GROUP_NAME:
+        if event_id is val.EVT_GROUP_NAME:
             return self.ch_group_name_events
 
-        elif event_id is val.EVT_DELETE_GROUP:
+        if event_id is val.EVT_DELETE_GROUP:
             return self.delete_group_events
 
-        elif event_id is val.EVT_OPEN_QUOTE:
+        if event_id is val.EVT_OPEN_QUOTE:
             return self.open_quote_events
 
-        else:
-            return None
+        if event_id is val.EVT_NEW_GROUP:
+            return self.new_group_events
+
+        if event_id is val.EVT_TABLE_UPDATE:
+            return self.new_group_events
+
+        return None
 
     def event(self, event_id):
         """Do the events bound with event_id."""
@@ -87,6 +94,10 @@ class Quote:
     def delete_groups(self, items: list):
         """Delete groups with ids given in items list"""
         for i in items:
+            if i == self.state.open_group:
+                self.state.open_group = None
+                self.state.event(val.EVT_SELECT_GROUP)
+
             success = self.database.groups.delete(i)
             if not success:
                 print(f"Failed to delete group with id '{i}'.")
@@ -100,8 +111,15 @@ class Quote:
         """Return the name of the group with id, or the open group if id is None."""
         if group_id is None:
             group_id = self.state.open_group
+        if group_id is None:
+            return ""
+
         row = self.database.groups.select(filt={0: ["=", group_id]})
-        return row[0][2]
+        try:
+            return row[0][2]
+        except IndexError:
+            print(f"Could not find the group name with id {group_id}")
+            return ""
 
     def get_quotes(self, search_term):
         """Return a list of [quote_id, quote_name] matching the search term."""
@@ -125,23 +143,58 @@ class Quote:
             self.database.offers.delete(primary_key)
         return None
 
+    def new_group(self):
+        """Create a new group to the opened quote."""
+        foreign_key = self.state.open_quote
+        if foreign_key:
+            self.database.groups.insert([foreign_key, "Uusi Ryhmä"])
+        else:
+            print("No quote is opened where a new group can be added.")
+
     def select_table(self, table: int):
         """Return the table class for given table id."""
+        db_tb = None
         if table is val.TBL_QUOTE:
-            return self.database.offers
+            db_tb = self.database.offers
         elif table is val.TBL_GROUP:
-            return self.database.groups
+            db_tb = self.database.groups
         elif table is val.TBL_PREDEF:
-            return self.database.group_predefs
+            db_tb = self.database.group_predefs
         elif table is val.TBL_MATERIAL:
-            return self.database.group_materials
+            db_tb = self.database.group_materials
         elif table is val.TBL_PRODUCT:
-            return self.database.group_products
+            db_tb = self.database.group_products
         elif table is val.TBL_PART:
-            return self.database.group_parts
-        else:
-            return None
+            db_tb = self.database.group_parts
 
+        return db_tb
+
+    def n_cols(self, table_id):
+        """Return the number of columns in the table."""
+        table = self.select_table(table_id)
+        return table.get_num_columns()
+
+    def col_label(self, table_id, col):
+        """Return the label for the column."""
+        table = self.select_table(table_id)
+        return table.get_column_label(col)
+
+    def col_type(self, table_id, col):
+        """Return the label for the column."""
+        table = self.select_table(table_id)
+        return table.get_column_type(col)
+
+    def set_cell(self, table_id, primary_key, col, value):
+        """Set the value of a cell in table."""
+        table = self.select_table(table_id)
+        return table.update(primary_key, col, value)
+
+    def table_update(self, table_id, col):
+        """Handle the update of a value in a table.
+
+        Process events related to it.
+        """
+        table = self.select_table(table_id)
 
 if __name__ == '__main__':
     from build_test_db import build_test_db
