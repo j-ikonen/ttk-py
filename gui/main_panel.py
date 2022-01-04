@@ -18,28 +18,38 @@ class MainPanel(wx.Panel):
         self.group_list = GroupList(self, quote)
         self.group_panel = GroupPanel(self, quote)
         self.quote_btn = wx.Button(self, label="Valitse tarjous")
+        # self.group_label = wx.StaticText(self, label="Ryhmät:")
+        self.new_group_btn = wx.Button(self, label="Uusi")
+        self.del_group_btn = wx.Button(self, label="Poista")
 
         self.Bind(wx.EVT_BUTTON, self.on_quote, self.quote_btn)
         self.quote.state.bind(val.EVT_OPEN_QUOTE, self.on_open_quote)
 
         sizer = wx.BoxSizer(wx.HORIZONTAL)
         sizer_left = wx.BoxSizer(wx.VERTICAL)
+        sizer_group_btns = wx.BoxSizer(wx.HORIZONTAL)
+
+        sizer_group_btns.Add(self.del_group_btn, 1, wx.EXPAND)
+        sizer_group_btns.Add(self.new_group_btn, 1, wx.EXPAND)
+
         sizer_left.Add(self.quote_btn, 0, wx.EXPAND)
+        # sizer_left.Add(self.group_label, 0, wx.EXPAND|wx.ALL, 5)
         sizer_left.Add(self.group_list, 1, wx.EXPAND)
+        sizer_left.Add(sizer_group_btns, 0, wx.EXPAND)
+
         sizer.Add(sizer_left, 0, wx.EXPAND)
         sizer.Add(self.group_panel, 0, wx.EXPAND)
         self.SetSizer(sizer)
 
     def on_quote(self, _evt):
         """Open the quote control dialog."""
-        # print("ONQUOTE")
         with QuoteDialog(self, self.quote) as dlg:
             if dlg.ShowModal() == wx.ID_OK:
-                # print("DLG OK")
                 sel = dlg.get_selection()
-                self.quote.open_quote(sel[0], sel[1])
-            # else:
-            #     print("DLG CANCEL")
+                if sel:
+                    self.quote.open_quote(sel[0], sel[1])
+                else:
+                    print("No quote selected.")
 
     def on_open_quote(self):
         """Handle changing the button label for quote."""
@@ -56,7 +66,7 @@ class QuoteDialog(wx.Dialog):
                          style=wx.RESIZE_BORDER)
 
         self.quote: Quote = quote
-        self.new = wx.Button(self, label="Uusi")
+        self.new_quote_btn = wx.Button(self, label="Uusi")
         self.search = wx.SearchCtrl(self)
         self.result: dv.DataViewListCtrl = dv.DataViewListCtrl(self, size=(-1, 350))
         line = wx.StaticLine(self, size=(20, -1), style=wx.LI_HORIZONTAL)
@@ -67,7 +77,7 @@ class QuoteDialog(wx.Dialog):
         btn_ok.SetDefault()
 
         self.Bind(wx.EVT_SEARCH, self.on_search, self.search)
-        self.Bind(wx.EVT_BUTTON, self.on_new, self.new)
+        self.Bind(wx.EVT_BUTTON, self.on_new, self.new_quote_btn)
 
         sizer = wx.BoxSizer(wx.VERTICAL)
         btn_sizer = wx.StdDialogButtonSizer()
@@ -76,7 +86,7 @@ class QuoteDialog(wx.Dialog):
         btn_sizer.AddButton(btn_no)
         btn_sizer.Realize()
 
-        sizer.Add(self.new, 0, wx.EXPAND)
+        sizer.Add(self.new_quote_btn, 0, wx.EXPAND)
         sizer.Add(self.search, 0, wx.EXPAND)
         sizer.Add(self.result, 1, wx.EXPAND)
         sizer.Add(line, 0, wx.EXPAND|wx.RIGHT|wx.TOP|wx.LEFT, 5)
@@ -102,8 +112,10 @@ class QuoteDialog(wx.Dialog):
     def get_selection(self):
         """Return the selected item as [id, name]."""
         item = self.result.GetSelection()
-        row = self.result.ItemToRow(item)
-        return [self.result.GetItemData(item), self.result.GetValue(row, 0)]
+        if item.IsOk():
+            row = self.result.ItemToRow(item)
+            return [self.result.GetItemData(item), self.result.GetValue(row, 0)]
+        return None
 
     def do_search(self, name):
         """Do a search and fill the result list."""

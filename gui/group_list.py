@@ -21,8 +21,8 @@ class GroupList(wx.Panel):
         super().__init__(parent, size=(170, -1))
 
         self.quote: Quote = quote
-        self.dvlc = dv.DataViewListCtrl(self, style=dv.DV_MULTIPLE)
-        self.dvlc.AppendTextColumn("Ryhmä", width=170,
+        self.dvlc = dv.DataViewListCtrl(self, style=dv.DV_MULTIPLE)#|dv.DV_NO_HEADER)
+        self.dvlc.AppendTextColumn("Ryhmät", width=170,
             mode=dv.DATAVIEW_CELL_ACTIVATABLE)
 
         self.dvlc.Bind(dv.EVT_DATAVIEW_ITEM_CONTEXT_MENU, self.on_context_menu)

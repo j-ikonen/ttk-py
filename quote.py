@@ -62,6 +62,8 @@ class Quote:
     def get_group_list(self, quote_id: int=None):
         """Return a list of groups in quote as [[group_id, name], ...]
 
+        If no quote_id is given and no quote is opened, return an empty list.
+
         Parameters
         ----------
         quote_id : int, optional
@@ -70,6 +72,9 @@ class Quote:
         """
         if quote_id is None:
             quote_id = self.state.open_quote
+
+        if quote_id is None:
+            return []
 
         values = self.database.groups.select(quote_id)
         return [[row[0], row[2]] for row in values]
