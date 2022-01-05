@@ -115,6 +115,16 @@ class Quote(evt.EventHandler):
         else:
             print("No quote is opened where a new group can be added.")
 
+    def new_table_row(self, table):
+        """Insert a new row to a table."""
+        group_id = self.state.open_group
+        if group_id:
+            primary_key = self.select_table(table).insert_empty(group_id)
+            if primary_key:
+                self.notify(evt.TABLE_ROW,
+                            evt.Event(self, [table, group_id, primary_key]))
+
+
     def select_table(self, table: int):
         """Return the table class for given table id."""
         db_tb = None
@@ -137,7 +147,9 @@ class Quote(evt.EventHandler):
         """Return the number of columns in the table."""
         table = self.select_table(table_id)
         try:
-            return table.get_num_columns()
+            i = table.get_num_columns()
+            print(f"NCOLS: {i}")
+            return i
         except AttributeError:
             print(f"Table id {table_id} is not a valid table.")
             return 0
@@ -152,10 +164,17 @@ class Quote(evt.EventHandler):
         table = self.select_table(table_id)
         return table.get_column_type(col)
 
-    def set_cell(self, table_id, primary_key, col, value):
-        """Set the value of a cell in table."""
+    def set_cell(self, table_id, primary_key, col, value) -> bool:
+        """Set the value of a cell in table.
+
+        Return True on success.
+        """
         table = self.select_table(table_id)
-        return table.update(primary_key, col, value)
+        success = table.update(primary_key, col, value)
+        if success:
+            self.notify(evt.TABLE_CELL, evt.Event(self, [
+                table_id, primary_key, col, value]))
+        return success
 
     def table_update(self, table_id, _col):
         """Handle the update of a value in a table.
@@ -163,6 +182,10 @@ class Quote(evt.EventHandler):
         Process events related to it.
         """
         _table = self.select_table(table_id)
+
+    def undo_barrier(self, table, group_id):
+        """Create an undo barrier."""
+        self.select_table(table).undo_barrier(group_id)
 
 
 if __name__ == '__main__':

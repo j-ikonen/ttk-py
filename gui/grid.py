@@ -295,7 +295,7 @@ class DbGrid(wxg.Grid):
         self.Bind(wxg.EVT_GRID_SELECT_CELL, self.on_select_cell) # Run child set fk
         self.Bind(wxg.EVT_GRID_COL_SIZE, self.on_col_size) # Save size
         self.Bind(wxg.EVT_GRID_COL_MOVE, self.on_col_move) # Save order
-        
+
         # Event that can be used to veto edit before showing editor.
         # self.Bind(wxg.EVT_GRID_EDITOR_SHOWN, self.on_show_editor)
 

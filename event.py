@@ -5,7 +5,8 @@ GROUP_CHANGE = 101  # []
 
 QUOTE_OPEN = 200    # [primary_key, name]
 
-TABLE_CELL = 300    # [primary_key, row, col, value]
+TABLE_CELL = 300    # [table_id, primary_key, col, value]
+TABLE_ROW = 301     # [table_id, foreign_key, primary_key]
 
 
 class EventHandler:
